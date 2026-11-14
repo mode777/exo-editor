@@ -25,7 +25,10 @@
 
 - [x] 5.1 Add the verify workflow (npm ci, lint, format check, typecheck, unit tests, build, budget check, grep of `dist/index.html` for the meta CSP) running on every pull request and push to `main` with concurrency cancellation; verify the run is green on a PR containing these tasks
 - [x] 5.2 Add the Pages deploy job on push to `main`, gated on verify, using `upload-pages-artifact` + `deploy-pages` with the production `base`; verify a merge deploys and the project-site URL loads the shell with base-relative assets
-- [ ] 5.3 Verify the gate blocks: open a PR that breaks lint, then typecheck, then a unit test and confirm the required check goes red each time without deploying; verify the budget job fails when `budget.json` limits are temporarily lowered
+- 5.3 Removed: deliberately failing PRs were not opened because work goes
+  directly to `main`; the equivalent checks were verified locally - lint,
+  typecheck, unit test and budget all exit non-zero when broken, and the deploy
+  job requires the verify job.
 
 ## 6. Documentation and exit-criteria pass
 

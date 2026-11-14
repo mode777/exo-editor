@@ -75,9 +75,9 @@ close the decisions that would otherwise be rediscovered mid-implementation.
 
 ## Layer 1 - `scaffold-shell-app`
 
-**Status:** implemented and deployed at `https://mode777.github.io/exo-editor/`;
-the verify and Pages workflows are green and the exit criteria were demonstrated
-against the deployed site. The OpenSpec change is awaiting archive.
+**Status:** complete - change archived; deployed at
+`https://mode777.github.io/exo-editor/`; the verify and Pages workflows are green
+and the exit criteria were demonstrated against the deployed site.
 
 **Goal:** a deployed, empty editor shell with the same verification discipline the
 workbench kit already has. This is the walking skeleton.
