@@ -5,10 +5,11 @@ product; editors are plugins.** Plugins are untrusted cross-origin iframes; the
 shell owns the workbench, workspace access and consent.
 
 **Current state:** layers 0 and 1 are complete. Layer 2 (workspace provider) is
-implemented and awaiting its deployed verification. The contracts are ratified,
-and the shell app (`apps/shell`) builds, tests and deploys to GitHub Pages through
-CI. Do not scaffold code ahead of the [roadmap](./ROADMAP.md) layer you were
-asked to work on, and do not invent commands or scripts that do not exist yet.
+verified against the deployed shell and ready to archive; layer 3 is next. The
+contracts are ratified, and the shell app (`apps/shell`) builds, tests and
+deploys to GitHub Pages through CI. Do not scaffold code ahead of the
+[roadmap](./ROADMAP.md) layer you were asked to work on, and do not invent
+commands or scripts that do not exist yet.
 
 ## Read this first
 

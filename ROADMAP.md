@@ -1,9 +1,9 @@
 # Exo Editor - Roadmap
 
-Status: layer 0 is complete and its contracts are ratified. Layer 2 is
-implemented and awaiting its deployed verification; layer 1 is deployed. Layers
-3-10 are sequenced behind it. Each layer is one OpenSpec change. A layer is done
-when its change is archived and its exit criteria are demonstrated against the
+Status: layer 0 is complete and its contracts are ratified. Layer 2 is verified
+against the deployed shell and ready to archive; layer 1 is deployed. Layers 3-10
+are sequenced behind it. Each layer is one OpenSpec change. A layer is done when
+its change is archived and its exit criteria are demonstrated against the
 deployed shell - never from a local dev server or local build.
 
 ## Sequencing rationale
@@ -116,6 +116,11 @@ workbench kit already has. This is the walking skeleton.
 ---
 
 ## Layer 2 - `workspace-provider`
+
+**Status:** verified against the deployed shell on 2026-11-14 with Chromium and
+Firefox; the change is ready to archive. The native directory-picker dialog is
+the only browser interaction not drivable by headless automation; the Chromium
+workspace was restored from a real File System Access handle instead.
 
 **Goal:** replace the mock file tree with real files the user owns.
 
