@@ -4,10 +4,9 @@ Exo Editor is a frontend-only, serverless editor shell. **The shell is the
 product; editors are plugins.** Plugins are untrusted cross-origin iframes; the
 shell owns the workbench, workspace access and consent.
 
-**Current state:** layers 0 and 1 are complete. Layer 2 (workspace provider) is
-verified against the deployed shell and ready to archive; layer 3 is next. The
-contracts are ratified, and the shell app (`apps/shell`) builds, tests and
-deploys to GitHub Pages through CI. Do not scaffold code ahead of the
+**Current state:** layers 0-3 are complete and archived. Layer 4 (plugin host) is
+next. The contracts are ratified, and the shell app (`apps/shell`) builds, tests
+and deploys to GitHub Pages through CI. Do not scaffold code ahead of the
 [roadmap](./ROADMAP.md) layer you were asked to work on, and do not invent
 commands or scripts that do not exist yet.
 
