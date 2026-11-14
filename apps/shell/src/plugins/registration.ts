@@ -481,9 +481,9 @@ export class RegistrationSession {
     this.phase = 'complete'
     this.send('shell/register-ack', ack)
     this.outcomeSent = true
-    this.options.onOutcome({ kind: 'active', editors, ack })
     this.closeTimer = this.setTimeoutImpl(() => {
       this.close()
     }, ACK_CLOSE_DELAY_MS)
+    this.options.onOutcome({ kind: 'active', editors, ack })
   }
 }
