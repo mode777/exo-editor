@@ -1,9 +1,11 @@
 # Exo Editor - Roadmap
 
-Status: layers 0-3 are complete and archived. Layer 4 (`plugin-host`) is next.
-Each layer is one OpenSpec change. A layer is done when its change is archived
-and its exit criteria are demonstrated against the deployed shell - never from a
-local dev server or local build.
+Status: layers 0-4 are complete and archived. Layer 5 (`plugin-file-editors`) is
+next. The parallel Stratofold provider track (P1) is documented and blocked on the
+client's npm publication; it does not gate the numbered layers. Each layer is one
+OpenSpec change. A layer is done when its change is archived and its exit criteria
+are demonstrated against the deployed shell - never from a local dev server or
+local build.
 
 ## Sequencing rationale
 
@@ -27,6 +29,12 @@ Two rules govern the sequence:
    behaviour the contract does not cover, the contract changes first, in that
    layer's change, with the implementation.
 
+The numbered layers are the plugin/core critical path. Provider extensions are
+orthogonal: they may start once their dependencies are archived, but they never
+gate a numbered layer. The first is the Stratofold provider track (P1), which can
+start after layer 3 and should land after layer 4 because both touch the runtime
+composition.
+
 | # | Change | Outcome | Depends on |
 | --- | --- | --- | --- |
 | 0 | `define-core-contracts` | Contracts ratified as OpenSpec specs | - |
@@ -40,6 +48,62 @@ Two rules govern the sequence:
 | 8 | `plugin-sdk-template` | Typed SDK, plugin template, compatibility policy | 4, 5, 6 |
 | 9 | `monaco-code-plugin` | Reference plugin, separate deploy, no shell changes | 8 |
 | 10 | `release-readiness` | Security review, a11y, browser matrix, author docs | 9 |
+
+---
+
+## Provider track (parallel, non-blocking)
+
+| # | Change | Outcome | Depends on | Status |
+| --- | --- | --- | --- | --- |
+| P1 | `add-stratofold-provider` | Stratofold vdir as a workspace: connect/restore, browse, read/write/save, viewer/public read-only | 0, 2, 3 | blocked on npm |
+
+P1 is not part of the numbered v1 critical path. It can start after layer 3 and
+may land alongside layers 4-10, but it never gates a numbered layer. Prefer
+landing after layer 4 because both touch `WorkspaceRuntime` and the app
+composition; the adapter spike can start earlier. See
+[`docs/providers/stratofold.md`](./docs/providers/stratofold.md) for the contract
+mapping, upstream status, residual gaps and the npm blocker.
+
+**Goal:** prove the provider abstraction with a real remote store and give the
+shell a workspace path that does not depend on the File System Access API.
+
+**Deliverables**
+
+- `StratofoldWorkspaceProvider` implementing the existing
+  `WorkspaceProvider`/`WorkspaceHandle`; no contract change.
+- Path mapping, capabilities from the token scope/role, version and mtime
+  mapping, error mapping, `stat`-based pre-checks for kind/existence/ifVersion,
+  and post-write/post-move stat.
+- Runtime provider registry plus a connect dialog (server + token, discover the
+  vdir and role through `tokenInfo()`), persisted connection config and restore;
+  viewer and public workspaces stay read-only.
+- Credential storage with explicit opt-in. No token in URLs, bundles, logs or
+  plugin messages.
+- Conformance and edge tests; verification against the deployed shell.
+
+**Exit criteria**
+
+- `@stratofold/client` installs from the registry in a clean `npm ci`, or a
+  vendoring exception is recorded in the provider document and this roadmap.
+- `runProviderConformance` passes for the adapter; the documented edge tests
+  (same-size rapid save, rename onto an existing file, non-recursive remove,
+  abort/dispose, case-insensitive reserved path, directory read) pass.
+- Against the deployed shell: connect, browse, open a text file, edit/save,
+  reload and restore; a viewer/public workspace is read-only; revoking the token
+  surfaces an explicit reconnect state; no token appears in network URLs or the
+  bundle.
+- Switching workspaces leaves no session state, and plugin-originated access to
+  `/exo.json` and `/.exo/**` is denied.
+- The normal `verify` gate, bundle budget and CSP checks pass.
+
+**Blocker**
+
+- `@stratofold/client` 0.11.0 is not on npm (404 as of 2026-11-14). Publish and
+  verify it, or record a vendoring decision, before the change exits. The
+  proposal and adapter spike may proceed while blocked.
+
+**Not in this track:** multi-root workspaces, sync/offline, file watching,
+remote providers beyond Stratofold, OAuth or token brokering.
 
 ---
 
@@ -185,6 +249,11 @@ before anything executes.
 ---
 
 ## Layer 4 - `plugin-host`
+
+**Status:** complete - change archived on 2026-11-14 after deployed verification
+with Chrome for Testing 131.0.6778.264. Cross-origin registration on
+`localhost:5174`, same-origin sandbox and storage, deny, widened re-consent, CORS,
+ready timeout, duplicate identity, live add/remove and workspace teardown passed.
 
 **Goal:** load an untrusted plugin's contributions with explicit consent and a
 bounded lifecycle. This is the security-critical layer.
@@ -404,7 +473,11 @@ any third-party plugin.
 
 ## Deferred beyond v1
 
-Multi-root workspaces, additional providers (OPFS, remote, read-only bundles),
-background plugin frames, plugin-to-plugin messaging, marketplace/updates,
-signature verification, LSP, terminal, Git, collaboration, Firefox/Safari folder
-support.
+Multi-root workspaces, additional providers beyond the P1 Stratofold track
+(OPFS, other remote stores, read-only bundles), background plugin frames,
+plugin-to-plugin messaging, marketplace/updates, signature verification, LSP,
+terminal, Git, collaboration, Firefox/Safari folder support.
+
+The P1 Stratofold provider is a parallel track that can start after layer 3 and
+land independently of the numbered layers. It is not part of the v1 release gate
+unless the roadmap and `docs/vision.md` are explicitly re-scoped.

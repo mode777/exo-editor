@@ -12,11 +12,13 @@ content is a plugin: a cross-origin iframe talking to the shell over a versioned
 
 ## Status
 
-Layer 0 and layer 1 are complete: the five contracts are ratified OpenSpec specs
-and the shell is deployed at `https://mode777.github.io/exo-editor/` through the
-GitHub Pages workflow. Layer 2 (workspace provider) is verified against the
-deployed shell and ready to archive. Verification is always against the deployed
-URL, never a local dev server.
+Layers 0-4 are complete and archived: the five contracts are ratified OpenSpec
+specs, the shell is deployed at `https://mode777.github.io/exo-editor/` through
+the GitHub Pages workflow, and the workspace provider, plugin-config and
+plugin-host layers are verified against it. Layer 5 (plugin file editors) is next.
+The parallel Stratofold provider track (P1) is documented and blocked on its
+client's npm publication; it does not gate the numbered layers. Verification is
+always against the deployed URL, never a local dev server.
 
 ## How it fits together
 
@@ -45,6 +47,7 @@ URL, never a local dev server.
 | [Protocol contract](./docs/contracts/plugin-protocol.md) | Envelope, handshake, registration, handler sessions |
 | [Events contract](./docs/contracts/events.md) | Topics, ordering, limits |
 | [Manifest schema](./schema/exo.schema.json) | Shared JSON Schema for `exo.json` and `exo-manifest.json` |
+| [Stratofold provider](./docs/providers/stratofold.md) | Remote-provider track, upstream status, npm blocker |
 | [Roadmap](./ROADMAP.md) | Layered OpenSpec changes and exit criteria |
 | [Agent guide](./AGENTS.md) | Instructions for coding agents working here |
 

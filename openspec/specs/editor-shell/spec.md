@@ -25,17 +25,20 @@ push-triggered GitHub Pages workflow.
 
 ### Requirement: Shell content security policy
 
-The deployed shell SHALL apply a CSP to its document with `frame-src https:`,
-`connect-src 'self' https:`, `script-src 'self'` and no `unsafe-eval` or
-`unsafe-inline` script sources, so plugin code cannot execute in the shell's
-realm and no privileged evaluation path exists. Static hosting cannot set
-response headers, so the policy SHALL be embedded in the shell's HTML document
-and SHALL be present in the deployed build.
+The deployed shell SHALL apply a CSP with
+`frame-src https: http://localhost:*`,
+`connect-src 'self' https: http://localhost:*` and `script-src 'self'`, and no
+`unsafe-eval` or `unsafe-inline` script sources. The localhost sources exist only
+for the manifest contract's localhost rule; no other plain-HTTP origin is
+allowed. The policy SHALL be embedded in the HTML document and present in the
+deployed build.
 
 #### Scenario: Policy is embedded in the deployed document
 
 - **WHEN** the deployed shell's HTML document is fetched
-- **THEN** it carries a content security policy with `frame-src https:`, `connect-src 'self' https:` and `script-src 'self'`, and no `unsafe-eval` or `unsafe-inline` script source
+- **THEN** it carries a content security policy with `frame-src https: http://localhost:*`,
+  `connect-src 'self' https: http://localhost:*` and `script-src 'self'`, and no
+  `unsafe-eval` or `unsafe-inline` script source
 
 #### Scenario: Plugin code stays in its frame
 
@@ -47,6 +50,16 @@ and SHALL be present in the deployed build.
 - **WHEN** the shell handles plugin-supplied data
 - **THEN** it does not pass it to `eval`, `new Function` or an equivalent dynamic
   evaluation API
+
+#### Scenario: Localhost manifest is usable
+
+- **WHEN** a declaration points at `http://localhost:5174/exo-manifest.json`
+- **THEN** the deployed shell can fetch the manifest and frame the entry page after consent
+
+#### Scenario: Other plain HTTP stays blocked
+
+- **WHEN** a manifest or entry uses `http://` on a host other than `localhost`
+- **THEN** the shell rejects it and the CSP does not allow the request
 
 ### Requirement: Shell composes the workbench kit
 
@@ -539,7 +552,7 @@ configuration store and the workspace session.
 #### Scenario: Adding does not load code
 
 - **WHEN** the user adds an entry
-- **THEN** the shell makes no request to the manifest URL, creates no frame, and shows no consent prompt
+- **THEN** the host fetches the manifest but mounts no frame or executes plugin code until consent is granted
 
 ### Requirement: Configuration states are explicit
 
@@ -620,3 +633,56 @@ invalid JSON.
 
 - **WHEN** a plugin requests a read or write of `/exo.json`
 - **THEN** the session denies it with `permission-denied` and the settings surface is the only writer
+
+### Requirement: Plugin runtime status, consent and log surface
+
+The Plugins section SHALL show, for each declared entry, the host status,
+manifest name, version, publisher and exact origin when known, the consent state
+with review or revoke actions, and the registered editor labels, and SHALL show a
+workspace-scoped log of host phases and error codes. Status and log SHALL reset
+on a workspace switch and SHALL never include file content.
+
+#### Scenario: Awaiting consent is visible
+
+- **WHEN** a valid manifest has no matching consent record
+- **THEN** the entry shows `awaiting-consent` and a Review action that opens the consent dialog
+
+#### Scenario: Active plugin shows its editors
+
+- **WHEN** a plugin completes registration with two editor contributions
+- **THEN** the entry shows `active`, its manifest name, version, publisher, exact origin and both editor labels
+
+#### Scenario: Failure shows code and phase
+
+- **WHEN** a manifest fetch or registration phase fails
+- **THEN** the entry shows `failed`, the stable error code and the phase that failed
+
+#### Scenario: Denied is visible without an automatic retry
+
+- **WHEN** the user denied consent in this session
+- **THEN** the entry shows `denied` and the dialog does not reopen by itself
+
+#### Scenario: Revoke tears down and can be reviewed
+
+- **WHEN** the user revokes consent for an active plugin
+- **THEN** its registrations and frames disappear, the entry shows `awaiting-consent`, and Review can reopen the dialog
+
+#### Scenario: Log entries are inspectable
+
+- **WHEN** host events have occurred for the workspace
+- **THEN** the section lists their time, plugin id or manifest URL, origin, phase and code
+
+#### Scenario: Workspace switch resets the surface
+
+- **WHEN** the user switches workspaces
+- **THEN** no host status, consent action or log entry from the previous workspace remains
+
+#### Scenario: No workspace
+
+- **WHEN** no workspace is open
+- **THEN** the section shows no host status or log and explains that a folder is required
+
+#### Scenario: No file content is displayed
+
+- **WHEN** any host status or log entry is rendered
+- **THEN** it contains no file text, bytes, manifest response body or path outside the plugin's declared entries
