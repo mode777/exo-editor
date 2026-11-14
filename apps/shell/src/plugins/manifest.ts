@@ -590,8 +590,10 @@ export async function loadManifest(
   const fetchImpl = options.fetchImpl ?? fetch
   const timeoutMs = options.timeoutMs ?? MANIFEST_TIMEOUT_MS
   const maxBytes = options.maxBytes ?? MANIFEST_MAX_BYTES
-  const setTimeoutImpl = options.setTimeoutImpl ?? setTimeout
-  const clearTimeoutImpl = options.clearTimeoutImpl ?? clearTimeout
+  const setTimeoutImpl =
+    options.setTimeoutImpl ?? (setTimeout.bind(globalThis) as typeof setTimeout)
+  const clearTimeoutImpl =
+    options.clearTimeoutImpl ?? (clearTimeout.bind(globalThis) as typeof clearTimeout)
   const controller = new AbortController()
   let timedOut = false
   const onAbort = () => controller.abort()

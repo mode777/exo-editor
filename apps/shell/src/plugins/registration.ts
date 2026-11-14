@@ -176,8 +176,10 @@ export class RegistrationSession {
     this.opaque = options.manifest.manifestOrigin === options.shellOrigin
     this.sandbox = this.opaque ? 'allow-scripts' : 'allow-scripts allow-same-origin'
     this.targetOrigin = this.opaque ? '*' : options.manifest.manifestOrigin
-    this.setTimeoutImpl = options.setTimeoutImpl ?? setTimeout
-    this.clearTimeoutImpl = options.clearTimeoutImpl ?? clearTimeout
+    this.setTimeoutImpl =
+      options.setTimeoutImpl ?? (setTimeout.bind(globalThis) as typeof setTimeout)
+    this.clearTimeoutImpl =
+      options.clearTimeoutImpl ?? (clearTimeout.bind(globalThis) as typeof clearTimeout)
   }
 
   start(): void {
