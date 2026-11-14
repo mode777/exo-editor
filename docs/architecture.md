@@ -100,6 +100,15 @@ and runs before the next workspace is opened:
 Handler frames are gone before the provider is released, and no workspace event
 can be emitted while state is being cleared.
 
+One `WorkspaceSession` owns path normalization, containment, the reserved-path
+guard, version comparison, the no-watch refresh fallback and permission
+escalation. Views, commands and document surfaces call the session; they never
+call a provider or hold a directory handle. The session exposes shell-originated
+access and a `forPlugin(pluginId)` facade that applies the reserved-path guard
+and logs denials. The authority for the current capabilities is
+`session.capabilities()`, because a gesture-bound permission grant can make a
+restored read-only workspace writable.
+
 Global preferences - theme, region visibility, sash sizes - are not part of the
 workspace and survive the switch. This is decision D7 below.
 
@@ -208,6 +217,11 @@ response headers, so the policy is embedded in the deployed HTML document as a
 the directive set is identical. Plugin origins are expected
 to serve `Access-Control-Allow-Origin` for their manifest; a missing CORS header
 is a manifest load failure with an actionable message, not a silent skip.
+
+Folder-backed workspaces are Chromium-only in v1 (D10). A browser without the
+File System Access API shows an explicit unsupported state. The in-memory
+provider exists for tests and the conformance suite; it is never mounted as a
+mock workspace, and no fabricated file tree is shown to an unsupported browser.
 
 ## 6. Hosting topology
 

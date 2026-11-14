@@ -15,11 +15,14 @@ import 'vscode-workbench/styles/global.css'
 import 'vscode-workbench/styles/workbench.css'
 import './app.css'
 import { App } from './App'
+import { configurePresetStore } from './workbench/tabs'
 
 const container = document.getElementById('root')
 if (!container) {
   throw new Error('Missing #root container')
 }
+
+configurePresetStore()
 
 createRoot(container).render(
   <StrictMode>

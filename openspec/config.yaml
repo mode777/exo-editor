@@ -14,6 +14,9 @@ context: |
   reset all workspace-scoped plugin state. See AGENTS.md before proposing.
   Work directly on main: do not create branches, worktrees or pull requests
   unless the user explicitly asks.
+  Every change is deployed to GitHub Pages by pushing main through the verify
+  and deploy workflow. Verify behaviour and exit criteria against the deployed
+  URL, never a local dev server or local build.
 
 # Example:
 #   context: |

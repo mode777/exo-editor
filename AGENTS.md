@@ -4,11 +4,11 @@ Exo Editor is a frontend-only, serverless editor shell. **The shell is the
 product; editors are plugins.** Plugins are untrusted cross-origin iframes; the
 shell owns the workbench, workspace access and consent.
 
-**Current state:** layers 0 and 1 are complete. The contracts are ratified, and
-the shell app (`apps/shell`) builds, tests and deploys to GitHub Pages through
-CI. Layer 2 (workspace provider) is next. Do not scaffold code ahead of the
-[roadmap](./ROADMAP.md) layer you were asked to work on, and do not invent
-commands or scripts that do not exist yet.
+**Current state:** layers 0 and 1 are complete. Layer 2 (workspace provider) is
+implemented and awaiting its deployed verification. The contracts are ratified,
+and the shell app (`apps/shell`) builds, tests and deploys to GitHub Pages through
+CI. Do not scaffold code ahead of the [roadmap](./ROADMAP.md) layer you were
+asked to work on, and do not invent commands or scripts that do not exist yet.
 
 ## Read this first
 
@@ -73,6 +73,15 @@ expected to ship as a child path of the shell site.
 
 - Work directly on `main`. Do not create branches, worktrees or pull requests
   unless the user explicitly asks for one.
+- Every change is deployed to GitHub Pages. Pushing to `main` runs the CI
+  `verify` job and, when it passes, deploys `apps/shell/dist` to
+  `https://mode777.github.io/exo-editor/`. Treat the deploy as part of done, not
+  an optional follow-up.
+- Verify behaviour and exit criteria against the deployed URL. Never use a local
+  dev server, a local build or a local browser page as verification evidence.
+  Local commands are development aids; CI is the gate and the deployed site is
+  the acceptance surface. If something cannot be verified against the deployed
+  site, say so and leave the acceptance task open.
 - Contracts before consumers. If implementation needs behaviour the contract
   does not describe, update the contract and its OpenSpec spec in the same
   change - do not add an undocumented message, field or provider method.
@@ -105,7 +114,13 @@ npm install        # npm ci in CI
 | Deployed CSP check | `npm run check:dist-csp` (after a build) |
 | Custom elements check | `npm run check:dist-elements` (after a build) |
 
-Dev server: `npm run dev` serves `http://localhost:5173/exo-editor/`.
+Dev server: `npm run dev` serves `http://localhost:5173/exo-editor/`. It is a
+development aid, not a verification target.
+
+The deployed verification surface is
+`https://mode777.github.io/exo-editor/`. Every push to `main` runs the gate below
+and deploys on success; behaviour and exit criteria are demonstrated there, never
+from a local dev server or local build.
 
 The full gate that must pass before a PR is the CI `verify` job:
 

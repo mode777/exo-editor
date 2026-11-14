@@ -14,8 +14,9 @@ content is a plugin: a cross-origin iframe talking to the shell over a versioned
 
 Layer 0 and layer 1 are complete: the five contracts are ratified OpenSpec specs
 and the shell is deployed at `https://mode777.github.io/exo-editor/` through the
-GitHub Pages workflow. Layer 2 (workspace provider) is next in the
-[roadmap](./ROADMAP.md).
+GitHub Pages workflow. Layer 2 (workspace provider) is implemented and awaiting
+its deployed verification. Verification is always against the deployed URL,
+never a local dev server.
 
 ## How it fits together
 

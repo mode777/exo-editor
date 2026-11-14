@@ -1,0 +1,198 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { useWorkbenchStore } from 'vscode-workbench'
+import {
+  PERSIST_KEY,
+  configurePresetStore,
+  installCloseGuard,
+  isCloseGuardInstalled,
+  openFileTab,
+  setTabDirty,
+  clearWorkspaceTabs,
+  type CloseRequest,
+} from './tabs'
+
+async function loadFresh() {
+  vi.resetModules()
+  const kit = await import('vscode-workbench')
+  const tabs = await import('./tabs')
+  return { kit, tabs }
+}
+
+describe('preset store tab persistence', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    useWorkbenchStore.persist.clearStorage()
+  })
+
+  it('persists layout and theme but not workspace tabs', () => {
+    configurePresetStore()
+    openFileTab('/notes.txt')
+    setTabDirty('/notes.txt', true)
+    useWorkbenchStore.getState().setTheme('light')
+    useWorkbenchStore.getState().setPrimarySideBarWidth(420)
+
+    const raw = localStorage.getItem(PERSIST_KEY)
+    expect(raw).toBeTruthy()
+    const envelope = JSON.parse(raw as string) as {
+      state: Record<string, unknown>
+    }
+
+    expect(envelope.state.theme).toBe('light')
+    expect(envelope.state.primarySideBarWidth).toBe(420)
+    expect(envelope.state.tabs).toBeUndefined()
+    expect(envelope.state.activeTabId).toBeUndefined()
+    expect(envelope.state.closedTabs).toBeUndefined()
+  })
+
+  it('restores layout and theme on reload but starts with no tabs', async () => {
+    const first = await loadFresh()
+    first.tabs.configurePresetStore()
+    first.tabs.openFileTab('/notes.txt')
+    first.kit.useWorkbenchStore.getState().setTheme('light')
+    first.kit.useWorkbenchStore.getState().setPrimarySideBarWidth(420)
+    first.kit.useWorkbenchStore.getState().closeTab('/notes.txt')
+
+    const second = await loadFresh()
+    second.tabs.configurePresetStore()
+    const state = second.kit.useWorkbenchStore.getState()
+
+    expect(state.theme).toBe('light')
+    expect(state.primarySideBarWidth).toBe(420)
+    expect(state.tabs).toEqual([])
+    expect(state.activeTabId).toBeNull()
+    expect(state.closedTabs).toEqual([])
+  })
+
+  it('clears tabs and reopen history on a workspace switch', () => {
+    configurePresetStore()
+    openFileTab('/a.txt')
+    openFileTab('/b.txt')
+    useWorkbenchStore.getState().closeTab('/b.txt')
+    expect(useWorkbenchStore.getState().closedTabs).toHaveLength(1)
+
+    clearWorkspaceTabs()
+
+    expect(useWorkbenchStore.getState().tabs).toEqual([])
+    expect(useWorkbenchStore.getState().activeTabId).toBeNull()
+    expect(useWorkbenchStore.getState().closedTabs).toEqual([])
+  })
+})
+
+describe('dirty close guard', () => {
+  let uninstall: (() => void) | null = null
+
+  beforeEach(() => {
+    localStorage.clear()
+    uninstall?.()
+    uninstall = null
+    configurePresetStore()
+    clearWorkspaceTabs()
+  })
+
+  it('pauses a dirty close until proceed and then closes the tab', () => {
+    openFileTab('/a.txt')
+    setTabDirty('/a.txt', true)
+    const requests: CloseRequest[] = []
+    const closed: string[] = []
+    let proceed: (() => void) | null = null
+    uninstall = installCloseGuard(
+      (request, resume) => {
+        requests.push(request)
+        proceed = resume
+      },
+      { onClosed: (tabs) => closed.push(...tabs.map((tab) => tab.id)) },
+    )
+
+    useWorkbenchStore.getState().closeTab('/a.txt')
+
+    expect(requests).toHaveLength(1)
+    expect(requests[0].reason).toBe('close')
+    expect(useWorkbenchStore.getState().tabs.map((tab) => tab.id)).toEqual(['/a.txt'])
+
+    ;(proceed as unknown as () => void)()
+
+    expect(useWorkbenchStore.getState().tabs).toEqual([])
+    expect(closed).toEqual(['/a.txt'])
+  })
+
+  it('keeps the tab when the close is cancelled', () => {
+    openFileTab('/a.txt')
+    setTabDirty('/a.txt', true)
+    let cancelled = false
+    uninstall = installCloseGuard(() => {
+      cancelled = true
+    })
+
+    useWorkbenchStore.getState().closeTab('/a.txt')
+
+    expect(cancelled).toBe(true)
+    expect(useWorkbenchStore.getState().tabs).toHaveLength(1)
+  })
+
+  it('closes a clean tab immediately without prompting', () => {
+    openFileTab('/clean.txt')
+    let prompted = false
+    const closed: string[] = []
+    uninstall = installCloseGuard(
+      () => {
+        prompted = true
+      },
+      { onClosed: (tabs) => closed.push(...tabs.map((tab) => tab.id)) },
+    )
+
+    useWorkbenchStore.getState().closeTab('/clean.txt')
+
+    expect(prompted).toBe(false)
+    expect(useWorkbenchStore.getState().tabs).toEqual([])
+    expect(closed).toEqual(['/clean.txt'])
+  })
+
+  it('prompts for every dirty tab in close-all', () => {
+    openFileTab('/a.txt')
+    openFileTab('/b.txt')
+    setTabDirty('/a.txt', true)
+    setTabDirty('/b.txt', true)
+    const requests: CloseRequest[] = []
+    let proceed: (() => void) | null = null
+    uninstall = installCloseGuard((request, resume) => {
+      requests.push(request)
+      proceed = resume
+    })
+
+    useWorkbenchStore.getState().closeAllTabs()
+
+    expect(requests).toHaveLength(1)
+    expect(requests[0].tabs.map((tab) => tab.id)).toEqual(['/a.txt', '/b.txt'])
+    ;(proceed as unknown as () => void)()
+    expect(useWorkbenchStore.getState().tabs).toEqual([])
+  })
+
+  it('prompts only for dirty tabs when closing others', () => {
+    openFileTab('/keep.txt')
+    openFileTab('/dirty.txt')
+    openFileTab('/clean.txt')
+    setTabDirty('/dirty.txt', true)
+    const requests: CloseRequest[] = []
+    uninstall = installCloseGuard((request) => {
+      requests.push(request)
+    })
+
+    useWorkbenchStore.getState().closeOtherTabs('/keep.txt')
+
+    expect(requests[0].tabs.map((tab) => tab.id)).toEqual(['/dirty.txt'])
+  })
+
+  it('closes a dirty tab silently when the guard is removed', () => {
+    openFileTab('/a.txt')
+    setTabDirty('/a.txt', true)
+    uninstall = installCloseGuard(() => undefined)
+    expect(isCloseGuardInstalled()).toBe(true)
+    uninstall()
+    uninstall = null
+    expect(isCloseGuardInstalled()).toBe(false)
+
+    useWorkbenchStore.getState().closeTab('/a.txt')
+
+    expect(useWorkbenchStore.getState().tabs).toEqual([])
+  })
+})

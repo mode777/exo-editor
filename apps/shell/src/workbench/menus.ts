@@ -1,12 +1,35 @@
 import type { MenuDefinition } from 'vscode-workbench'
 
-// Menus only reference commands that exist in the workspace-free registry.
+// Menu entries are stable; the registry filters applicability in the palette and
+// `run` re-checks it, so an unavailable entry is a no-op rather than a fake.
 export const workbenchMenus: MenuDefinition[] = [
+  {
+    id: 'file',
+    label: 'File',
+    entries: [
+      { label: 'Open Folder…', commandId: 'exo.workspace.open' },
+      { separator: true },
+      { label: 'New File…', commandId: 'exo.explorer.newFile' },
+      { label: 'New Folder…', commandId: 'exo.explorer.newFolder' },
+      { separator: true },
+      {
+        label: 'Save',
+        commandId: 'exo.file.save',
+        keybinding: 'Ctrl+S',
+      },
+    ],
+  },
   {
     id: 'view',
     label: 'View',
     entries: [
       { label: 'Command Palette…', commandId: 'view.commandPalette' },
+      { label: 'Go to File…', commandId: 'view.quickOpen' },
+      { separator: true },
+      {
+        label: 'Refresh Explorer',
+        commandId: 'exo.explorer.refresh',
+      },
       { separator: true },
       {
         label: 'Toggle Primary Side Bar',

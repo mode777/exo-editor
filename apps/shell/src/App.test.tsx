@@ -62,6 +62,15 @@ describe('empty shell composition', () => {
     ).not.toBeNull()
   })
 
+  it('shows an explicit unsupported state instead of mock files', async () => {
+    await act(async () => root.render(<App />))
+
+    expect(container.textContent).toContain('No workspace is open.')
+    expect(container.textContent).toContain('Chromium')
+    expect(container.textContent).toContain('No workspace · Unsupported browser')
+    expect(container.querySelector('.exo-tree-row')).toBeNull()
+  })
+
   it('opens the command palette from the status bar button', async () => {
     await act(async () => root.render(<App />))
 

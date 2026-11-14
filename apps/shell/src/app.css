@@ -2,7 +2,11 @@
    vscode-workbench's stylesheets. */
 
 .exo-explorer {
-  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+  padding: 8px;
   color: var(--vscode-descriptionForeground);
 }
 
@@ -14,6 +18,326 @@
 .exo-explorer-hint {
   margin: 0;
   font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.exo-explorer-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.exo-explorer-action {
+  border: 1px solid var(--vscode-button-border, transparent);
+  border-radius: 3px;
+  padding: 3px 6px;
+  background: var(--vscode-button-secondaryBackground, transparent);
+  color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.exo-explorer-action:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.exo-explorer-action:focus-visible,
+.exo-status-button:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 1px;
+}
+
+.exo-workspace-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px;
+  border: 1px solid var(--vscode-inputValidation-warningBorder, var(--vscode-widget-border));
+  background: var(--vscode-inputValidation-warningBackground, transparent);
+  color: var(--vscode-foreground);
+  font-size: 12px;
+}
+
+.exo-tree {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: auto;
+}
+
+.exo-tree-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 22px;
+  padding-right: 6px;
+  color: var(--vscode-foreground);
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+
+.exo-tree-row:hover {
+  background: var(--vscode-list-hoverBackground);
+}
+
+.exo-tree-row.is-selected {
+  background: var(--vscode-list-activeSelectionBackground);
+  color: var(--vscode-list-activeSelectionForeground);
+}
+
+.exo-tree-row:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+.exo-tree-twisty {
+  width: 12px;
+  flex: 0 0 12px;
+  color: var(--vscode-descriptionForeground);
+  text-align: center;
+}
+
+.exo-tree-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.exo-tree-rename {
+  min-width: 0;
+  width: 100%;
+  border: 1px solid var(--vscode-focusBorder);
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  font: inherit;
+  font-size: 13px;
+}
+
+.exo-tree-loading {
+  color: var(--vscode-descriptionForeground);
+}
+
+.exo-explorer-error {
+  margin: 2px 0 4px 20px;
+  color: var(--vscode-errorForeground);
+  font-size: 11px;
+}
+
+.exo-context-menu {
+  position: fixed;
+  z-index: 1200;
+  display: flex;
+  min-width: 150px;
+  flex-direction: column;
+  padding: 4px;
+  border: 1px solid var(--vscode-menu-border, var(--vscode-widget-border));
+  background: var(--vscode-menu-background, var(--vscode-editorWidget-background));
+  box-shadow: 0 4px 12px var(--vscode-widget-shadow);
+}
+
+.exo-context-menu button {
+  border: 0;
+  padding: 5px 8px;
+  background: transparent;
+  color: var(--vscode-menu-foreground, var(--vscode-foreground));
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.exo-context-menu button:hover,
+.exo-context-menu button:focus-visible {
+  background: var(--vscode-menu-selectionBackground);
+  color: var(--vscode-menu-selectionForeground);
+}
+
+.exo-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.exo-dialog {
+  width: min(440px, calc(100vw - 48px));
+  max-height: calc(100vh - 96px);
+  overflow: auto;
+  padding: 16px;
+  border: 1px solid var(--vscode-widget-border);
+  border-radius: 6px;
+  background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  color: var(--vscode-foreground);
+  box-shadow: 0 8px 24px var(--vscode-widget-shadow);
+}
+
+.exo-dialog h2 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
+.exo-dialog p {
+  margin: 0 0 10px;
+  font-size: 12px;
+}
+
+.exo-dialog-hint {
+  color: var(--vscode-descriptionForeground);
+}
+
+.exo-dialog input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 5px 6px;
+  border: 1px solid var(--vscode-input-border, var(--vscode-widget-border));
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  font: inherit;
+}
+
+.exo-dialog-error {
+  color: var(--vscode-errorForeground);
+}
+
+.exo-dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.exo-dialog-actions button {
+  padding: 4px 10px;
+  border: 1px solid var(--vscode-button-border, transparent);
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  font: inherit;
+  cursor: pointer;
+}
+
+.exo-close-list {
+  max-height: 140px;
+  overflow: auto;
+  margin: 0 0 10px;
+  padding-left: 20px;
+  font-size: 12px;
+}
+
+.exo-document {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  background: var(--vscode-editor-background);
+}
+
+.exo-document-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--vscode-editorWidget-border, var(--vscode-widget-border));
+  font-size: 12px;
+}
+
+.exo-document-title {
+  overflow: hidden;
+  color: var(--vscode-foreground);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.exo-document-meta,
+.exo-document-readonly {
+  margin-left: auto;
+  color: var(--vscode-descriptionForeground);
+}
+
+.exo-document-save,
+.exo-document-action {
+  border: 1px solid var(--vscode-button-border, transparent);
+  padding: 3px 8px;
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.exo-document-save:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.exo-document-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--vscode-widget-border);
+  background: var(--vscode-inputValidation-infoBackground, transparent);
+  color: var(--vscode-foreground);
+  font-size: 12px;
+}
+
+.exo-document-banner.is-error {
+  background: var(--vscode-inputValidation-errorBackground, transparent);
+  color: var(--vscode-errorForeground);
+}
+
+.exo-document-state {
+  margin: 0;
+  padding: 20px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.exo-document-state h2 {
+  margin: 0 0 8px;
+  color: var(--vscode-foreground);
+  font-size: 16px;
+}
+
+.exo-document-editor {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+  resize: none;
+  border: 0;
+  padding: 12px;
+  background: var(--vscode-editor-background);
+  color: var(--vscode-editor-foreground);
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: var(--vscode-editor-font-size, 13px);
+  line-height: 1.5;
+  tab-size: 2;
+}
+
+.exo-document-editor:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+.exo-status-warning {
+  color: var(--vscode-statusBarItem-warningForeground, inherit);
+}
+
+.exo-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 .exo-status-button {

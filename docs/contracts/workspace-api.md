@@ -136,15 +136,80 @@ export interface WorkspaceHandle {
   remove(path: WorkspacePath, options?: { recursive?: boolean; signal?: AbortSignal }): Promise<void>
   move(from: WorkspacePath, to: WorkspacePath, options?: { overwrite?: boolean; signal?: AbortSignal }): Promise<FileStat>
 
+  /**
+   * Optional. Request read-write permission from a user gesture and return the
+   * updated capabilities. Absent when the provider cannot escalate permission.
+   */
+  requestPermission?(options?: { signal?: AbortSignal }): Promise<WorkspaceCapabilities>
+
   /** Optional. Absent when capabilities().watchable is false. */
   watch?(paths: WorkspacePath[], onChange: (change: WorkspaceChange) => void): Disposable
 }
 ```
 
+```ts
+export interface OpenDocumentSnapshot {
+  path: WorkspacePath
+  /** The version the shell loaded; refresh compares against this. */
+  version: string
+}
+
+export interface WorkspaceAccess {
+  list(path: WorkspacePath, options?: ListOptions): Promise<FileStat[]>
+  stat(path: WorkspacePath, options?: { signal?: AbortSignal }): Promise<FileStat>
+  read(path: WorkspacePath, options?: ReadOptions): Promise<Uint8Array>
+  write(path: WorkspacePath, data: Uint8Array, options?: WriteOptions): Promise<FileStat>
+  mkdir(path: WorkspacePath, options?: { recursive?: boolean; signal?: AbortSignal }): Promise<void>
+  remove(path: WorkspacePath, options?: { recursive?: boolean; signal?: AbortSignal }): Promise<void>
+  move(from: WorkspacePath, to: WorkspacePath, options?: { overwrite?: boolean; signal?: AbortSignal }): Promise<FileStat>
+}
+
+export interface WorkspaceSession extends WorkspaceAccess {
+  /** Snapshot taken when the session was created; capabilities() is authoritative. */
+  readonly descriptor: WorkspaceDescriptor
+
+  capabilities(): WorkspaceCapabilities
+
+  /** Plugin-scoped facade. Applies the reserved-path guard and logs denials. */
+  forPlugin(pluginId: string): WorkspaceAccess
+
+  /** Gesture-bound permission escalation. Returns the updated capabilities. */
+  requestPermission(options?: { signal?: AbortSignal }): Promise<WorkspaceCapabilities>
+
+  /** Replace the tracked open-document set used by the refresh fallback. */
+  setOpenDocuments(documents: OpenDocumentSnapshot[]): void
+
+  /** Re-stat tracked documents and return only the changes. */
+  refreshOpenDocuments(): Promise<WorkspaceChange[]>
+
+  onExternalChange(listener: (change: WorkspaceChange) => void): Disposable
+
+  dispose(): Promise<void>
+}
+
+export interface WorkspaceLogEntry {
+  at: number
+  operation: 'list' | 'stat' | 'read' | 'write' | 'mkdir' | 'remove' | 'move' | 'permission'
+  pluginId?: string
+  path?: WorkspacePath
+  code?: WorkspaceErrorCode
+}
+```
+
 `WorkspaceSession` is the shell-facing wrapper. It adds the workspace-scoped
-behaviour that providers do not own: the reserved-path guard, the operation log
-used for diagnostics, the polling fallback, and the reset lifecycle described in
-section 7.
+behaviour that providers do not own: path normalization, containment, the
+reserved-path guard, the operation log used for diagnostics, the polling
+fallback, permission escalation and the reset lifecycle described in section 7.
+
+Shell-originated calls on the session are unrestricted except for normalization.
+`forPlugin(pluginId)` returns a facade over the same rules; every call through it
+is checked against the reserved set and logged with the plugin id. The facade
+cannot widen access and never receives a handle.
+
+`descriptor.capabilities` is a snapshot from open or restore. A successful
+`requestPermission()` may make a workspace writable; callers use
+`capabilities()` for the current state. The session replaces its descriptor
+snapshot when that happens.
 
 ## 3. Path rules
 
@@ -171,6 +236,9 @@ provider permissions:
 
 The shell itself may read and write `exo.json`. There is no API that lets a
 plugin write it, and no message exists that names it as a save target.
+`forPlugin(pluginId)` is the only plugin-facing path: it filters reserved entries
+from listings, denies reserved reads, writes, stats, directory creation, removal
+and moves, and records the plugin id and code in the session log.
 
 ## 5. Errors
 
@@ -210,6 +278,9 @@ plugin frame.
 - After reload, `queryPermission({ mode: 'readwrite' })` decides whether to
   restore silently. `requestPermission` must run in a user gesture; until it
   does, the workspace is restored read-only and the UI offers "Restore access".
+  The handle exposes `requestPermission()` for that gesture; it returns the
+  updated capabilities and rejects with `unsupported` when the provider cannot
+  escalate.
 - Writes use `createWritable()`, write, close. `ifVersion` is enforced by
   re-statting immediately before opening the writable and comparing `version`;
   the API offers no atomic compare-and-swap, so the window is narrow but real and
@@ -219,7 +290,8 @@ plugin frame.
 
 ### Memory provider
 
-Required for tests and for the "unsupported browser" state:
+Required for tests as the reference implementation and deterministic oracle; it
+is not mounted as a fallback for unsupported browsers:
 
 - Deterministic, synchronous-backed, no persistence, `watchable: true`,
   `persistent: false`, `caseSensitive: true`, `writable: true`.
@@ -231,6 +303,8 @@ Required for tests and for the "unsupported browser" state:
 - Used by contract tests for the session, the plugin broker and the save flow, so
   it is the reference implementation of this contract and the test oracle for the
   folder provider.
+- A browser without the File System Access API gets an explicit unsupported
+  state, never a memory-backed mock workspace.
 
 ### Future providers
 
@@ -263,6 +337,21 @@ workspace event can be emitted while state is being cleared.
 After `dispose()` resolves, no callback from the old workspace may mutate shell
 state. Late callbacks are dropped by a generation counter captured at dispatch
 time.
+
+### Refresh and permission
+
+The session tracks the open documents supplied through `setOpenDocuments()`
+(path and loaded version). When the provider declares `watchable: false`, the
+session installs `focus` and `visibilitychange` listeners on its event target and
+re-stats the tracked documents. It emits a `changed` or `deleted` result only
+when the version, kind or existence differs, and checks the owning generation
+before any callback. A watchable provider supplies changes through `watch()`
+instead. `refreshOpenDocuments()` is the explicit form of the same operation.
+
+`requestPermission()` delegates to the handle, updates the session's capability
+snapshot and returns the new capabilities. It is intended to be called only from
+a user gesture. A denial leaves the workspace read-only; a provider without the
+operation rejects with `unsupported`.
 
 ## 8. Out of scope for v1
 

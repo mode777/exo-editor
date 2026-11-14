@@ -1,9 +1,10 @@
 # Exo Editor - Roadmap
 
-Status: layer 0 is complete and its contracts are ratified. Layer 1 is next;
-layers 2-10 are sequenced behind it. Each layer is one OpenSpec change. A layer
-is done when its change is archived and its exit criteria are demonstrated
-against the deployed shell.
+Status: layer 0 is complete and its contracts are ratified. Layer 2 is
+implemented and awaiting its deployed verification; layer 1 is deployed. Layers
+3-10 are sequenced behind it. Each layer is one OpenSpec change. A layer is done
+when its change is archived and its exit criteria are demonstrated against the
+deployed shell - never from a local dev server or local build.
 
 ## Sequencing rationale
 
@@ -121,7 +122,9 @@ workbench kit already has. This is the walking skeleton.
 **Deliverables**
 
 - Session + provider implementation for the File System Access API, plus an
-  in-memory provider used by tests and by unsupported browsers.
+  in-memory provider used by the conformance tests as the deterministic oracle.
+  Unsupported browsers get an explicit unsupported state; the memory provider is
+  never mounted as a mock workspace (D10).
 - Folder picking, permission restore after reload, workspace identity, canonical
   path handling, reserved-path guard, `conflict` on stale writes.
 - Explorer view with expand/collapse, create/rename/delete, keyboard operation,
