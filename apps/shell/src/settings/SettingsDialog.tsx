@@ -1,21 +1,30 @@
 import { useEffect, useRef } from 'react'
 import { useWorkbenchStore } from 'vscode-workbench'
+import { PluginSettings } from './PluginSettings'
+
+export type SettingsSection = 'general' | 'plugins'
 
 interface SettingsDialogProps {
   open: boolean
+  section?: SettingsSection
   onClose: () => void
 }
 
-// The shell-owned settings surface. Layer 1 has one real preference - the
-// theme - and later layers extend this dialog; it is never a dead command.
-export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
+// The shell-owned settings surface. Theme is global; plugin configuration is
+// workspace-scoped and rendered by PluginSettings.
+export function SettingsDialog({ open, section = 'general', onClose }: SettingsDialogProps) {
   const theme = useWorkbenchStore((state) => state.theme)
   const setTheme = useWorkbenchStore((state) => state.setTheme)
   const closeButton = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
-    if (open) closeButton.current?.focus()
-  }, [open])
+    if (!open) return
+    if (section === 'plugins') {
+      document.getElementById('exo-settings-plugins')?.focus()
+      return
+    }
+    closeButton.current?.focus()
+  }, [open, section])
 
   useEffect(() => {
     if (!open) return
@@ -72,6 +81,7 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
             Light
           </label>
         </section>
+        <PluginSettings />
       </div>
     </div>
   )

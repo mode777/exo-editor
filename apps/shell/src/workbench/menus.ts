@@ -53,6 +53,7 @@ export const workbenchMenus: MenuDefinition[] = [
     label: 'Preferences',
     entries: [
       { label: 'Open Settings', commandId: 'exo.settings.open' },
+      { label: 'Open Plugin Configuration', commandId: 'exo.plugins.open' },
       { label: 'Toggle Theme', commandId: 'exo.theme.toggle' },
     ],
   },

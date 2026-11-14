@@ -44,12 +44,85 @@ Rules:
 - Duplicate manifest URLs are rejected. This is a semantic check across entries,
   not something the JSON Schema can express.
 - `exo.json` is shell-only. No plugin message can read or write it. The settings
-  UI rewrites it as canonical 2-space JSON; comments and formatting are not
+  UI rewrites it as canonical 2-space JSON; formatting and key order are not
   preserved (D8).
-- A missing `exo.json` means "no plugins", not an error. A malformed one is
-  surfaced as a workspace problem and no plugin is loaded.
+- `exo.json` is strict JSON. Comments and trailing commas are not valid and are
+  reported as `invalid-json`; the shell does not strip them. A missing file means
+  "no plugins", not an error. A malformed one is surfaced as a workspace problem
+  and no plugin is loaded.
 - Plugin entries added after the workspace is ready are initialized immediately;
   removed entries are torn down immediately.
+
+### 2.1 Loading and refresh
+
+The shell reads `/exo.json` through the shell side of the workspace session when
+a workspace becomes ready. It refreshes its declaration state after every shell
+write and on window focus or visibility. A refresh stats the file first and does
+not re-read a version that was already loaded.
+
+- A missing file is `absent`, not an error; it means zero plugins.
+- The file is capped at 256 KiB. A larger file is `too-large` and yields zero
+  usable entries.
+- A permission or I/O failure is `not-readable` and yields zero usable entries.
+  The rest of the workspace stays usable.
+- A workspace switch resets the declaration before the new workspace is ready.
+  A late read from the old workspace cannot update the new one.
+- Loading or refreshing the declaration performs no network request to a
+  manifest URL and creates no frame.
+
+### 2.2 Validation is all-or-nothing
+
+The complete file is validated against the `exoFile` branch of
+[`schema/exo.schema.json`](../../schema/exo.schema.json) and the semantic rules
+above before any entry is used. Every failure is collected and reported; one
+invalid entry disables the whole declaration, so a valid sibling is never
+partially loaded. The over-limit and duplicate cases are therefore errors with
+zero usable entries, not truncation or partial acceptance.
+
+An issue has this shape:
+
+```ts
+type PluginConfigIssueCode =
+  | 'invalid-json'
+  | 'unsupported-version'
+  | 'invalid-config'
+  | 'too-many-plugins'
+  | 'duplicate-manifest'
+  | 'too-large'
+  | 'not-readable'
+  | 'conflict'
+
+interface PluginConfigIssue {
+  code: PluginConfigIssueCode
+  path: '/exo.json'
+  /** JSON Pointer into the file when the problem belongs to a field. */
+  field?: string
+  /** Zero-based plugin entry index when the problem belongs to one entry. */
+  entryIndex?: number
+}
+```
+
+Issues never contain raw file content, provider messages or stack traces.
+
+The shared schema does not change when the shell implements this validation. The
+shell validator mirrors the `exoFile` branch, and a unit test reads the schema and
+pins the constants and shape it relies on, so the two cannot drift silently.
+
+### 2.3 Canonical rewrite
+
+The shell writes `exo.json` only through the workspace session and only after
+validation. The canonical form is 2-space JSON with:
+
+- `schemaVersion` before `plugins`;
+- `manifest` before `enabled` in every entry;
+- `enabled` written explicitly, including `true`;
+- one trailing newline.
+
+The settings surface is the only writer. A rewrite of an already-canonical file
+changes only the entry or flag the user edited. A valid but non-canonical file is
+normalized on its first rewrite; the UI states that formatting and key order are
+not preserved. Writes use the loaded stat version as `ifVersion`, so a stale
+settings view fails with `conflict` rather than overwriting an external edit.
 
 ## 3. `exo-manifest.json`
 

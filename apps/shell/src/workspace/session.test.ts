@@ -39,6 +39,22 @@ describe('session caller scoping', () => {
     })
   })
 
+  it('lets the shell write reserved paths while a plugin facade is denied', async () => {
+    const { session } = await makeSession()
+    const plugin = session.forPlugin('plugin.one')
+    const body = encoder.encode('{"schemaVersion":1,"plugins":[]}')
+
+    await expect(session.write('/exo.json', body)).resolves.toMatchObject({
+      kind: 'file',
+    })
+    expect(new TextDecoder().decode(await session.read('/exo.json'))).toBe(
+      '{"schemaVersion":1,"plugins":[]}',
+    )
+    await expect(plugin.write('/exo.json', body)).rejects.toMatchObject({
+      code: 'permission-denied',
+    })
+  })
+
   it('denies every plugin mutation on reserved paths', async () => {
     const { session } = await makeSession()
     const plugin = session.forPlugin('plugin.one')

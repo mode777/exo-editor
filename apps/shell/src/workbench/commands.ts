@@ -30,6 +30,7 @@ export interface CommandContext {
 
 export interface ExoCommandHandlers {
   openSettings: () => void
+  openPluginSettings: () => void
   openFolder: () => void
   restoreAccess: () => void
   saveActive: () => void
@@ -98,6 +99,12 @@ export function createExoCommands(handlers: ExoCommandHandlers): WorkbenchComman
       title: 'Toggle Theme',
       category: 'Preferences',
       run: () => useWorkbenchStore.getState().toggleTheme(),
+    },
+    {
+      id: 'exo.plugins.open',
+      title: 'Open Plugin Configuration',
+      category: 'Preferences',
+      run: handlers.openPluginSettings,
     },
     {
       id: 'exo.settings.open',

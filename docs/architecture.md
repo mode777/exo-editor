@@ -109,6 +109,13 @@ and logs denials. The authority for the current capabilities is
 `session.capabilities()`, because a gesture-bound permission grant can make a
 restored read-only workspace writable.
 
+The shell reads `/exo.json` through the session when the workspace becomes ready,
+keeps the parsed declaration in a workspace-scoped store, and refreshes it after
+shell writes and on focus or visibility. The declaration is strict JSON, capped
+at 256 KiB, validated all-or-nothing, and resets on a workspace switch before the
+new declaration is read. A missing file means zero plugins. Plugin-originated
+access to the path stays denied; only the shell's settings surface writes it.
+
 Global preferences - theme, region visibility, sash sizes - are not part of the
 workspace and survive the switch. This is decision D7 below.
 
@@ -312,7 +319,7 @@ layer named in the last column.
 | D5 | First-party plugins may share `<owner>.github.io`; a separate origin is optional and only needed for plugin storage or stricter separation | decided | none |
 | D6 | The folder provider persists its directory handle in IndexedDB and re-requests permission after reload | decided | layer 2 |
 | D7 | Workspace switch resets tabs, plugin registry and workspace-scoped settings but keeps global layout and theme | decided | layer 2 |
-| D8 | `exo.json` is shell-only; the settings UI rewrites it as canonical 2-space JSON and does not preserve comments or formatting | decided | layer 3 |
+| D8 | `exo.json` is shell-only and strict JSON; the settings UI rewrites it as canonical 2-space JSON, does not preserve formatting or key order, and reports comments rather than stripping them | decided | layer 3 |
 | D9 | Cross-origin frames use `sandbox="allow-scripts allow-same-origin"`; same-origin frames use `allow-scripts` only; never top navigation, popups or modals | decided | layer 4 |
 | D10 | v1 supports Chromium only for folder-backed workspaces; other browsers get an explicit unsupported state | decided | layer 2 |
 | D11 | Plugin settings live in the shell's store keyed by workspace, not in `exo.json` | decided | layer 7 |

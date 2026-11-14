@@ -7,7 +7,7 @@ import {
 } from 'vscode-workbench'
 import { DocumentArea } from './document/DocumentArea'
 import { requestExplorerCommand } from './explorer/bus'
-import { SettingsDialog } from './settings/SettingsDialog'
+import { SettingsDialog, type SettingsSection } from './settings/SettingsDialog'
 import { ThemeSync } from './theme-sync'
 import {
   createExoCommandRegistry,
@@ -62,12 +62,28 @@ function Shell({ runtime }: { runtime: WorkspaceRuntime }) {
   const snapshot = useWorkspaceSnapshot()
   const dirty = useDirtyDocuments()
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [settingsSection, setSettingsSection] = useState<SettingsSection>('general')
   const [pendingClose, setPendingClose] = useState<PendingClose | null>(null)
   const [closeError, setCloseError] = useState<string | null>(null)
+
+  const openSettings = useCallback(() => {
+    setSettingsSection('general')
+    setSettingsOpen(true)
+  }, [])
+
+  const openPluginSettings = useCallback(() => {
+    setSettingsSection('plugins')
+    setSettingsOpen(true)
+  }, [])
 
   useEffect(() => {
     void runtime.start()
   }, [runtime])
+
+  useEffect(() => {
+    runtime.setReservedDocumentHandler(openPluginSettings)
+    return () => runtime.setReservedDocumentHandler(null)
+  }, [runtime, openPluginSettings])
 
   useEffect(() => {
     if (!dirty) return
@@ -128,7 +144,8 @@ function Shell({ runtime }: { runtime: WorkspaceRuntime }) {
 
   const handlers = useMemo<ExoCommandHandlers>(
     () => ({
-      openSettings: () => setSettingsOpen(true),
+      openSettings,
+      openPluginSettings,
       openFolder,
       restoreAccess: () => void runtime.requestPermission(),
       saveActive: () => void runtime.saveActiveDocument(),
@@ -138,7 +155,7 @@ function Shell({ runtime }: { runtime: WorkspaceRuntime }) {
       delete: () => requestExplorerCommand('delete'),
       refreshExplorer: () => runtime.refreshExplorer(),
     }),
-    [openFolder, runtime],
+    [openFolder, openPluginSettings, openSettings, runtime],
   )
 
   const getContext = useCallback((): CommandContext => {
@@ -203,7 +220,11 @@ function Shell({ runtime }: { runtime: WorkspaceRuntime }) {
         statusBar={<ExoStatusBar />}
         initialSession={EMPTY_SESSION}
       />
-      <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <SettingsDialog
+        open={settingsOpen}
+        section={settingsSection}
+        onClose={() => setSettingsOpen(false)}
+      />
       {pendingClose && (
         <ClosePromptDialog
           paths={pendingClose.paths}

@@ -12,6 +12,7 @@ const NO_WORKSPACE: CommandContext = {
 function setup(context: CommandContext = NO_WORKSPACE) {
   const handlers: ExoCommandHandlers = {
     openSettings: vi.fn(),
+    openPluginSettings: vi.fn(),
     openFolder: vi.fn(),
     restoreAccess: vi.fn(),
     saveActive: vi.fn(),
@@ -130,6 +131,14 @@ describe('exo command registry', () => {
 
     expect(registry.run('exo.settings.open')).toBe(true)
     expect(handlers.openSettings).toHaveBeenCalledTimes(1)
+  })
+
+  it('opens plugin configuration without a workspace', () => {
+    const { registry, handlers } = setup()
+
+    expect(registry.list().map((command) => command.id)).toContain('exo.plugins.open')
+    expect(registry.run('exo.plugins.open')).toBe(true)
+    expect(handlers.openPluginSettings).toHaveBeenCalledTimes(1)
   })
 
   it('toggles the theme immediately', () => {

@@ -1,10 +1,11 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useWorkbenchStore } from 'vscode-workbench'
 import { WorkspaceRuntime } from './runtime'
 import { MemoryWorkspaceProvider } from './providers/memory'
 import { MemoryHandleStore } from './providers/folder/handle-store'
 import { WorkspaceError, type WorkspaceProvider } from './contract'
 import { clearWorkspaceTabs, configurePresetStore } from '../workbench/tabs'
+import { EXO_CONFIG_PATH } from '../plugins/config'
 
 function memoryProvider(files: Record<string, string> = {}) {
   return new MemoryWorkspaceProvider({ now: () => 1, initialFiles: files })
@@ -234,6 +235,70 @@ describe('workspace runtime', () => {
       phase: 'unsupported',
       writable: false,
     })
+    await runtime.dispose()
+  })
+
+  it('loads the plugin declaration after a workspace becomes ready', async () => {
+    const runtime = runtimeWith([
+      memoryProvider({
+        [EXO_CONFIG_PATH]:
+          '{"schemaVersion":1,"plugins":[{"manifest":"https://example.com/m.json"}]}',
+      }),
+    ])
+    await runtime.start()
+    await runtime.openFolder()
+
+    await vi.waitFor(() =>
+      expect(runtime.pluginConfig.getSnapshot()).toMatchObject({
+        status: 'valid',
+        entries: [{ index: 0, manifest: 'https://example.com/m.json', enabled: true }],
+      }),
+    )
+    await runtime.dispose()
+  })
+
+  it('resets plugin configuration on a workspace switch', async () => {
+    const first = memoryProvider({
+      [EXO_CONFIG_PATH]:
+        '{"schemaVersion":1,"plugins":[{"manifest":"https://first.example/m.json"}]}',
+    })
+    const second = memoryProvider({
+      [EXO_CONFIG_PATH]:
+        '{"schemaVersion":1,"plugins":[{"manifest":"https://second.example/m.json"}]}',
+    })
+    const runtime = runtimeWith([first, second])
+    await runtime.start()
+    await runtime.openFolder()
+    await vi.waitFor(() =>
+      expect(runtime.pluginConfig.getSnapshot().entries[0]?.manifest).toBe(
+        'https://first.example/m.json',
+      ),
+    )
+
+    await runtime.openFolder()
+
+    await vi.waitFor(() =>
+      expect(runtime.pluginConfig.getSnapshot().entries).toEqual([
+        { index: 0, manifest: 'https://second.example/m.json', enabled: true },
+      ]),
+    )
+    await runtime.dispose()
+  })
+
+  it('routes reserved document paths to the handler without creating a tab', async () => {
+    const runtime = runtimeWith([memoryProvider({ '/a.txt': 'one' })])
+    await runtime.start()
+    await runtime.openFolder()
+    const handler = vi.fn()
+    runtime.setReservedDocumentHandler(handler)
+
+    runtime.openDocument(EXO_CONFIG_PATH)
+    runtime.openDocument('/.exo/state.json')
+
+    expect(handler).toHaveBeenCalledWith(EXO_CONFIG_PATH)
+    expect(handler).toHaveBeenCalledWith('/.exo/state.json')
+    expect(useWorkbenchStore.getState().tabs).toEqual([])
+    expect(runtime.documents.paths()).toEqual([])
     await runtime.dispose()
   })
 })

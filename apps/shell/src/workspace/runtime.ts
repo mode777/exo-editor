@@ -12,6 +12,8 @@ import {
 } from './contract'
 import { DocumentStore } from './documents'
 import { Session } from './session'
+import { isReservedPath, normalizePath } from './paths'
+import { PluginConfigStore } from '../plugins/store'
 import { FolderWorkspaceProvider } from './providers/folder/provider'
 import { IndexedDbHandleStore, type HandleStore } from './providers/folder/handle-store'
 import { supportsFolderWorkspaces } from './providers/folder/fsa'
@@ -45,6 +47,7 @@ export interface WorkspaceRuntimeOptions {
   supportsFolder?: () => boolean
   handleStore?: HandleStore
   eventTarget?: EventTarget
+  isVisible?: () => boolean
   now?: () => number
   createSession?: (handle: WorkspaceHandle) => WorkspaceSession
 }
@@ -60,6 +63,7 @@ const INITIAL_SNAPSHOT: WorkspaceSnapshot = {
 
 export class WorkspaceRuntime {
   readonly documents: DocumentStore
+  readonly pluginConfig: PluginConfigStore
 
   private readonly options: WorkspaceRuntimeOptions
   private readonly handleStore: HandleStore
@@ -69,6 +73,7 @@ export class WorkspaceRuntime {
   private provider: WorkspaceProvider | null = null
   private session: WorkspaceSession | null = null
   private externalRegistration: { dispose(): void } | null = null
+  private reservedDocumentHandler: ((path: WorkspacePath) => void) | null = null
   private startPromise: Promise<void> | null = null
   private disposed = false
   private generationCount = 0
@@ -77,6 +82,10 @@ export class WorkspaceRuntime {
     this.options = options
     this.handleStore = options.handleStore ?? new IndexedDbHandleStore()
     this.supportsFolder = options.supportsFolder ?? supportsFolderWorkspaces
+    this.pluginConfig = new PluginConfigStore({
+      eventTarget: options.eventTarget,
+      isVisible: options.isVisible,
+    })
     this.documents = new DocumentStore({
       getSession: () => this.session,
       onDirtyChange: (path, dirty) => setTabDirty(path, dirty),
@@ -96,6 +105,10 @@ export class WorkspaceRuntime {
 
   getProvider(): WorkspaceProvider | null {
     return this.provider
+  }
+
+  setReservedDocumentHandler(handler: ((path: WorkspacePath) => void) | null): void {
+    this.reservedDocumentHandler = handler
   }
 
   start(): Promise<void> {
@@ -165,6 +178,17 @@ export class WorkspaceRuntime {
   }
 
   openDocument(path: WorkspacePath): void {
+    let normalized: WorkspacePath
+    try {
+      normalized = normalizePath(path)
+    } catch {
+      return
+    }
+    const caseSensitive = this.current.capabilities?.caseSensitive ?? true
+    if (isReservedPath(normalized, caseSensitive)) {
+      this.reservedDocumentHandler?.(normalized)
+      return
+    }
     openFileTab(path)
     void this.documents.open(path)
   }
@@ -196,6 +220,8 @@ export class WorkspaceRuntime {
   async dispose(): Promise<void> {
     if (this.disposed) return
     this.disposed = true
+    this.reservedDocumentHandler = null
+    this.pluginConfig.detach()
     this.externalRegistration?.dispose()
     this.externalRegistration = null
     await this.session?.dispose()
@@ -260,6 +286,7 @@ export class WorkspaceRuntime {
   private async activate(handle: WorkspaceHandle, provider: WorkspaceProvider): Promise<void> {
     const previousSession = this.session
     const previousProvider = this.provider
+    this.pluginConfig.detach()
     this.externalRegistration?.dispose()
     this.externalRegistration = null
     await previousSession?.dispose()
@@ -290,6 +317,7 @@ export class WorkspaceRuntime {
       selection: null,
       explorerRevision: this.current.explorerRevision + 1,
     })
+    void this.pluginConfig.attach(session)
   }
 
   private createSession(handle: WorkspaceHandle): WorkspaceSession {
