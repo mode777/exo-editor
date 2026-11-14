@@ -1,0 +1,669 @@
+import satisfies from 'semver/functions/satisfies.js'
+import validRange from 'semver/ranges/valid.js'
+import { compileGlob } from './glob'
+
+/**
+ * Mirror of the `exoManifest` branch of `schema/exo.schema.json` plus the
+ * semantic rules in `docs/contracts/plugin-manifest.md`. The schema remains the
+ * shared shape; a parity test pins the constants used here.
+ */
+
+export const MANIFEST_SCHEMA_VERSION = 1
+export const MANIFEST_MAX_BYTES = 256 * 1024
+export const MANIFEST_TIMEOUT_MS = 5000
+export const MANIFEST_MAX_EDITORS = 20
+export const MANIFEST_MAX_GLOB_LENGTH = 200
+export const MANIFEST_MAX_NAME = 80
+export const MANIFEST_MAX_DESCRIPTION = 500
+export const MANIFEST_MAX_LABEL = 40
+export const MANIFEST_MAX_PAGE = 512
+export const MANIFEST_PRIORITY_MIN = -100
+export const MANIFEST_PRIORITY_MAX = 100
+
+export const MANIFEST_ID_PATTERN = '^[a-z0-9][a-z0-9.-]{2,63}$'
+export const MANIFEST_SEMVER_PATTERN =
+  '^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-((?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\\+([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?$'
+export const MANIFEST_RELATIVE_PAGE_PATTERN =
+  '^(?!/)(?![A-Za-z][A-Za-z0-9+.-]*:)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*[?#\\u0000]).+\\.[Hh][Tt][Mm][Ll]?$'
+export const MANIFEST_RELATIVE_ASSET_PATTERN =
+  '^(?!/)(?![A-Za-z][A-Za-z0-9+.-]*:)(?!.*[?#\\u0000]).+$'
+export const MANIFEST_HTTPS_URL_PATTERN = '^https://[^\\s@#]+$'
+
+export const PLUGIN_PERMISSIONS = ['workspace:read', 'workspace:write', 'events:subscribe'] as const
+
+export type PluginPermission = (typeof PLUGIN_PERMISSIONS)[number]
+
+export const MANIFEST_REQUIRED_FIELDS = [
+  'schemaVersion',
+  'id',
+  'name',
+  'version',
+  'publisher',
+  'engines',
+  'runtime',
+  'permissions',
+] as const
+
+export type ManifestErrorCode =
+  | 'network'
+  | 'cors'
+  | 'timeout'
+  | 'http-status'
+  | 'too-large'
+  | 'invalid-json'
+  | 'invalid-manifest'
+  | 'unsupported-origin'
+  | 'unsupported-version'
+  | 'incompatible-engine'
+
+export interface ManifestIssue {
+  code: ManifestErrorCode
+  field?: string
+  message?: string
+  status?: number
+}
+
+export interface ManifestPublisher {
+  name: string
+  url?: string
+}
+
+export interface ManifestFileEditor {
+  glob: string
+  /** Declared relative page, as written in the manifest. */
+  entry: string
+  /** Resolved absolute page URL. */
+  entryUrl: string
+  label: string
+  priority: number
+}
+
+export interface PluginManifest {
+  schemaVersion: typeof MANIFEST_SCHEMA_VERSION
+  manifestUrl: string
+  manifestOrigin: string
+  controllerUrl: string
+  /** Path of the approved directory tree, with a trailing slash. */
+  pluginRoot: string
+  id: string
+  name: string
+  version: string
+  description?: string
+  publisher: ManifestPublisher
+  homepage?: string
+  license?: string
+  icon?: string
+  engines: { exo: string }
+  permissions: PluginPermission[]
+  fileEditors: ManifestFileEditor[]
+}
+
+export type ManifestValidationResult =
+  { ok: true; manifest: PluginManifest } | { ok: false; error: ManifestIssue }
+
+export type ManifestLoadResult = ManifestValidationResult
+
+export type EntryFailureReason = 'invalid-contribution' | 'permission-denied'
+
+export type ResolvedEntry =
+  { ok: true; url: string; path: string } | { ok: false; reason: EntryFailureReason }
+
+const ID = new RegExp(MANIFEST_ID_PATTERN)
+const SEMVER = new RegExp(MANIFEST_SEMVER_PATTERN)
+const RELATIVE_PAGE = new RegExp(MANIFEST_RELATIVE_PAGE_PATTERN)
+const RELATIVE_ASSET = new RegExp(MANIFEST_RELATIVE_ASSET_PATTERN)
+const HTTPS_URL = new RegExp(MANIFEST_HTTPS_URL_PATTERN)
+const ENCODED_DOT = /%2e/i
+
+function issue(
+  code: ManifestErrorCode,
+  options: { field?: string; message?: string; status?: number } = {},
+): ManifestIssue {
+  return { code, ...options }
+}
+
+function invalid(field?: string, message?: string): ManifestValidationResult {
+  return { ok: false, error: issue('invalid-manifest', { field, message }) }
+}
+
+function pointer(...segments: Array<string | number>): string {
+  return `/${segments
+    .map((segment) => String(segment).replace(/~/g, '~0').replace(/\//g, '~1'))
+    .join('/')}`
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function hasOwn(value: Record<string, unknown>, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(value, key)
+}
+
+function unknownKeys(
+  value: Record<string, unknown>,
+  allowed: readonly string[],
+  base: string,
+): ManifestIssue | null {
+  for (const key of Object.keys(value)) {
+    if (!allowed.includes(key)) {
+      return issue('invalid-manifest', { field: `${base}/${key}` })
+    }
+  }
+  return null
+}
+
+function isStringInRange(value: unknown, min: number, max: number): value is string {
+  return typeof value === 'string' && value.length >= min && value.length <= max
+}
+
+function isHttpsUrl(value: unknown): value is string {
+  return typeof value === 'string' && HTTPS_URL.test(value) && !value.includes('\\')
+}
+
+function isRelativeAsset(value: unknown): value is string {
+  return typeof value === 'string' && RELATIVE_ASSET.test(value)
+}
+
+/** A final manifest/entry URL must be HTTPS, or HTTP only on localhost. */
+export function isSupportedOriginUrl(value: string): boolean {
+  let url: URL
+  try {
+    url = new URL(value)
+  } catch {
+    return false
+  }
+  if (url.username !== '' || url.password !== '') return false
+  if (url.protocol === 'https:') return true
+  return url.protocol === 'http:' && url.hostname === 'localhost'
+}
+
+function isSupportedPageUrl(value: string): boolean {
+  if (!isSupportedOriginUrl(value)) return false
+  const url = new URL(value)
+  return url.search === '' && url.hash === ''
+}
+
+function pluginRootFor(controllerUrl: string): string {
+  const { pathname } = new URL(controllerUrl)
+  return pathname.slice(0, pathname.lastIndexOf('/') + 1)
+}
+
+/**
+ * Resolve a declared page against the final manifest URL and confine it to the
+ * approved plugin root. Used by manifest validation and by registration.
+ */
+export function resolvePluginEntry(
+  declared: unknown,
+  manifestUrl: string,
+  pluginOrigin: string,
+  pluginRoot: string,
+): ResolvedEntry {
+  if (
+    typeof declared !== 'string' ||
+    declared.length === 0 ||
+    declared.length > MANIFEST_MAX_PAGE
+  ) {
+    return { ok: false, reason: 'invalid-contribution' }
+  }
+  if (!RELATIVE_PAGE.test(declared) || declared.includes('\\') || ENCODED_DOT.test(declared)) {
+    try {
+      const absolute = new URL(declared)
+      if (absolute.origin !== pluginOrigin) {
+        return { ok: false, reason: 'permission-denied' }
+      }
+    } catch {
+      // Not an absolute URL; fall through to the malformed-page error.
+    }
+    return { ok: false, reason: 'invalid-contribution' }
+  }
+
+  let url: URL
+  try {
+    url = new URL(declared, manifestUrl)
+  } catch {
+    return { ok: false, reason: 'invalid-contribution' }
+  }
+  if (url.origin !== pluginOrigin) return { ok: false, reason: 'permission-denied' }
+  if (!isSupportedPageUrl(url.href) || ENCODED_DOT.test(url.pathname)) {
+    return { ok: false, reason: 'permission-denied' }
+  }
+  if (!url.pathname.startsWith(pluginRoot)) {
+    return { ok: false, reason: 'permission-denied' }
+  }
+  return { ok: true, url: url.href, path: url.pathname }
+}
+
+function resolveController(
+  declared: string,
+  manifestUrl: string,
+  manifestOrigin: string,
+): { ok: true; controllerUrl: string; pluginRoot: string } | { ok: false; error: ManifestIssue } {
+  if (
+    typeof declared !== 'string' ||
+    declared.length === 0 ||
+    declared.length > MANIFEST_MAX_PAGE
+  ) {
+    return { ok: false, error: issue('invalid-manifest', { field: '/runtime/entry' }) }
+  }
+  if (!RELATIVE_PAGE.test(declared) || ENCODED_DOT.test(declared)) {
+    try {
+      const absolute = new URL(declared)
+      if (absolute.origin !== manifestOrigin) {
+        return { ok: false, error: issue('unsupported-origin', { field: '/runtime/entry' }) }
+      }
+    } catch {
+      // Not an absolute URL; fall through to the malformed-relative-page error.
+    }
+    return { ok: false, error: issue('invalid-manifest', { field: '/runtime/entry' }) }
+  }
+  let url: URL
+  try {
+    url = new URL(declared, manifestUrl)
+  } catch {
+    return { ok: false, error: issue('invalid-manifest', { field: '/runtime/entry' }) }
+  }
+  if (url.origin !== manifestOrigin) {
+    return { ok: false, error: issue('unsupported-origin', { field: '/runtime/entry' }) }
+  }
+  if (!isSupportedPageUrl(url.href) || ENCODED_DOT.test(url.pathname)) {
+    return { ok: false, error: issue('unsupported-origin', { field: '/runtime/entry' }) }
+  }
+  return { ok: true, controllerUrl: url.href, pluginRoot: pluginRootFor(url.href) }
+}
+
+function parsePermissions(value: unknown): PluginPermission[] | ManifestIssue {
+  if (!Array.isArray(value) || value.length > PLUGIN_PERMISSIONS.length) {
+    return issue('invalid-manifest', { field: '/permissions' })
+  }
+  const seen = new Set<string>()
+  const permissions: PluginPermission[] = []
+  for (let index = 0; index < value.length; index += 1) {
+    const permission = value[index]
+    if (
+      typeof permission !== 'string' ||
+      !(PLUGIN_PERMISSIONS as readonly string[]).includes(permission) ||
+      seen.has(permission)
+    ) {
+      return issue('invalid-manifest', { field: pointer('permissions', index) })
+    }
+    seen.add(permission)
+    permissions.push(permission as PluginPermission)
+  }
+  if (seen.has('workspace:write') && !seen.has('workspace:read')) {
+    return issue('invalid-manifest', {
+      field: '/permissions',
+      message: 'workspace:write requires workspace:read.',
+    })
+  }
+  return permissions
+}
+
+function parseFileEditors(
+  value: unknown,
+  manifestUrl: string,
+  manifestOrigin: string,
+  pluginRoot: string,
+): ManifestFileEditor[] | ManifestIssue {
+  if (!Array.isArray(value) || value.length > MANIFEST_MAX_EDITORS) {
+    return issue('invalid-manifest', { field: '/contributes/fileEditors' })
+  }
+  const editors: ManifestFileEditor[] = []
+  const globs = new Set<string>()
+  for (let index = 0; index < value.length; index += 1) {
+    const raw = value[index]
+    const base = pointer('contributes', 'fileEditors', index)
+    if (!isPlainObject(raw)) {
+      return issue('invalid-manifest', { field: base })
+    }
+    const unknown = unknownKeys(raw, ['glob', 'entry', 'label', 'priority'], base)
+    if (unknown) return unknown
+    if (!hasOwn(raw, 'glob') || typeof raw.glob !== 'string') {
+      return issue('invalid-manifest', { field: `${base}/glob` })
+    }
+    const compiled = compileGlob(raw.glob)
+    if (!compiled.ok) {
+      return issue('invalid-manifest', { field: `${base}/glob` })
+    }
+    if (globs.has(raw.glob)) {
+      return issue('invalid-manifest', {
+        field: `${base}/glob`,
+        message: 'A glob may be declared only once.',
+      })
+    }
+    globs.add(raw.glob)
+    if (!hasOwn(raw, 'entry')) {
+      return issue('invalid-manifest', { field: `${base}/entry` })
+    }
+    const entry = resolvePluginEntry(raw.entry, manifestUrl, manifestOrigin, pluginRoot)
+    if (!entry.ok) {
+      return issue(
+        entry.reason === 'permission-denied' ? 'unsupported-origin' : 'invalid-manifest',
+        { field: `${base}/entry` },
+      )
+    }
+    if (!isStringInRange(raw.label, 1, MANIFEST_MAX_LABEL)) {
+      return issue('invalid-manifest', { field: `${base}/label` })
+    }
+    let priority = 0
+    if (hasOwn(raw, 'priority')) {
+      if (
+        typeof raw.priority !== 'number' ||
+        !Number.isInteger(raw.priority) ||
+        raw.priority < MANIFEST_PRIORITY_MIN ||
+        raw.priority > MANIFEST_PRIORITY_MAX
+      ) {
+        return issue('invalid-manifest', { field: `${base}/priority` })
+      }
+      priority = raw.priority
+    }
+    editors.push({
+      glob: raw.glob,
+      entry: raw.entry as string,
+      entryUrl: entry.url,
+      label: raw.label,
+      priority,
+    })
+  }
+  return editors
+}
+
+/** Validate an already-parsed manifest against a final response URL. */
+export function validateManifest(
+  value: unknown,
+  finalUrl: string,
+  shellVersion: string,
+): ManifestValidationResult {
+  if (!isSupportedOriginUrl(finalUrl)) {
+    return { ok: false, error: issue('unsupported-origin') }
+  }
+  let manifestUrl: URL
+  try {
+    manifestUrl = new URL(finalUrl)
+  } catch {
+    return { ok: false, error: issue('unsupported-origin') }
+  }
+  if (manifestUrl.username !== '' || manifestUrl.password !== '') {
+    return { ok: false, error: issue('unsupported-origin') }
+  }
+  if (!isPlainObject(value)) return invalid()
+
+  const unknown = unknownKeys(
+    value,
+    [
+      'schemaVersion',
+      'id',
+      'name',
+      'version',
+      'description',
+      'publisher',
+      'homepage',
+      'license',
+      'icon',
+      'engines',
+      'runtime',
+      'permissions',
+      'contributes',
+    ],
+    '',
+  )
+  if (unknown) return { ok: false, error: unknown }
+
+  for (const field of MANIFEST_REQUIRED_FIELDS) {
+    if (!hasOwn(value, field)) return invalid(`/${field}`)
+  }
+
+  if (value.schemaVersion !== MANIFEST_SCHEMA_VERSION) {
+    return { ok: false, error: issue('unsupported-version', { field: '/schemaVersion' }) }
+  }
+  if (typeof value.id !== 'string' || !ID.test(value.id)) return invalid('/id')
+  if (!isStringInRange(value.name, 1, MANIFEST_MAX_NAME)) return invalid('/name')
+  if (typeof value.version !== 'string' || !SEMVER.test(value.version)) return invalid('/version')
+  if (
+    hasOwn(value, 'description') &&
+    !isStringInRange(value.description, 0, MANIFEST_MAX_DESCRIPTION)
+  ) {
+    return invalid('/description')
+  }
+
+  if (!isPlainObject(value.publisher)) return invalid('/publisher')
+  const publisherUnknown = unknownKeys(value.publisher, ['name', 'url'], '/publisher')
+  if (publisherUnknown) return { ok: false, error: publisherUnknown }
+  if (!isStringInRange(value.publisher.name, 1, MANIFEST_MAX_NAME)) {
+    return invalid('/publisher/name')
+  }
+  if (hasOwn(value.publisher, 'url') && !isHttpsUrl(value.publisher.url)) {
+    return invalid('/publisher/url')
+  }
+  if (hasOwn(value, 'homepage') && !isHttpsUrl(value.homepage)) return invalid('/homepage')
+  if (hasOwn(value, 'license') && !isStringInRange(value.license, 1, 256)) {
+    return invalid('/license')
+  }
+  if (hasOwn(value, 'icon') && !(isHttpsUrl(value.icon) || isRelativeAsset(value.icon))) {
+    return invalid('/icon')
+  }
+
+  if (!isPlainObject(value.engines)) return invalid('/engines')
+  const engineUnknown = unknownKeys(value.engines, ['exo'], '/engines')
+  if (engineUnknown) return { ok: false, error: engineUnknown }
+  if (!isStringInRange(value.engines.exo, 1, 256)) return invalid('/engines/exo')
+  if (validRange(value.engines.exo) === null) return invalid('/engines/exo')
+  if (!satisfies(shellVersion, value.engines.exo)) {
+    return { ok: false, error: issue('incompatible-engine', { field: '/engines/exo' }) }
+  }
+
+  if (!isPlainObject(value.runtime)) return invalid('/runtime')
+  const runtimeUnknown = unknownKeys(value.runtime, ['entry'], '/runtime')
+  if (runtimeUnknown) return { ok: false, error: runtimeUnknown }
+  if (typeof value.runtime.entry !== 'string') return invalid('/runtime/entry')
+  const controller = resolveController(value.runtime.entry, manifestUrl.href, manifestUrl.origin)
+  if (!controller.ok) return { ok: false, error: controller.error }
+
+  const permissions = parsePermissions(value.permissions)
+  if (!Array.isArray(permissions)) return { ok: false, error: permissions }
+
+  let fileEditors: ManifestFileEditor[] = []
+  if (hasOwn(value, 'contributes')) {
+    if (!isPlainObject(value.contributes)) return invalid('/contributes')
+    const contributesUnknown = unknownKeys(value.contributes, ['fileEditors'], '/contributes')
+    if (contributesUnknown) return { ok: false, error: contributesUnknown }
+    if (hasOwn(value.contributes, 'configuration')) {
+      return invalid('/contributes/configuration')
+    }
+    if (hasOwn(value.contributes, 'fileEditors')) {
+      const parsed = parseFileEditors(
+        value.contributes.fileEditors,
+        manifestUrl.href,
+        manifestUrl.origin,
+        controller.pluginRoot,
+      )
+      if (!Array.isArray(parsed)) return { ok: false, error: parsed }
+      fileEditors = parsed
+    }
+  }
+
+  return {
+    ok: true,
+    manifest: {
+      schemaVersion: MANIFEST_SCHEMA_VERSION,
+      manifestUrl: manifestUrl.href,
+      manifestOrigin: manifestUrl.origin,
+      controllerUrl: controller.controllerUrl,
+      pluginRoot: controller.pluginRoot,
+      id: value.id,
+      name: value.name,
+      version: value.version,
+      description: typeof value.description === 'string' ? value.description : undefined,
+      publisher: {
+        name: value.publisher.name,
+        url: typeof value.publisher.url === 'string' ? value.publisher.url : undefined,
+      },
+      homepage: typeof value.homepage === 'string' ? value.homepage : undefined,
+      license: typeof value.license === 'string' ? value.license : undefined,
+      icon: typeof value.icon === 'string' ? value.icon : undefined,
+      engines: { exo: value.engines.exo },
+      permissions,
+      fileEditors,
+    },
+  }
+}
+
+export interface LoadManifestOptions {
+  shellOrigin: string
+  shellVersion: string
+  fetchImpl?: typeof fetch
+  timeoutMs?: number
+  maxBytes?: number
+  signal?: AbortSignal
+  setTimeoutImpl?: typeof setTimeout
+  clearTimeoutImpl?: typeof clearTimeout
+}
+
+interface ReadTextResult {
+  ok: boolean
+  text?: string
+  code?: 'too-large' | 'invalid-json'
+}
+
+async function readText(response: Response, maxBytes: number): Promise<ReadTextResult> {
+  const length = response.headers.get('content-length')
+  if (length !== null && Number(length) > maxBytes) {
+    return { ok: false, code: 'too-large' }
+  }
+  let bytes: Uint8Array
+  if (!response.body) {
+    bytes = new Uint8Array(await response.arrayBuffer())
+    if (bytes.byteLength > maxBytes) return { ok: false, code: 'too-large' }
+  } else {
+    const reader = response.body.getReader()
+    const chunks: Uint8Array[] = []
+    let total = 0
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      total += value.byteLength
+      if (total > maxBytes) {
+        await reader.cancel()
+        return { ok: false, code: 'too-large' }
+      }
+      chunks.push(value)
+    }
+    bytes = new Uint8Array(total)
+    let offset = 0
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset)
+      offset += chunk.byteLength
+    }
+  }
+  try {
+    return { ok: true, text: new TextDecoder('utf-8', { fatal: true }).decode(bytes) }
+  } catch {
+    return { ok: false, code: 'invalid-json' }
+  }
+}
+
+function isJsonContentType(value: string | null): boolean {
+  if (!value) return false
+  const type = value.split(';', 1)[0].trim().toLowerCase()
+  return type === 'application/json' || type.endsWith('+json')
+}
+
+/**
+ * Fetch and validate one manifest. The returned origin and controller URL come
+ * from the final response URL, never from the declared URL.
+ */
+export async function loadManifest(
+  url: string,
+  options: LoadManifestOptions,
+): Promise<ManifestLoadResult> {
+  const requestUrl = (() => {
+    try {
+      return new URL(url)
+    } catch {
+      return null
+    }
+  })()
+  if (!requestUrl || !isSupportedOriginUrl(requestUrl.href)) {
+    return { ok: false, error: issue('unsupported-origin') }
+  }
+
+  const fetchImpl = options.fetchImpl ?? fetch
+  const timeoutMs = options.timeoutMs ?? MANIFEST_TIMEOUT_MS
+  const maxBytes = options.maxBytes ?? MANIFEST_MAX_BYTES
+  const setTimeoutImpl = options.setTimeoutImpl ?? setTimeout
+  const clearTimeoutImpl = options.clearTimeoutImpl ?? clearTimeout
+  const controller = new AbortController()
+  let timedOut = false
+  const onAbort = () => controller.abort()
+  options.signal?.addEventListener('abort', onAbort, { once: true })
+  const timer = setTimeoutImpl(() => {
+    timedOut = true
+    controller.abort()
+  }, timeoutMs)
+
+  let response: Response
+  try {
+    try {
+      response = await fetchImpl(url, {
+        mode: 'cors',
+        credentials: 'omit',
+        redirect: 'follow',
+        referrerPolicy: 'no-referrer',
+        signal: controller.signal,
+      })
+    } catch (error) {
+      if (options.signal?.aborted) throw error
+      if (timedOut) return { ok: false, error: issue('timeout') }
+      const crossOrigin = requestUrl.origin !== options.shellOrigin
+      return {
+        ok: false,
+        error: issue(crossOrigin ? 'cors' : 'network', {
+          message: crossOrigin
+            ? `Could not fetch ${requestUrl.origin}; a CORS or network failure is possible.`
+            : `Could not fetch ${requestUrl.origin}.`,
+        }),
+      }
+    }
+
+    if (!response.ok) {
+      return {
+        ok: false,
+        error: issue('http-status', { status: response.status }),
+      }
+    }
+    if (!isJsonContentType(response.headers.get('content-type'))) {
+      return {
+        ok: false,
+        error: issue('invalid-manifest', { message: 'Expected a JSON content type.' }),
+      }
+    }
+
+    const finalUrl = response.url || url
+    if (!isSupportedOriginUrl(finalUrl)) {
+      return { ok: false, error: issue('unsupported-origin') }
+    }
+
+    let text: ReadTextResult
+    try {
+      text = await readText(response, maxBytes)
+    } catch (error) {
+      if (options.signal?.aborted) throw error
+      if (timedOut) return { ok: false, error: issue('timeout') }
+      return { ok: false, error: issue('network') }
+    }
+    if (!text.ok) {
+      return { ok: false, error: issue(text.code ?? 'invalid-json') }
+    }
+
+    let value: unknown
+    try {
+      value = JSON.parse(text.text ?? '')
+    } catch {
+      return { ok: false, error: issue('invalid-json') }
+    }
+    return validateManifest(value, finalUrl, options.shellVersion)
+  } finally {
+    clearTimeoutImpl(timer)
+    options.signal?.removeEventListener('abort', onAbort)
+  }
+}

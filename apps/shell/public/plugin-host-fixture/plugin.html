@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Exo fixture controller</title>
+  </head>
+  <body>
+    <pre id="observation">starting</pre>
+    <script>
+      const params = new URLSearchParams(location.hash.slice(1))
+      const host = params.get('exo-host')
+      const mode = params.get('exo-mode')
+      const sessionId = params.get('exo-session')
+      let storage = 'unavailable'
+      try {
+        localStorage.setItem('exo-fixture', '1')
+        localStorage.removeItem('exo-fixture')
+        storage = 'available'
+      } catch {
+        storage = 'unavailable'
+      }
+      const observation = {
+        mode,
+        origin: location.origin,
+        storage,
+        hidden: document.visibilityState,
+      }
+      document.getElementById('observation').textContent = JSON.stringify(observation)
+      document.title = `Exo fixture ${mode} ${storage}`
+
+      window.addEventListener('message', (event) => {
+        if (!host || event.origin !== host) return
+        const data = event.data
+        if (!data || data.exo !== 1 || data.type !== 'shell/init') return
+        if (mode !== 'register') return
+        parent.postMessage(
+          {
+            exo: 1,
+            type: 'plugin/register',
+            payload: { fileEditors: [{ glob: '**/*.txt', entry: 'sibling.html' }] },
+          },
+          host,
+        )
+        parent.postMessage({ exo: 1, type: 'plugin/register-complete', payload: {} }, host)
+      })
+
+      if (host && sessionId) {
+        parent.postMessage(
+          {
+            exo: 1,
+            type: 'plugin/ready',
+            payload: { protocolVersion: '1', sessionId },
+          },
+          host,
+        )
+      }
+    </script>
+  </body>
+</html>

@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "id": "com.example.exo.fixture",
+  "name": "Exo Host Fixture (widened)",
+  "version": "1.1.0",
+  "description": "The same plugin with one more permission and one more editor.",
+  "publisher": { "name": "Exo" },
+  "engines": { "exo": ">=0.1.0" },
+  "runtime": { "entry": "plugin.html" },
+  "permissions": ["workspace:read", "workspace:write"],
+  "contributes": {
+    "fileEditors": [
+      {
+        "glob": "**/*.txt",
+        "entry": "editor.html",
+        "label": "Fixture Text",
+        "priority": 0
+      },
+      {
+        "glob": "**/*.md",
+        "entry": "editor.html",
+        "label": "Fixture Markdown",
+        "priority": 5
+      }
+    ]
+  }
+}

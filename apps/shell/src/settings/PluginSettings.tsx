@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { usePluginConfig, useWorkspaceRuntime, useWorkspaceSnapshot } from '../workspace/context'
+import {
+  usePluginConfig,
+  usePluginHost,
+  useWorkspaceRuntime,
+  useWorkspaceSnapshot,
+} from '../workspace/context'
+import type { PluginHostRecord, PluginLogEntry } from '../plugins/host'
 import {
   emptyExoConfig,
   serializeExoConfig,
@@ -52,10 +58,106 @@ function IssueList({ issues }: { issues: PluginConfigIssue[] }) {
   )
 }
 
+function phaseText(record: PluginHostRecord | undefined): string {
+  if (!record) return 'Not loaded yet'
+  switch (record.phase) {
+    case 'disabled':
+      return 'Disabled'
+    case 'loading':
+      return 'Loading manifest…'
+    case 'awaiting-consent':
+      return 'Awaiting consent'
+    case 'denied':
+      return 'Consent denied for this session'
+    case 'registering':
+      return 'Registering…'
+    case 'active':
+      return record.registrations.length === 0
+        ? 'Active (no editors)'
+        : `Active — ${record.registrations.map((editor) => editor.label).join(', ')}`
+    case 'failed':
+      return record.error ? `Failed — ${record.error.code} (${record.error.phase})` : 'Failed'
+  }
+}
+
+export function RuntimeRow({
+  record,
+  onReview,
+  onRevoke,
+}: {
+  record: PluginHostRecord | undefined
+  onReview: (identity: string) => void
+  onRevoke: (identity: string) => void
+}) {
+  const [confirmRevoke, setConfirmRevoke] = useState(false)
+  if (!record) {
+    return <p className="exo-plugin-status">Not loaded yet</p>
+  }
+  const canReview =
+    (record.phase === 'awaiting-consent' ||
+      record.phase === 'denied' ||
+      record.consent === 'revoked') &&
+    Boolean(record.identity)
+  const canRevoke =
+    Boolean(record.identity) && (record.phase === 'active' || record.phase === 'registering')
+
+  return (
+    <div className="exo-plugin-runtime">
+      <p className={`exo-plugin-status exo-plugin-status-${record.phase}`}>{phaseText(record)}</p>
+      {record.manifest && (
+        <p className="exo-plugin-meta">
+          {record.manifest.name} {record.manifest.version} — {record.manifest.publisher.name}
+        </p>
+      )}
+      {record.manifest && (
+        <p className="exo-plugin-origin">
+          Origin: <code>{record.manifest.manifestOrigin}</code>
+        </p>
+      )}
+      {record.error?.message && <p className="exo-plugin-error-message">{record.error.message}</p>}
+      {record.registrations.length > 0 && (
+        <p className="exo-plugin-editors">
+          Editors:{' '}
+          {record.registrations.map((editor) => (
+            <code key={`${editor.glob}:${editor.entryUrl}`}>{editor.label}</code>
+          ))}
+        </p>
+      )}
+      {(canReview || canRevoke) && (
+        <div className="exo-plugin-runtime-actions">
+          {canReview && record.identity && (
+            <button type="button" onClick={() => onReview(record.identity as string)}>
+              Review consent
+            </button>
+          )}
+          {canRevoke && record.identity && (
+            <button
+              type="button"
+              className="exo-plugin-revoke"
+              onClick={() => {
+                if (!confirmRevoke) {
+                  setConfirmRevoke(true)
+                  return
+                }
+                setConfirmRevoke(false)
+                onRevoke(record.identity as string)
+              }}
+              onBlur={() => setConfirmRevoke(false)}
+            >
+              {confirmRevoke ? 'Confirm revoke' : 'Revoke consent'}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function PluginSettings() {
   const runtime = useWorkspaceRuntime()
   const workspace = useWorkspaceSnapshot()
   const config = usePluginConfig()
+  const host = usePluginHost()
   const store = runtime.pluginConfig
 
   const writable = workspace.phase === 'ready' && workspace.writable
@@ -225,6 +327,11 @@ export function PluginSettings() {
                       Remove
                     </button>
                   </div>
+                  <RuntimeRow
+                    record={host.records.find((record) => record.manifestUrl === entry.manifest)}
+                    onReview={(identity) => runtime.pluginHost.requestConsent(identity)}
+                    onRevoke={(identity) => runtime.pluginHost.revokeConsent(identity)}
+                  />
                 </li>
               ))}
             </ul>
@@ -251,8 +358,8 @@ export function PluginSettings() {
                 </button>
               </div>
               <p className="exo-settings-hint">
-                Adding records the URL only. The manifest is not fetched until the plugin host loads
-                it, and no code runs in this layer.
+                Adding records the URL and starts loading the manifest. The plugin still needs your
+                consent before a frame is mounted.
               </p>
             </form>
           )}
@@ -321,6 +428,34 @@ export function PluginSettings() {
           {status}
         </p>
       )}
+
+      {workspace.phase === 'ready' && <PluginLog entries={host.log} />}
+    </section>
+  )
+}
+
+export function PluginLog({ entries }: { entries: PluginLogEntry[] }) {
+  if (entries.length === 0) return null
+  return (
+    <section className="exo-plugin-log" aria-labelledby="exo-plugin-log-title">
+      <h4 id="exo-plugin-log-title">Plugin log</h4>
+      <ul>
+        {entries.map((entry, index) => (
+          <li key={`${entry.at}:${entry.phase}:${entry.code ?? ''}:${index}`}>
+            <time dateTime={new Date(entry.at).toISOString()}>
+              {new Date(entry.at).toLocaleTimeString()}
+            </time>{' '}
+            <code>{entry.pluginId ?? entry.manifestUrl ?? 'shell'}</code> {entry.phase}
+            {entry.code && (
+              <>
+                {' '}
+                <code>{entry.code}</code>
+              </>
+            )}
+            {entry.message && <span> — {entry.message}</span>}
+          </li>
+        ))}
+      </ul>
     </section>
   )
 }

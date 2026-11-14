@@ -5,7 +5,11 @@ import { resolve } from 'node:path'
 // Asserts the deployed document carries the ratified CSP. This runs against the
 // build output, not the source constant, so a transform or template regression
 // fails the pipeline instead of slipping into the deploy.
-const EXPECTED_DIRECTIVES = ['frame-src https:', "connect-src 'self' https:", "script-src 'self'"]
+const EXPECTED_DIRECTIVES = [
+  'frame-src https: http://localhost:*',
+  "connect-src 'self' https: http://localhost:*",
+  "script-src 'self'",
+]
 
 const indexFile = resolve(process.argv[2] ?? 'dist/index.html')
 const html = readFileSync(indexFile, 'utf8')

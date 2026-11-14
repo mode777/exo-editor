@@ -21,9 +21,20 @@ describe('content security policy injection', () => {
     expect(tag.attrs?.content).toBe(CSP_DIRECTIVES)
     expect(tag.injectTo).toBe('head-prepend')
 
-    expect(CSP_DIRECTIVES).toContain('frame-src https:')
-    expect(CSP_DIRECTIVES).toContain("connect-src 'self' https:")
+    expect(CSP_DIRECTIVES).toContain('frame-src https: http://localhost:*')
+    expect(CSP_DIRECTIVES).toContain("connect-src 'self' https: http://localhost:*")
     expect(CSP_DIRECTIVES).toContain("script-src 'self'")
+  })
+
+  it('allows only localhost as a plain-HTTP source', () => {
+    const tokens = CSP_DIRECTIVES.split(/[\s;]+/).filter(Boolean)
+    expect(tokens).not.toContain('http:')
+    expect(tokens.filter((token) => token.startsWith('http:'))).toEqual([
+      'http://localhost:*',
+      'http://localhost:*',
+    ])
+    expect(CSP_DIRECTIVES).toContain('frame-src https: http://localhost:*')
+    expect(CSP_DIRECTIVES).toContain("connect-src 'self' https: http://localhost:*")
   })
 
   it('never allows dynamic evaluation or inline scripts', () => {

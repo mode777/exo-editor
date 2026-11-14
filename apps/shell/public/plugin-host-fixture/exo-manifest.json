@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "com.example.exo.fixture",
+  "name": "Exo Host Fixture",
+  "version": "1.0.0",
+  "description": "A stub plugin used to verify the Exo plugin host.",
+  "publisher": { "name": "Exo" },
+  "engines": { "exo": ">=0.1.0" },
+  "runtime": { "entry": "plugin.html" },
+  "permissions": ["workspace:read"],
+  "contributes": {
+    "fileEditors": [
+      {
+        "glob": "**/*.txt",
+        "entry": "editor.html",
+        "label": "Fixture Text",
+        "priority": 0
+      }
+    ]
+  }
+}

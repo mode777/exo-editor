@@ -4,7 +4,8 @@ import type { HtmlTagDescriptor, Plugin } from 'vite'
 // headers, so this is embedded in the document instead. Deliberately no
 // `default-src` and no `style-src`: the workbench kit positions sashes and
 // panels with inline style attributes, and the spec fixes the directive set.
-export const CSP_DIRECTIVES = "frame-src https:; connect-src 'self' https:; script-src 'self'"
+export const CSP_DIRECTIVES =
+  "frame-src https: http://localhost:*; connect-src 'self' https: http://localhost:*; script-src 'self'"
 
 export const CSP_META_TAG: HtmlTagDescriptor = {
   tag: 'meta',

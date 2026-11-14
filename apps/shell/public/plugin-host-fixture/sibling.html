@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Exo fixture sibling editor</title>
+  </head>
+  <body>
+    <pre id="observation">sibling</pre>
+    <script>
+      const observation = {
+        mode: new URLSearchParams(location.hash.slice(1)).get('exo-mode'),
+        origin: location.origin,
+      }
+      document.getElementById('observation').textContent = JSON.stringify(observation)
+    </script>
+  </body>
+</html>

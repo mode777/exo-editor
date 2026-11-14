@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useSyncExternalStore, type Reac
 import type { WorkspacePath } from './contract'
 import type { DocumentState } from './documents'
 import type { PluginConfigSnapshot } from '../plugins/store'
+import type { PluginHostSnapshot } from '../plugins/host'
 import type { WorkspaceRuntime, WorkspaceSnapshot } from './runtime'
 
 const WorkspaceRuntimeContext = createContext<WorkspaceRuntime | null>(null)
@@ -53,5 +54,11 @@ export function useDirtyDocuments(): boolean {
 export function usePluginConfig(): PluginConfigSnapshot {
   const runtime = useWorkspaceRuntime()
   const store = runtime.pluginConfig
+  return useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
+}
+
+export function usePluginHost(): PluginHostSnapshot {
+  const runtime = useWorkspaceRuntime()
+  const store = runtime.pluginHost
   return useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
 }

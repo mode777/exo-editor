@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "com.example.exo.neverready",
+  "name": "Exo Host Fixture (never ready)",
+  "version": "1.0.0",
+  "description": "A controller that never sends plugin/ready, used to verify the timeout.",
+  "publisher": { "name": "Exo" },
+  "engines": { "exo": ">=0.1.0" },
+  "runtime": { "entry": "never-ready.html" },
+  "permissions": ["workspace:read"]
+}

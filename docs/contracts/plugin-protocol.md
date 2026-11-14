@@ -127,7 +127,13 @@ interface ShellInit {
 }
 ```
 
-4. Plugin proceeds with registration or its first file request.
+4. Shell-to-plugin messages use the plugin's exact origin as the `postMessage`
+   `targetOrigin`. The only exception is a same-origin plugin running with
+   `allow-scripts` only: its frame has an opaque origin, so the shell uses `*`
+   and relies on the frame instance plus the session id for identity. `*` is
+   never used for a cross-origin frame, and no message sent to an opaque frame
+   contains file content in the registration phase.
+5. Plugin proceeds with registration or its first file request.
 
 Handler init is not acknowledged and there is no heartbeat in v1; the first
 request is the earliest liveness signal, and an unresponsive handler surfaces as
@@ -173,21 +179,35 @@ plugin/register-complete {}
 shell/register-ack      { accepted: string[]; rejected: RejectedContribution[] }
 
 FileEditorContribution = { glob: string; entry: string; label?: string }
+RejectedContribution   = { index: number; reason: RegistrationRejection; message?: string }
+RegistrationRejection  = 'not-declared' | 'permission-denied' | 'invalid-glob' | 'invalid-contribution'
 ```
 
 - `plugin/register` may be sent 0..n times before `plugin/register-complete`.
   Registrations are additive and validated on receipt; invalid entries are
-  collected in `rejected` with a reason and never become active.
-- A registered `glob` must be declared in the manifest; a registered `entry` must
-  resolve inside the plugin root. The glob may be paired with any page in that
-  root, including one added after the manifest was approved (D14). An undeclared
-  glob is rejected with `not-declared`; an entry outside the root is rejected
-  with `permission-denied`. A register message after `register-complete` is a
-  protocol violation (section 3.3), not a live update.
-- `shell/register-ack` is the last message the plugin receives. The shell removes
-  the iframe 250 ms later so the plugin can flush logs.
+  collected in `rejected` with an index and a reason and never become active.
+- A registered `glob` must be declared exactly once in the manifest; a registered
+  `entry` must resolve inside the plugin root. The glob may be paired with any
+  page in that root, including one added after the manifest was approved (D14).
+  An undeclared glob is rejected with `not-declared`; an entry outside the root
+  is rejected with `permission-denied`. A register message after
+  `register-complete` is a protocol violation (section 3.3), not a live update.
+- A missing `label` defaults to the label of the manifest contribution for that
+  glob. A supplied label must be 1-40 characters; otherwise the contribution is
+  rejected with `invalid-contribution`. Priority is not part of the registration
+  message: it always comes from the manifest contribution for the glob.
+- Identical `glob` and `entry` pairs registered more than once before completion
+  produce one registry contribution.
+- `shell/register-ack` is the last message the plugin receives. `accepted`
+  contains the accepted glob strings; `rejected` contains one entry per rejected
+  contribution, in registration order. The shell removes the iframe 250 ms later
+  so the plugin can flush logs.
 - Registrations become active only after `plugin/register-complete`. A plugin that
   never completes registers nothing.
+- Registration order is the order in which the shell accepted the contributions,
+  and the plugin's declaration position in `exo.json` is the outer selection
+  order. Equal-priority selection therefore never depends on network or handshake
+  completion order.
 - If the plugin declared no `contributes.fileEditors`, it may complete
   immediately; the shell records it as a configuration-only or event-only plugin
   for later layers.

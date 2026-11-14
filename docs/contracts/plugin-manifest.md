@@ -190,9 +190,15 @@ validator; it is never ignored in v1.
   brace alternation (`{ts,tsx}`). No negation, no extglobs, no regex.
 - A glob may not start with `/`, contain `..`, contain NUL, be empty, or be
   longer than 200 characters.
+- Each `glob` may be declared at most once in `contributes.fileEditors`. Two
+  contributions with the same `glob` make the manifest invalid, so a registered
+  glob has exactly one priority and one default label.
 - Overlapping registrations are allowed. When several plugins match a file, the
-  shell picks the highest `priority`, then the earliest registration, and offers
-  the others through "Open with...".
+  shell picks the highest `priority`, then the earliest registration, where
+  "earliest" means the earlier enabled entry in `exo.json` and then the earlier
+  registration message within that plugin. The choice therefore does not depend
+  on fetch or handshake completion order. The other matches are offered through
+  "Open with...".
 
 ## 4. Entry resolution and the plugin root
 
@@ -215,7 +221,10 @@ resolved with the same rules:
    Siblings of the controller entry and descendants of its directory are allowed;
    parents and unrelated directories are rejected. For example, with
    `runtime.entry = "plugin.html"`, `other.html` and `editors/code.html` are
-   allowed while `../shared/plugin.html` is not.
+   allowed while `../shared/plugin.html` is not. Percent-encoded dot segments
+   (`%2e`, case-insensitive) are rejected in the declared and resolved path even
+   though they survive URL normalization, because a server may decode them after
+   the browser has removed literal `..` segments.
 5. The entry must be `https` (or `http://localhost` in development).
 6. The entry origin **may equal the shell origin**. A same-origin plugin is
    mounted with the stricter sandbox (`allow-scripts`, no
@@ -250,6 +259,11 @@ origin and CSP, not the shell's.
   `unsupported-origin`, `unsupported-version`, `incompatible-engine`. These are
   the codes the consent UI and the plugin log display; they never include raw
   response bodies or stack traces.
+- Browsers reject a CORS failure and a network failure with the same `TypeError`.
+  A cross-origin request that rejects before a response is therefore reported as
+  `cors`, and its message names the origin and says that a network failure is
+  possible. A same-origin rejection is `network`; `timeout` is reserved for the
+  five-second limit and `http-status` for a non-success response.
 - The manifest is cached in memory for the session. It is never persisted as
   trusted data; consent is persisted separately (section 6).
 
@@ -258,6 +272,15 @@ origin and CSP, not the shell's.
 Consent is required before the controller entry is mounted, and is requested
 again whenever the capability surface widens. It is shown for every plugin,
 including first-party plugins served from the shell origin.
+
+### Identity
+
+A plugin's identity is `${manifestOrigin}::${id}`, using the final origin after
+redirects. Consent records, settings and the runtime registry key on it. Two
+entries in one workspace may resolve to the same identity only if they are the
+same plugin: the shell loads the earlier declaration and reports the later entry
+as `duplicate-identity`, with no consent prompt and no frame. The same `id` on a
+different origin is a different plugin.
 
 ### Displayed to the user
 

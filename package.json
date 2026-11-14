@@ -13,6 +13,7 @@
   ],
   "scripts": {
     "dev": "npm run dev --workspace @exo/shell",
+    "dev:plugin": "npm run dev:plugin --workspace @exo/shell",
     "lint": "npm run lint --workspace @exo/shell",
     "format": "npm run format --workspace @exo/shell",
     "format:check": "npm run format:check --workspace @exo/shell",

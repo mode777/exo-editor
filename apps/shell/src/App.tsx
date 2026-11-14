@@ -7,6 +7,7 @@ import {
 } from 'vscode-workbench'
 import { DocumentArea } from './document/DocumentArea'
 import { requestExplorerCommand } from './explorer/bus'
+import { ConsentDialog } from './plugins/ConsentDialog'
 import { SettingsDialog, type SettingsSection } from './settings/SettingsDialog'
 import { ThemeSync } from './theme-sync'
 import {
@@ -23,6 +24,7 @@ import { workbenchViews } from './workbench/views'
 import { workspaceErrorMessage, type WorkspacePath } from './workspace/contract'
 import {
   useDirtyDocuments,
+  usePluginHost,
   useWorkspaceSnapshot,
   WorkspaceRuntimeProvider,
 } from './workspace/context'
@@ -61,6 +63,7 @@ export function App({ runtime: providedRuntime }: AppProps = {}) {
 function Shell({ runtime }: { runtime: WorkspaceRuntime }) {
   const snapshot = useWorkspaceSnapshot()
   const dirty = useDirtyDocuments()
+  const host = usePluginHost()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [settingsSection, setSettingsSection] = useState<SettingsSection>('general')
   const [pendingClose, setPendingClose] = useState<PendingClose | null>(null)
@@ -224,6 +227,12 @@ function Shell({ runtime }: { runtime: WorkspaceRuntime }) {
         open={settingsOpen}
         section={settingsSection}
         onClose={() => setSettingsOpen(false)}
+      />
+      <ConsentDialog
+        request={host.consentRequest}
+        shellOrigin={typeof window === 'undefined' ? '' : window.location.origin}
+        onApprove={(identity) => runtime.pluginHost.approveConsent(identity)}
+        onDeny={(identity) => runtime.pluginHost.denyConsent(identity)}
       />
       {pendingClose && (
         <ClosePromptDialog

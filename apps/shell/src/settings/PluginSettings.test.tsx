@@ -9,8 +9,77 @@ import { MemoryHandleStore } from '../workspace/providers/folder/handle-store'
 import type { WorkspaceProvider } from '../workspace/contract'
 import { clearWorkspaceTabs, configurePresetStore } from '../workbench/tabs'
 import { EXO_CONFIG_PATH } from '../plugins/config'
+import { ConsentStore, type ConsentStorage, type Digest } from '../plugins/consent'
+import { FakeFrameTransport } from '../plugins/frame-test-support'
+import { PluginHost } from '../plugins/host'
 
 const decoder = new TextDecoder()
+const FIXED_FINGERPRINT = `v1:${'0'.repeat(64)}`
+const fixedDigest: Digest = async () => new Uint8Array(32).buffer
+
+class MemoryStorage implements ConsentStorage {
+  readonly values = new Map<string, string>()
+  getItem(key: string): string | null {
+    return this.values.get(key) ?? null
+  }
+  setItem(key: string, value: string): void {
+    this.values.set(key, value)
+  }
+  removeItem(key: string): void {
+    this.values.delete(key)
+  }
+}
+
+function testManifest(): Record<string, unknown> {
+  return {
+    schemaVersion: 1,
+    id: 'com.example.test',
+    name: 'Test Plugin',
+    version: '1.0.0',
+    publisher: { name: 'Test Publisher' },
+    engines: { exo: '*' },
+    runtime: { entry: 'plugin.html' },
+    permissions: ['workspace:read'],
+    contributes: {
+      fileEditors: [{ glob: '**/*.txt', entry: 'editor.html', label: 'Text', priority: 0 }],
+    },
+  }
+}
+
+function manifestResponse(url: string): Response {
+  const response = new Response(JSON.stringify(testManifest()), {
+    headers: { 'content-type': 'application/json' },
+  })
+  Object.defineProperty(response, 'url', { value: url })
+  return response
+}
+
+function testHost() {
+  const storage = new MemoryStorage()
+  const consentStore = new ConsentStore({ storage })
+  for (const origin of ['https://plugins.example.com', 'https://a.example', 'https://b.example']) {
+    consentStore.grant({
+      manifestOrigin: origin,
+      pluginId: 'com.example.test',
+      manifestUrl: `${origin}/exo-manifest.json`,
+      version: '1.0.0',
+      fingerprint: FIXED_FINGERPRINT,
+      grantedAt: '2026-11-14T00:00:00.000Z',
+    })
+  }
+  const fetchImpl = vi.fn(async (url: RequestInfo | URL) => manifestResponse(String(url)))
+  const host = new PluginHost({
+    transport: new FakeFrameTransport(),
+    fetchImpl: fetchImpl as unknown as typeof fetch,
+    consentStore,
+    digest: fixedDigest,
+    shellOrigin: 'https://editor.example.com',
+    shellVersion: '0.1.0',
+    now: () => 1,
+    createSessionId: () => 'session-1',
+  })
+  return { host, fetchImpl, storage }
+}
 
 function configJson(manifests: string[]): string {
   return `${JSON.stringify(
@@ -32,12 +101,14 @@ async function mount(
     initialFiles: files,
     writable: options.writable ?? true,
   })
+  const host = testHost()
   const runtime = new WorkspaceRuntime({
     providerFactory: () => provider,
     supportsFolder: () => true,
     handleStore: new MemoryHandleStore(),
     eventTarget: new EventTarget(),
     now: () => 1,
+    pluginHost: host.host,
   })
   await runtime.start()
   if (options.open !== false) await runtime.openFolder()
@@ -46,7 +117,15 @@ async function mount(
   document.body.appendChild(container)
   const root = createRoot(container)
   await act(async () => root.render(<App runtime={runtime} />))
-  return { provider, runtime, container, root, handle: await provider.open() }
+  return {
+    provider,
+    runtime,
+    container,
+    root,
+    handle: await provider.open(),
+    host: host.host,
+    fetchImpl: host.fetchImpl,
+  }
 }
 
 async function unmount(workspace: Awaited<ReturnType<typeof mount>>) {
@@ -73,7 +152,10 @@ function submit(form: Element | null) {
   form?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
 }
 
-async function openPluginSettings(workspace: Awaited<ReturnType<typeof mount>>) {
+async function openPluginSettings(workspace: {
+  runtime: WorkspaceRuntime
+  container: HTMLElement
+}) {
   await act(async () => {
     workspace.runtime.openDocument(EXO_CONFIG_PATH)
   })
@@ -102,9 +184,7 @@ describe('plugin settings surface', () => {
     vi.unstubAllGlobals()
   })
 
-  it('creates exo.json from the missing state without loading plugin code', async () => {
-    const fetchSpy = vi.fn()
-    vi.stubGlobal('fetch', fetchSpy)
+  it('creates exo.json and starts the host after adding an entry', async () => {
     const workspace = await mount({ '/a.txt': 'one' })
     try {
       await openPluginSettings(workspace)
@@ -125,11 +205,17 @@ describe('plugin settings surface', () => {
           'https://plugins.example.com/exo-manifest.json',
         ),
       )
+      await vi.waitFor(() =>
+        expect(workspace.host.getSnapshot().records[0]?.phase).toBe('registering'),
+      )
       expect(decoder.decode(await workspace.handle.read(EXO_CONFIG_PATH))).toBe(
         configJson(['https://plugins.example.com/exo-manifest.json']),
       )
       expect(workspace.container.querySelectorAll('iframe')).toHaveLength(0)
-      expect(fetchSpy).not.toHaveBeenCalled()
+      expect(workspace.fetchImpl).toHaveBeenCalledWith(
+        'https://plugins.example.com/exo-manifest.json',
+        expect.objectContaining({ mode: 'cors', credentials: 'omit' }),
+      )
       expect(useWorkbenchStore.getState().tabs).toEqual([])
     } finally {
       await unmount(workspace)
@@ -164,7 +250,9 @@ describe('plugin settings surface', () => {
         remove?.click()
       })
       await vi.waitFor(() =>
-        expect(workspace.container.textContent).not.toContain('https://a.example/m.json'),
+        expect(workspace.container.querySelector('.exo-plugin-list')?.textContent).not.toContain(
+          'https://a.example/m.json',
+        ),
       )
       expect(decoder.decode(await workspace.handle.read(EXO_CONFIG_PATH))).toBe(
         configJson(['https://b.example/m.json']),

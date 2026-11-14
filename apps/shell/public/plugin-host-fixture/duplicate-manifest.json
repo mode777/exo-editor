@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "com.example.exo.fixture",
+  "name": "Exo Host Fixture (duplicate identity)",
+  "version": "1.0.0",
+  "description": "A second manifest that claims the same origin and plugin id.",
+  "publisher": { "name": "Exo" },
+  "engines": { "exo": ">=0.1.0" },
+  "runtime": { "entry": "plugin.html" },
+  "permissions": ["workspace:read"],
+  "contributes": {
+    "fileEditors": [
+      {
+        "glob": "**/*.txt",
+        "entry": "editor.html",
+        "label": "Duplicate Fixture",
+        "priority": 0
+      }
+    ]
+  }
+}

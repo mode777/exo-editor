@@ -177,6 +177,14 @@ Timeouts are contract values, not implementation details: 10 s to `plugin/ready`
 1 s for a dispose acknowledgement. A miss is reported to the user with the
 plugin id and the phase that failed, and the frame is removed.
 
+The host initializes enabled entries in `exo.json` declaration order and uses
+that order as the registration sequence, so equal-priority selection never
+depends on fetch or handshake completion. Identity is the final manifest origin
+plus the plugin id; a later duplicate identity is reported and not mounted. The
+host exposes a workspace-scoped status and log (ids, origins, phases, codes, no
+content), reconciles live add/remove/disable changes, and tears down frames,
+registrations, timers, fetches and log before a workspace session is released.
+
 ## 5. Trust model
 
 Plugins are untrusted, even though the user consented to them.
@@ -217,11 +225,14 @@ Plugins are untrusted, even though the user consented to them.
   [`schema/exo.schema.json`](../schema/exo.schema.json) before any UI or frame is
   created; an invalid manifest is reported, never partially applied.
 
-The corresponding CSP for the shell is `frame-src https:`, `connect-src 'self'
-https:`, `script-src 'self'`, with no `unsafe-eval`. GitHub Pages cannot set
-response headers, so the policy is embedded in the deployed HTML document as a
-`<meta http-equiv="Content-Security-Policy">` tag rather than sent as a header;
-the directive set is identical. Plugin origins are expected
+The corresponding CSP for the shell is
+`frame-src https: http://localhost:*`,
+`connect-src 'self' https: http://localhost:*`, `script-src 'self'`, with no
+`unsafe-eval`. The localhost sources exist only because the manifest contract
+permits `http://localhost`; no other plain-HTTP origin is allowed. GitHub Pages
+cannot set response headers, so the policy is embedded in the deployed HTML
+document as a `<meta http-equiv="Content-Security-Policy">` tag rather than sent
+as a header; the directive set is identical. Plugin origins are expected
 to serve `Access-Control-Allow-Origin` for their manifest; a missing CORS header
 is a manifest load failure with an actionable message, not a silent skip.
 
@@ -229,6 +240,16 @@ Folder-backed workspaces are Chromium-only in v1 (D10). A browser without the
 File System Access API shows an explicit unsupported state. The in-memory
 provider exists for tests and the conformance suite; it is never mounted as a
 mock workspace, and no fabricated file tree is shown to an unsupported browser.
+
+Remote providers are a parallel track, not a numbered layer (D17). They are
+opt-in: the user connects a remote workspace and supplies its credential, which
+the shell stores only with explicit consent. A remote provider implements the
+same session contract, so the plugin protocol and document flow do not change.
+The first is Stratofold; its contract mapping, residual gaps, credential model
+and distribution blocker are documented in
+[`providers/stratofold.md`](./providers/stratofold.md). A remote workspace is the
+path out of D10's folder-only browser limitation, but it does not weaken D10 for
+folder-backed workspaces.
 
 ## 6. Hosting topology
 
@@ -326,3 +347,6 @@ layer named in the last column.
 | D12 | The SDK, plugin template and Monaco reference plugin stay in this repository through v1; a split is reconsidered after layer 9, not before layer 8 | decided | none |
 | D13 | Manifest and protocol are versioned independently; the shell accepts exactly one protocol major version per release | decided | layer 4 |
 | D14 | Page loading is confined to the directory tree of the controller entry (siblings and descendants); consent covers that root, not each page | decided | layer 4 |
+| D15 | Plugin identity is the final manifest origin plus plugin id; a later duplicate identity in one workspace is reported and not mounted | decided | layer 4 |
+| D16 | Enabled entries initialize in `exo.json` declaration order, and that order is the editor-selection tie-break, independent of fetch or handshake completion | decided | layer 4 |
+| D17 | Remote providers are opt-in workspace providers implementing the same session contract; credentials are shell-owned and never exposed to plugins or URLs; they are not a sync or cloud-storage feature | decided | P1 |

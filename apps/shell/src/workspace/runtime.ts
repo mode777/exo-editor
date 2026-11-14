@@ -14,6 +14,7 @@ import { DocumentStore } from './documents'
 import { Session } from './session'
 import { isReservedPath, normalizePath } from './paths'
 import { PluginConfigStore } from '../plugins/store'
+import { PluginHost } from '../plugins/host'
 import { FolderWorkspaceProvider } from './providers/folder/provider'
 import { IndexedDbHandleStore, type HandleStore } from './providers/folder/handle-store'
 import { supportsFolderWorkspaces } from './providers/folder/fsa'
@@ -50,6 +51,7 @@ export interface WorkspaceRuntimeOptions {
   isVisible?: () => boolean
   now?: () => number
   createSession?: (handle: WorkspaceHandle) => WorkspaceSession
+  pluginHost?: PluginHost
 }
 
 const INITIAL_SNAPSHOT: WorkspaceSnapshot = {
@@ -64,6 +66,7 @@ const INITIAL_SNAPSHOT: WorkspaceSnapshot = {
 export class WorkspaceRuntime {
   readonly documents: DocumentStore
   readonly pluginConfig: PluginConfigStore
+  readonly pluginHost: PluginHost
 
   private readonly options: WorkspaceRuntimeOptions
   private readonly handleStore: HandleStore
@@ -86,6 +89,7 @@ export class WorkspaceRuntime {
       eventTarget: options.eventTarget,
       isVisible: options.isVisible,
     })
+    this.pluginHost = options.pluginHost ?? new PluginHost()
     this.documents = new DocumentStore({
       getSession: () => this.session,
       onDirtyChange: (path, dirty) => setTabDirty(path, dirty),
@@ -221,6 +225,7 @@ export class WorkspaceRuntime {
     if (this.disposed) return
     this.disposed = true
     this.reservedDocumentHandler = null
+    this.pluginHost.dispose()
     this.pluginConfig.detach()
     this.externalRegistration?.dispose()
     this.externalRegistration = null
@@ -286,6 +291,7 @@ export class WorkspaceRuntime {
   private async activate(handle: WorkspaceHandle, provider: WorkspaceProvider): Promise<void> {
     const previousSession = this.session
     const previousProvider = this.provider
+    this.pluginHost.detach()
     this.pluginConfig.detach()
     this.externalRegistration?.dispose()
     this.externalRegistration = null
@@ -318,6 +324,7 @@ export class WorkspaceRuntime {
       explorerRevision: this.current.explorerRevision + 1,
     })
     void this.pluginConfig.attach(session)
+    this.pluginHost.attach({ session, config: this.pluginConfig })
   }
 
   private createSession(handle: WorkspaceHandle): WorkspaceSession {
