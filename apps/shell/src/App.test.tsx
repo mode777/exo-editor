@@ -46,7 +46,6 @@ describe('empty shell composition', () => {
     await act(async () => {
       useWorkbenchStore.getState().setQuickOpen(true, 'commands')
     })
-
     const palette = document.querySelector('[role="dialog"][aria-label="Command palette"]')
     expect(palette).not.toBeNull()
     expect(palette?.textContent).toContain('Toggle Theme')
@@ -61,5 +60,15 @@ describe('empty shell composition', () => {
     expect(
       document.querySelector('[role="dialog"][aria-labelledby="exo-settings-title"]'),
     ).not.toBeNull()
+  })
+
+  it('opens the command palette from the status bar button', async () => {
+    await act(async () => root.render(<App />))
+
+    const button = container.querySelector<HTMLButtonElement>('.exo-status-button')
+    expect(button).not.toBeNull()
+    await act(async () => button?.click())
+
+    expect(document.querySelector('[role="dialog"][aria-label="Command palette"]')).not.toBeNull()
   })
 })

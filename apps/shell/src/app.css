@@ -29,6 +29,20 @@
   white-space: nowrap;
 }
 
+.exo-status-button {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.exo-status-button:hover,
+.exo-status-button:focus-visible {
+  text-decoration: underline;
+}
+
 .exo-empty-editor {
   display: flex;
   flex-direction: column;

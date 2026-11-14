@@ -173,6 +173,10 @@ headless Chrome is a later hardening item, not a layer 1 deliverable.
   Compose from `vscode-workbench/react` primitives instead of forking or
   patching; record the composition choice in `docs/architecture.md` and raise
   the gap upstream if it is one.
+- [Kit menus are pointer-only in 0.1.3 - the context menu does not take focus
+  when opened] → Exo's status bar carries a keyboard-focusable "Command
+  Palette" button, and the palette itself is fully keyboard operable (Escape
+  closes, Enter runs). Re-check on kit upgrades.
 - [GitHub Pages base-path 404s] → base-relative assets via the fixed `base`,
   plus the manual smoke pass on the deployed URL.
 - [Upstream ships a breaking minor] → minor pin `~0.1.3`; the upgrade is a
