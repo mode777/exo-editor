@@ -1,8 +1,9 @@
 # Exo Editor - Architecture
 
-Status: draft. Contracts referenced here are in [`docs/contracts/`](./contracts/).
-Verified facts about the reused kit are marked with the version they were checked
-against.
+Status: ratified by the OpenSpec change `define-core-contracts`. Contracts
+referenced here are in [`docs/contracts/`](./contracts/) and mirrored in
+`openspec/specs/`. Verified facts about the reused kit are marked with the version
+they were checked against.
 
 ## 1. Shape of the system
 
@@ -85,19 +86,22 @@ preview.
                                                                    └────────────┘
 ```
 
-Teardown order is normative and runs before the next workspace is opened:
+Teardown order is normative, mirrors the workspace contract's `dispose()` order,
+and runs before the next workspace is opened:
 
-1. Dispose every file handler session (close frames, drop pending requests).
-2. Dispose every plugin registration and its registry entries.
+1. Abort every in-flight workspace operation and stop all watchers.
+2. Dispose every file handler session, then every plugin registration and its
+   registry entries.
 3. Unsubscribe all event topics and reset per-workspace sequence numbers.
-4. Stop watchers and abort in-flight workspace operations.
-5. Drop workspace-scoped settings, open tabs and file caches.
+4. Drop workspace-scoped settings, open tabs and file caches.
+5. Release the provider (drop handles, stop polling).
 6. Persist the new workspace identity and provider state.
 
+Handler frames are gone before the provider is released, and no workspace event
+can be emitted while state is being cleared.
+
 Global preferences - theme, region visibility, sash sizes - are not part of the
-workspace and survive the switch. This is the working interpretation of "reset
-all customization and registrations". It is recorded as decision D7 below and
-should be confirmed during ratification.
+workspace and survive the switch. This is decision D7 below.
 
 ## 4. Plugin lifecycle
 
@@ -193,12 +197,15 @@ Plugins are untrusted, even though the user consented to them.
 - **The shell never evaluates plugin content.** No `eval`, no `new Function`, no
   plugin-supplied HTML outside the iframe, no `dangerouslySetInnerHTML` for
   plugin data.
-- **Manifests are data.** A manifest is validated against the schema before any
-  UI or frame is created; an invalid manifest is reported, never partially
-  applied.
+- **Manifests are data.** A manifest is validated against the shared
+  [`schema/exo.schema.json`](../schema/exo.schema.json) before any UI or frame is
+  created; an invalid manifest is reported, never partially applied.
 
 The corresponding CSP for the shell is `frame-src https:`, `connect-src 'self'
-https:`, `script-src 'self'`, with no `unsafe-eval`. Plugin origins are expected
+https:`, `script-src 'self'`, with no `unsafe-eval`. GitHub Pages cannot set
+response headers, so the policy is embedded in the deployed HTML document as a
+`<meta http-equiv="Content-Security-Policy">` tag rather than sent as a header;
+the directive set is identical. Plugin origins are expected
 to serve `Access-Control-Allow-Origin` for their manifest; a missing CORS header
 is a manifest load failure with an actionable message, not a silent skip.
 
@@ -231,11 +238,16 @@ Local development uses two origins by construction: shell on
 only permitted non-HTTPS origin; manifests on other `http://` origins are
 rejected.
 
+**GitHub Pages CSP gotcha:** Pages does not allow custom response headers, so
+the shell's policy from section 5 is embedded in the document as a meta tag. A
+header-based CSP is not available on the deploy target; do not remove the meta
+tag assuming a header exists.
+
 ## 7. Target repository layout
 
 The shell is one application. The SDK, template and reference plugin are
-workspace packages in this repository and may be split out later; the decision
-is deferred to the SDK layer.
+workspace packages in this repository for v1 (D12); a split is reconsidered after
+layer 9.
 
 ```text
 AGENTS.md                agent rules and invariants
@@ -249,6 +261,8 @@ packages/
 docs/
   vision.md  architecture.md
   contracts/             normative contracts, one file per surface
+schema/
+  exo.schema.json        shared JSON Schema for exo.json and exo-manifest.json
 openspec/
   specs/                 ratified capabilities
   changes/               active changes
@@ -288,6 +302,6 @@ layer named in the last column.
 | D9 | Cross-origin frames use `sandbox="allow-scripts allow-same-origin"`; same-origin frames use `allow-scripts` only; never top navigation, popups or modals | decided | layer 4 |
 | D10 | v1 supports Chromium only for folder-backed workspaces; other browsers get an explicit unsupported state | decided | layer 2 |
 | D11 | Plugin settings live in the shell's store keyed by workspace, not in `exo.json` | decided | layer 7 |
-| D12 | The SDK/template and Monaco plugin stay in this repository at first; split-out is revisited after the reference plugin ships | open | layer 8 |
+| D12 | The SDK, plugin template and Monaco reference plugin stay in this repository through v1; a split is reconsidered after layer 9, not before layer 8 | decided | none |
 | D13 | Manifest and protocol are versioned independently; the shell accepts exactly one protocol major version per release | decided | layer 4 |
 | D14 | Page loading is confined to the directory tree of the controller entry (siblings and descendants); consent covers that root, not each page | decided | layer 4 |

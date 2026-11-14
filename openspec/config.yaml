@@ -12,6 +12,8 @@ context: |
   change both in the same change, never add an undocumented message, field or
   provider method. No backend, no proxying, no secrets. A workspace switch must
   reset all workspace-scoped plugin state. See AGENTS.md before proposing.
+  Work directly on main: do not create branches, worktrees or pull requests
+  unless the user explicitly asks.
 
 # Example:
 #   context: |

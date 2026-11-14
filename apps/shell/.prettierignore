@@ -1,0 +1,5 @@
+dist/
+public/codicons/
+coverage/
+node_modules/
+package-lock.json

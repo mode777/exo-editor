@@ -4,10 +4,10 @@ Exo Editor is a frontend-only, serverless editor shell. **The shell is the
 product; editors are plugins.** Plugins are untrusted cross-origin iframes; the
 shell owns the workbench, workspace access and consent.
 
-**Current state:** documents and contracts only. There is no `package.json`, no
-app and no build. Layer 1 creates them. Do not scaffold code ahead of the
-[roadmap](./ROADMAP.md) layer you were asked to work on, and do not invent
-commands or scripts that do not exist yet.
+**Current state:** layer 0 is complete and the contracts are ratified; there is
+still no `package.json`, no app and no build. Layer 1 creates them. Do not
+scaffold code ahead of the [roadmap](./ROADMAP.md) layer you were asked to work
+on, and do not invent commands or scripts that do not exist yet.
 
 ## Read this first
 
@@ -15,7 +15,7 @@ commands or scripts that do not exist yet.
 | --- | --- |
 | [`docs/vision.md`](./docs/vision.md) | Product intent, principles, non-goals |
 | [`docs/architecture.md`](./docs/architecture.md) | Runtime model, lifecycle, trust boundaries, decisions D1-D14 |
-| [`docs/contracts/`](./docs/contracts/) | Draft contracts; normative once `define-core-contracts` is archived |
+| [`docs/contracts/`](./docs/contracts/) | Normative contracts; ratified by `define-core-contracts` and mirrored in `openspec/specs/` |
 | [`ROADMAP.md`](./ROADMAP.md) | Layer order, one OpenSpec change per layer, exit criteria |
 
 ## Hard invariants
@@ -63,12 +63,15 @@ These are decisions, not suggestions. Changing one requires an OpenSpec change.
 ## Open decisions that block work
 
 Check [`docs/architecture.md#8-decisions`](./docs/architecture.md) before
-starting a layer. No open decision blocks layers 1-7; D12 (SDK/repo split) must
-be settled before layer 8. First-party plugins may share `<owner>.github.io`
-(D5), and the code plugin is expected to ship as a child path of the shell site.
+starting a layer. No decision is open: D12 keeps the SDK/template and reference
+plugin in this repository through v1, with a split reconsidered after layer 9.
+First-party plugins may share `<owner>.github.io` (D5), and the code plugin is
+expected to ship as a child path of the shell site.
 
 ## Working rules
 
+- Work directly on `main`. Do not create branches, worktrees or pull requests
+  unless the user explicitly asks for one.
 - Contracts before consumers. If implementation needs behaviour the contract
   does not describe, update the contract and its OpenSpec spec in the same
   change - do not add an undocumented message, field or provider method.
@@ -84,15 +87,38 @@ be settled before layer 8. First-party plugins may share `<owner>.github.io`
 
 ## Verification
 
-No project commands exist yet. Until layer 1 lands, the only checks are:
+Install once from the repository root:
 
 ```bash
-openspec validate --all   # specs and change proposals
+npm install        # npm ci in CI
 ```
 
-After layer 1, this section must list the real scripts for install, dev, lint,
-typecheck, test and build, and the full gate that must pass before a PR. Do not
-document a command before `package.json` provides it.
+| Check | Command |
+| --- | --- |
+| Lint | `npm run lint` |
+| Format | `npm run format:check` (write with `npm run format`) |
+| Typecheck | `npm run typecheck` |
+| Unit tests | `npm test` |
+| Build | `npm run build` |
+| Bundle budget | `npm run budget` |
+| Deployed CSP check | `npm run check:dist-csp` (after a build) |
+
+Dev server: `npm run dev` serves `http://localhost:5173/exo-editor/`.
+
+The full gate that must pass before a PR is the CI `verify` job:
+
+```bash
+npm ci
+npm run lint
+npm run format:check
+npm run typecheck
+npm test
+npm run build
+node apps/shell/scripts/check-bundle-budget.mjs apps/shell/dist apps/shell/budget.json
+node apps/shell/scripts/check-dist-csp.mjs apps/shell/dist/index.html
+```
+
+Specs and change proposals still validate with `openspec validate --all`.
 
 ## Repository map
 
@@ -100,6 +126,7 @@ document a command before `package.json` provides it.
 docs/vision.md          product intent and non-goals
 docs/architecture.md    runtime model, trust boundaries, decisions
 docs/contracts/         normative contracts, one file per surface
+schema/exo.schema.json  shared JSON Schema for exo.json and exo-manifest.json
 ROADMAP.md              layered OpenSpec change plan
 openspec/specs/         ratified capabilities
 openspec/changes/       active changes; archive when done
