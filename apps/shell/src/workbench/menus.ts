@@ -6,6 +6,8 @@ export const workbenchMenus: MenuDefinition[] = [
     id: 'view',
     label: 'View',
     entries: [
+      { label: 'Command Palette…', commandId: 'view.commandPalette' },
+      { separator: true },
       {
         label: 'Toggle Primary Side Bar',
         commandId: 'view.togglePrimary',
