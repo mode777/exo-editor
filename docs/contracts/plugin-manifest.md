@@ -1,8 +1,11 @@
 # Plugin Manifest Contract (v1)
 
-Status: draft - normative once the OpenSpec change `define-core-contracts` is
-archived. Mirrored in
-`openspec/changes/define-core-contracts/specs/plugin-manifest/spec.md`.
+Status: ratified by the OpenSpec change `define-core-contracts`. Normative
+requirements are mirrored in `openspec/specs/plugin-manifest/spec.md`. The
+authoritative shape of both files is the shared JSON Schema at
+[`schema/exo.schema.json`](../../schema/exo.schema.json); this document adds the
+semantic rules a schema cannot express (duplicates, origins, containment,
+engine compatibility).
 
 ## 1. Purpose
 
@@ -38,7 +41,8 @@ Rules:
 
 - Unknown top-level or entry fields are rejected, so a typo cannot silently
   disable a plugin.
-- Duplicate manifest URLs are rejected.
+- Duplicate manifest URLs are rejected. This is a semantic check across entries,
+  not something the JSON Schema can express.
 - `exo.json` is shell-only. No plugin message can read or write it. The settings
   UI rewrites it as canonical 2-space JSON; comments and formatting are not
   preserved (D8).
@@ -96,10 +100,14 @@ Rules:
 | `license` | string | no | SPDX identifier. |
 | `icon` | string | no | Relative to the manifest. `https` absolute also allowed. Rendered only after validation; failures are ignored. |
 | `engines.exo` | string | yes | SemVer range. The shell refuses a plugin whose range excludes its version. |
-| `runtime.entry` | string | yes | Relative URL to the controller HTML document, loaded as a hidden registration iframe. Must share the manifest's origin. Its directory is the plugin root: every other page the plugin loads must be a sibling or descendant of it. |
+| `runtime.entry` | string | yes | Relative HTML path to the controller document, loaded as a hidden registration iframe. No query, fragment or `..` segment. Must share the manifest's origin. Its directory is the plugin root: every other page the plugin loads must be a sibling or descendant of it. |
 | `permissions` | array | yes | Subset of `workspace:read`, `workspace:write`, `events:subscribe`. No duplicates. `workspace:write` implies `workspace:read`. |
 | `contributes.fileEditors` | array | no | Maximum 20. Each entry: `glob` (required), `entry` (required, relative HTML URL for the per-document iframe, inside the plugin root), `label` (required, 1-40 chars), `priority` (integer -100..100, default 0). Every editor entry uses the entry-resolution rules in section 4. |
-| `contributes.configuration` | object | no | Reserved for the plugin settings layer; rejected by the v1 validator until that layer is ratified. |
+| `contributes.configuration` | object | no | Reserved for the plugin settings layer (D11); the v1 validator rejects the field. Layer 7 adds its schema and validation in a new change; until then a manifest that declares it is invalid, not partially accepted. |
+
+Unknown manifest fields are rejected at every level, like unknown `exo.json`
+fields. A field added by a future schema version requires that version and a new
+validator; it is never ignored in v1.
 
 ### Glob rules
 
@@ -124,15 +132,19 @@ resolved with the same rules:
 - **Editor entries** - each `contributes.fileEditors[].entry`, mounted in a
   handler iframe when a matching file opens.
 
-1. The entry is resolved against `M` (not against the declared URL).
-2. The resolved entry must have the same origin as `M`.
-3. The entry path must be inside the plugin root after dot-segment removal.
+1. A declared entry must be a relative HTML path with no query string, no
+   fragment and no `..` segment. Registration entries are checked the same way
+   after resolution; a declared entry that already contains `..` is invalid, not
+   normalized.
+2. The entry is resolved against `M` (not against the declared URL).
+3. The resolved entry must have the same origin as `M`.
+4. The entry path must be inside the plugin root after dot-segment removal.
    Siblings of the controller entry and descendants of its directory are allowed;
    parents and unrelated directories are rejected. For example, with
    `runtime.entry = "plugin.html"`, `other.html` and `editors/code.html` are
    allowed while `../shared/plugin.html` is not.
-4. The entry must be `https` (or `http://localhost` in development).
-5. The entry origin **may equal the shell origin**. A same-origin plugin is
+5. The entry must be `https` (or `http://localhost` in development).
+6. The entry origin **may equal the shell origin**. A same-origin plugin is
    mounted with the stricter sandbox (`allow-scripts`, no
    `allow-same-origin`), so it runs in an opaque origin: no storage, cookies or
    parent DOM. A cross-origin plugin keeps `allow-same-origin` and its own
@@ -152,7 +164,9 @@ origin and CSP, not the shell's.
 
 - `fetch(url, { mode: 'cors', credentials: 'omit', redirect: 'follow',
   referrerPolicy: 'no-referrer' })`.
-- 5 s timeout; 256 KiB response cap; `Content-Type` must be JSON-compatible.
+- 5 s timeout; 256 KiB response cap; `Content-Type` must be JSON-compatible
+  (`application/json` or another `+json` media type). A missing or non-JSON type
+  fails with `invalid-manifest` before parsing.
 - Redirects are followed, but the **final** URL defines the origin used for
   consent and for the entry-containment check. A redirect across origins is
   displayed as the final origin.
@@ -160,7 +174,9 @@ origin and CSP, not the shell's.
   beyond the loading row. Validation is all-or-nothing.
 - Failures are reported per plugin with a stable code: `network`, `cors`,
   `timeout`, `http-status`, `too-large`, `invalid-json`, `invalid-manifest`,
-  `unsupported-origin`, `unsupported-version`, `incompatible-engine`.
+  `unsupported-origin`, `unsupported-version`, `incompatible-engine`. These are
+  the codes the consent UI and the plugin log display; they never include raw
+  response bodies or stack traces.
 - The manifest is cached in memory for the session. It is never persisted as
   trusted data; consent is persisted separately (section 6).
 
@@ -205,6 +221,9 @@ are excluded: they are display metadata or pages inside the already-approved
 root. Changing the origin, the approved root, a permission or a declared glob
 changes the fingerprint and re-prompts. Adding, removing or renaming a page
 inside the root does not, because the user approved the directory tree (D14).
+The input list is exhaustive: a new manifest field that changes what the plugin
+can do must be added to the fingerprint in the same change, or consent would
+silently cover behaviour the user never saw.
 
 ### Storage
 

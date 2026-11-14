@@ -12,9 +12,10 @@ content is a plugin: a cross-origin iframe talking to the shell over a versioned
 
 ## Status
 
-Early. The repository currently holds the written system: vision, architecture,
-contracts and the layered implementation plan. Application code starts at layer 1
-of the [roadmap](./ROADMAP.md).
+Layer 0 is complete: the five core contracts are ratified OpenSpec specs in
+`openspec/specs/`, and no decision blocks layers 2 or 4. The repository still
+holds no application code; the shell starts at layer 1 of the
+[roadmap](./ROADMAP.md).
 
 ## How it fits together
 
@@ -42,15 +43,17 @@ of the [roadmap](./ROADMAP.md).
 | [Manifest contract](./docs/contracts/plugin-manifest.md) | `exo.json`, `exo-manifest.json`, consent, fingerprint |
 | [Protocol contract](./docs/contracts/plugin-protocol.md) | Envelope, handshake, registration, handler sessions |
 | [Events contract](./docs/contracts/events.md) | Topics, ordering, limits |
+| [Manifest schema](./schema/exo.schema.json) | Shared JSON Schema for `exo.json` and `exo-manifest.json` |
 | [Roadmap](./ROADMAP.md) | Layered OpenSpec changes and exit criteria |
 | [Agent guide](./AGENTS.md) | Instructions for coding agents working here |
 
 ## Contracts are normative
 
-The documents in `docs/contracts/` are drafts until the OpenSpec change
-`define-core-contracts` is archived, at which point they are mirrored as
-requirements in `openspec/specs/` and become the source of truth. A behaviour
-change is a contract change, not an implementation detail.
+The documents in `docs/contracts/` are ratified by the OpenSpec change
+`define-core-contracts` and mirrored as requirements in `openspec/specs/`. They
+are the source of truth; [`schema/exo.schema.json`](./schema/exo.schema.json) is
+the shared shape for both JSON files. A behaviour change is a contract change,
+not an implementation detail.
 
 ```bash
 openspec list

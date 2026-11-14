@@ -1,7 +1,7 @@
 # Exo Editor - Vision
 
-Status: draft. Behavioural details live in [`docs/contracts/`](./contracts/) and are
-ratified by the OpenSpec change `define-core-contracts`.
+Status: product intent. Behavioural details live in [`docs/contracts/`](./contracts/)
+and are ratified by the OpenSpec change `define-core-contracts`.
 
 ## Problem
 

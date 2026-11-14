@@ -1,8 +1,7 @@
 # Plugin Events Contract (v1)
 
-Status: draft - normative once the OpenSpec change `define-core-contracts` is
-archived. Mirrored in
-`openspec/changes/define-core-contracts/specs/plugin-events/spec.md`.
+Status: ratified by the OpenSpec change `define-core-contracts`. Normative
+requirements are mirrored in `openspec/specs/plugin-events/spec.md`.
 
 ## 1. Purpose
 
@@ -31,7 +30,9 @@ shell/event         { topic: string, seq: number, payload: unknown }
   `shell/dispose`.
 - Only handler frames may subscribe. Registration frames are too short-lived;
   a plugin that needs events without an open document needs a background frame,
-  which is not part of v1.
+  which is not part of v1. This is sufficient for the reference editor: theme and
+  file changes matter while a document is open, and a closed document has nothing
+  to render.
 
 ## 3. Event shape
 
@@ -122,13 +123,15 @@ subscribing. `config/changed` is then incremental.
 - The catalog is closed for v1. A plugin cannot publish topics; plugin-to-shell
   notifications use the protocol's request messages.
 
-## 8. Open questions (resolve during ratification)
+## 8. Resolved during ratification
 
-1. Should `workspace/file-changed` include the originating session so a plugin
-   can ignore its own save echo? Current answer: no, the save result already
-   orders it.
-2. Should `theme/changed` carry the resolved CSS custom properties rather than a
-   theme name, so plugins do not duplicate palettes? Current answer: name only in
-   v1; the token set is a separate contract if plugins need it.
-3. Does a plugin with no matching open document need any subscription at all?
-   Current answer: no.
+1. `workspace/file-changed` does **not** carry the originating session. The save
+   result is delivered before the event, so a plugin can treat the first event
+   after its own save as the echo; adding a session field would leak another
+   document's identity for no v1 benefit.
+2. `theme/changed` carries the theme name only. Resolved CSS custom properties
+   would create a second token contract and couple plugins to the shell's
+   palette. A token set can be proposed later as its own contract.
+3. A plugin with no matching open document has no handler frame and therefore no
+   subscription in v1. Background frames are out of scope until a later layer
+   needs them.

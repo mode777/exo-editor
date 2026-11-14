@@ -1,0 +1,189 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:exo:schema:v1",
+  "title": "Exo workspace and plugin manifests (v1)",
+  "description": "Shared shape for exo.json and exo-manifest.json. Semantic rules that JSON Schema cannot express - duplicate manifest URLs, origin equality, plugin-root containment, engine compatibility and consent - are enforced by the validator and specified in docs/contracts/plugin-manifest.md.",
+  "oneOf": [
+    { "$ref": "#/$defs/exoFile" },
+    { "$ref": "#/$defs/exoManifest" }
+  ],
+  "$defs": {
+    "httpsUrl": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://[^\\s@#]+$"
+    },
+    "manifestUrl": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^(?:https://[^\\s@#]+|http://localhost(?::[0-9]{1,5})?(?:/[^\\s@#]*)?)$"
+    },
+    "relativePage": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^(?!/)(?![A-Za-z][A-Za-z0-9+.-]*:)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*[?#\\u0000]).+\\.[Hh][Tt][Mm][Ll]?$"
+    },
+    "relativeAsset": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^(?!/)(?![A-Za-z][A-Za-z0-9+.-]*:)(?!.*[?#\\u0000]).+$"
+    },
+    "glob": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "pattern": "^(?!/)(?!^!)(?!.*\\.\\.)(?!.*[\\\\\\u0000]).{1,200}$"
+    },
+    "semver": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-((?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\\+([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?$"
+    },
+    "pluginEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["manifest"],
+      "properties": {
+        "manifest": { "$ref": "#/$defs/manifestUrl" },
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "publisher": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "url": { "$ref": "#/$defs/httpsUrl" }
+      }
+    },
+    "fileEditor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["glob", "entry", "label"],
+      "properties": {
+        "glob": { "$ref": "#/$defs/glob" },
+        "entry": { "$ref": "#/$defs/relativePage" },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": -100,
+          "maximum": 100,
+          "default": 0
+        }
+      }
+    },
+    "contributes": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "fileEditors": {
+          "type": "array",
+          "maxItems": 20,
+          "items": { "$ref": "#/$defs/fileEditor" }
+        },
+        "configuration": false
+      }
+    },
+    "exoFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "plugins"],
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "plugins": {
+          "type": "array",
+          "maxItems": 50,
+          "$comment": "Duplicate manifest URLs are rejected by the validator; JSON Schema cannot express uniqueness of a property across array items.",
+          "items": { "$ref": "#/$defs/pluginEntry" }
+        }
+      }
+    },
+    "exoManifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "id",
+        "name",
+        "version",
+        "publisher",
+        "engines",
+        "runtime",
+        "permissions"
+      ],
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9.-]{2,63}$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "version": { "$ref": "#/$defs/semver" },
+        "description": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "publisher": { "$ref": "#/$defs/publisher" },
+        "homepage": { "$ref": "#/$defs/httpsUrl" },
+        "license": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "icon": {
+          "oneOf": [
+            { "$ref": "#/$defs/httpsUrl" },
+            { "$ref": "#/$defs/relativeAsset" }
+          ]
+        },
+        "engines": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["exo"],
+          "properties": {
+            "exo": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          }
+        },
+        "runtime": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["entry"],
+          "properties": {
+            "entry": { "$ref": "#/$defs/relativePage" }
+          }
+        },
+        "permissions": {
+          "type": "array",
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "enum": ["workspace:read", "workspace:write", "events:subscribe"]
+          },
+          "$comment": "workspace:write without workspace:read is rejected by the validator; JSON Schema cannot express that dependency cleanly."
+        },
+        "contributes": { "$ref": "#/$defs/contributes" }
+      }
+    }
+  }
+}

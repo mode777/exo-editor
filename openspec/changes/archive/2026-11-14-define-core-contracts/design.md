@@ -135,11 +135,13 @@ into a file the user owns and the shell rewrites canonically would create noisy
 diffs and couple settings to plugin declaration. Settings are stored by the shell
 per workspace and delivered through init and `config/changed`.
 
-### D12 - Keep the SDK, template and reference plugin in-repository at first (open)
+### D12 - Keep the SDK, template and reference plugin in-repository through v1 (decided)
 
 One repository makes the protocol change and its consumers change together while
 the contract is young. Splitting early would add release coordination before the
-protocol has proven stable. The split is revisited after layer 9.
+protocol has proven stable. The SDK, template and Monaco plugin therefore ship as
+workspace packages in this repository for v1. A split is reconsidered after
+layer 9, once the protocol has a real consumer; it does not block layer 8.
 
 ### D13 - Protocol major is separate from manifest schema and shell version
 
@@ -204,8 +206,8 @@ Later changes modify those specs rather than adding a parallel contract.
 
 ## Open Questions
 
-1. D12: whether the SDK/template and reference plugin move to separate
-   repositories after layer 9.
-2. D7: confirm that global layout/theme survive a workspace switch.
-3. Should `theme/changed` carry resolved tokens instead of a theme name (see
-   [`docs/contracts/events.md`](../../../docs/contracts/events.md#8-open-questions-resolve-during-ratification))?
+None. Ratification closed D12 (in-repository through v1), confirmed D7 (global
+layout and theme survive a workspace switch), and settled the event questions in
+[`docs/contracts/events.md`](../../../docs/contracts/events.md#8-resolved-during-ratification):
+file-change events carry no originating session, `theme/changed` carries a theme
+name rather than resolved tokens, and v1 has no background subscriptions.

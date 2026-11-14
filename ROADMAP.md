@@ -1,8 +1,9 @@
 # Exo Editor - Roadmap
 
-Status: layers 0 and 1 are startable. Everything else is sequenced behind them.
-Each layer is one OpenSpec change. A layer is done when its change is archived
-and its exit criteria are demonstrated against the deployed shell.
+Status: layer 0 is complete and its contracts are ratified. Layer 1 is next;
+layers 2-10 are sequenced behind it. Each layer is one OpenSpec change. A layer
+is done when its change is archived and its exit criteria are demonstrated
+against the deployed shell.
 
 ## Sequencing rationale
 
@@ -44,6 +45,9 @@ Two rules govern the sequence:
 
 ## Layer 0 - `define-core-contracts`
 
+**Status:** complete - change archived; `openspec validate --all` passes; every
+contract document matches its spec; no decision blocks layer 2 or layer 4.
+
 **Goal:** turn the draft contracts in `docs/contracts/` into ratified specs, and
 close the decisions that would otherwise be rediscovered mid-implementation.
 
@@ -57,7 +61,7 @@ close the decisions that would otherwise be rediscovered mid-implementation.
 - Add a schema document for `exo.json` and `exo-manifest.json` that the validator
   and the docs both point at.
 
-**Exit criteria**
+**Exit criteria (met)**
 
 - `openspec validate --all` passes; every contract doc matches its spec
   requirement text.
@@ -308,8 +312,8 @@ settings surface as shell settings.
   second origin, build, typecheck and a protocol conformance test.
 - Compatibility policy: SDK version vs protocol major vs manifest schema;
   deprecation rules.
-- Decision on publishing the SDK/template (D12): workspace package first,
-  publish or split after layer 9.
+- D12 is settled for v1: the SDK/template stays a workspace package. Revisit
+  publishing or splitting only after layer 9, not in this layer.
 - Optional: shared component reuse for plugin UI. Only if it does not weaken the
   origin or CSP model, and never by loading shell code into the plugin frame
   without a versioned contract.

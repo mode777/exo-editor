@@ -1,12 +1,11 @@
-# Spec Delta
+# editor-shell Specification
 
 ## Purpose
-
 Defines the shell as the product: a static, backend-free workbench that composes
 the reused workbench kit, owns the workspace and plugin surfaces, and gives no
 editor privileged access.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Static, backend-free delivery
 
@@ -23,6 +22,24 @@ push-triggered GitHub Pages workflow.
 
 - **WHEN** a commit lands on the main branch
 - **THEN** the workflow builds and publishes the site, while a pull request runs the same checks without deploying
+
+### Requirement: Shell content security policy
+
+The deployed shell SHALL send a CSP with `frame-src https:`, `connect-src 'self'
+https:`, `script-src 'self'` and no `unsafe-eval` or `unsafe-inline` script
+sources, so plugin code cannot execute in the shell's realm and no privileged
+evaluation path exists.
+
+#### Scenario: Plugin code stays in its frame
+
+- **WHEN** a plugin manifest or entry tries to inject script into the shell
+- **THEN** the CSP blocks it and the plugin remains confined to its iframe
+
+#### Scenario: No evaluation
+
+- **WHEN** the shell handles plugin-supplied data
+- **THEN** it does not pass it to `eval`, `new Function` or an equivalent dynamic
+  evaluation API
 
 ### Requirement: Shell composes the workbench kit
 

@@ -1,8 +1,7 @@
 # Workspace Access Contract (v1)
 
-Status: draft - normative once the OpenSpec change `define-core-contracts` is
-archived. Normative requirements are mirrored in
-`openspec/changes/define-core-contracts/specs/workspace-access/spec.md`.
+Status: ratified by the OpenSpec change `define-core-contracts`. Normative
+requirements are mirrored in `openspec/specs/workspace-access/spec.md`.
 
 ## 1. Purpose
 
@@ -17,8 +16,8 @@ Rules that hold for every provider:
    any object whose methods can reach outside the workspace root.
 2. Paths are workspace-relative, POSIX-style and normalized by the session. The
    root is `/`.
-3. Every operation accepts an `AbortSignal` and rejects with a `WorkspaceError`
-   when aborted.
+3. Every asynchronous filesystem operation accepts an `AbortSignal` and rejects
+   with a `WorkspaceError` when aborted.
 4. Reads and writes are byte-oriented. Text decoding belongs to the caller.
 5. Writes are isolation-safe: a stale write must fail with `conflict` rather
    than overwrite a newer version.
@@ -185,6 +184,7 @@ plugin write it, and no message exists that names it as a save target.
 | `mkdir`/`move` without overwrite onto an existing path | `already-exists` |
 | Provider permission not granted | `permission-denied` |
 | `ifVersion` mismatch | `conflict` |
+| Path traversal, reserved path or a path the caller may not see | `permission-denied` |
 | Operation exceeds `maxFileSize` | `too-large` |
 | Backend cannot express the operation | `unsupported` |
 | `AbortSignal` fired | `aborted` |
@@ -221,9 +221,16 @@ plugin frame.
 
 Required for tests and for the "unsupported browser" state:
 
-- Deterministic, synchronous-backed, no persistence, `watchable: true`.
+- Deterministic, synchronous-backed, no persistence, `watchable: true`,
+  `persistent: false`, `caseSensitive: true`, `writable: true`.
+- `version` is a monotonic counter per file (`m1`, `m2`, ...); `mtime` comes from
+  an injectable clock. The same operation sequence always produces the same stats.
+- Watch callbacks are delivered in operation order; aborting an operation never
+  emits a change.
 - Exposes the same error codes, including `conflict`.
-- Used by contract tests for the session, the plugin broker and the save flow.
+- Used by contract tests for the session, the plugin broker and the save flow, so
+  it is the reference implementation of this contract and the test oracle for the
+  folder provider.
 
 ### Future providers
 
@@ -242,11 +249,16 @@ ready -> dispose -> no session
 
 `dispose()` performs, in order:
 
-1. Abort every in-flight operation and watcher.
-2. Notify the plugin host to tear down handler frames and registrations (see
+1. Abort every in-flight operation and stop all watchers.
+2. Dispose every plugin handler session, then every plugin registration (see
    [`plugin-protocol.md`](./plugin-protocol.md)).
-3. Clear caches, open tabs and workspace-scoped settings.
-4. Release the provider (drop handles, stop polling).
+3. Unsubscribe all event topics and reset per-workspace sequence numbers (see
+   [`events.md`](./events.md)).
+4. Clear caches, open tabs and workspace-scoped settings.
+5. Release the provider (drop handles, stop polling).
+
+Handler frames are therefore gone before the provider is released, and no
+workspace event can be emitted while state is being cleared.
 
 After `dispose()` resolves, no callback from the old workspace may mutate shell
 state. Late callbacks are dropped by a generation counter captured at dispatch

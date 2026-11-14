@@ -1,8 +1,7 @@
 # Plugin Protocol Contract (v1)
 
-Status: draft - normative once the OpenSpec change `define-core-contracts` is
-archived. Mirrored in
-`openspec/changes/define-core-contracts/specs/plugin-protocol/spec.md`.
+Status: ratified by the OpenSpec change `define-core-contracts`. Normative
+requirements are mirrored in `openspec/specs/plugin-protocol/spec.md`.
 
 ## 1. Purpose
 
@@ -134,6 +133,30 @@ Handler init is not acknowledged and there is no heartbeat in v1; the first
 request is the earliest liveness signal, and an unresponsive handler surfaces as
 a failed save rather than a disconnect.
 
+### 3.3 Phase rules
+
+`exo-mode` fixes a frame's phase for its whole lifetime. The shell does not
+reinterpret a frame that starts in one mode as the other.
+
+| Phase | Allowed plugin messages |
+| --- | --- |
+| `register` | `plugin/ready`, `plugin/register`, `plugin/register-complete` |
+| `editor` | `plugin/ready`, `plugin/request-file`, `plugin/dirty`, `plugin/save-content`, `plugin/subscribe`, `plugin/unsubscribe`, `plugin/dispose-ack` |
+
+- `plugin/ready` is accepted once per frame. A second `ready`, a
+  `plugin/register-complete` before `ready`, or a registration message after
+  `register-complete` is a protocol violation.
+- A message from the other phase's row, and any other message sent before
+  `ready`, is a protocol violation: the shell replies `shell/error` with
+  `protocol-violation`, counts it toward the frame's budget and performs no state
+  change.
+- `plugin/save-content` is accepted only when it carries a `replyTo` matching the
+  single live `shell/request-save`. Content with no live request, or for a
+  request that already timed out, is ignored, never written, and counted as a
+  protocol violation.
+- `shell/save-result` echoes the save request's `id` in `replyTo`; a plugin must
+  correlate it rather than assuming completion order.
+
 Timeouts: `plugin/ready` 10 s from mount; `plugin/register-complete` 10 s from
 `shell/init`. On timeout the shell reports `timeout` with the plugin id and
 phase, removes the iframe and rolls back partial registrations.
@@ -152,14 +175,15 @@ shell/register-ack      { accepted: string[]; rejected: RejectedContribution[] }
 FileEditorContribution = { glob: string; entry: string; label?: string }
 ```
 
-- `plugin/register` may be sent 0..n times. Registrations are additive and
-  validated on receipt; invalid entries are collected in `rejected` with a
-  reason and never become active.
+- `plugin/register` may be sent 0..n times before `plugin/register-complete`.
+  Registrations are additive and validated on receipt; invalid entries are
+  collected in `rejected` with a reason and never become active.
 - A registered `glob` must be declared in the manifest; a registered `entry` must
   resolve inside the plugin root. The glob may be paired with any page in that
   root, including one added after the manifest was approved (D14). An undeclared
   glob is rejected with `not-declared`; an entry outside the root is rejected
-  with `permission-denied`.
+  with `permission-denied`. A register message after `register-complete` is a
+  protocol violation (section 3.3), not a live update.
 - `shell/register-ack` is the last message the plugin receives. The shell removes
   the iframe 250 ms later so the plugin can flush logs.
 - Registrations become active only after `plugin/register-complete`. A plugin that
@@ -223,7 +247,10 @@ shell/save-result     { ok: true, version } | { ok: false, code, message? }
   treated as clean.
 - The shell may request a save at any time while the session is alive. It sends
   one `shell/request-save` at a time and queues at most one additional request.
-- The plugin answers within 5 s or the save fails with `timeout`.
+- The plugin answers within 5 s or the save fails with `timeout`. `save-content`
+  must carry `replyTo` for the live request; unsolicited content is ignored and
+  never written (section 3.3).
+- `shell/save-result` echoes the request's `id` in `replyTo`.
 - The shell writes with `ifVersion` set to the version it last delivered in
   `shell/init` or `file-content`. A `conflict` result means the file changed
   underneath; the shell reports it and leaves the tab dirty. The plugin may
@@ -235,12 +262,14 @@ shell/save-result     { ok: true, version } | { ok: false, code, message? }
 ### 5.4 External changes
 
 ```text
-shell/file-changed    { path, kind: 'changed' | 'deleted' | 'renamed', version }
+shell/file-changed    { path, kind: 'changed' | 'deleted' | 'renamed', version? }
 ```
 
 Sent when the shell observes a change to the open file (poll on focus, or the
-provider's watcher). The plugin decides whether to reload, keep its buffer, or
-ask the user. The shell does not auto-reload a dirty tab.
+provider's watcher). `version` is present for `changed` and `renamed`, absent for
+`deleted`. The plugin decides whether to reload, keep its buffer, or ask the
+user. The shell does not auto-reload a dirty tab. A save after deletion fails with
+`not-found` and does not recreate the file.
 
 ### 5.5 Disposal
 

@@ -38,6 +38,25 @@ to messages that fail origin or source validation.
 - **WHEN** a plugin answers with a `replyTo` that does not match a live request
 - **THEN** the shell discards the answer and the original request remains pending or times out
 
+#### Scenario: Message from the wrong phase
+
+- **WHEN** a registration frame sends a handler message, or an editor frame sends
+  a registration message
+- **THEN** the shell replies `protocol-violation`, performs no state change and
+  counts the message toward the frame's violation budget
+
+#### Scenario: Registration is closed on completion
+
+- **WHEN** a plugin sends `plugin/register` after `plugin/register-complete`
+- **THEN** the registration is rejected as a protocol violation and the approved
+  editor set is unchanged
+
+#### Scenario: Duplicate ready
+
+- **WHEN** a frame sends `plugin/ready` a second time
+- **THEN** the shell treats it as a protocol violation and does not reinitialize
+  the frame
+
 ### Requirement: Bootstrap and handshake
 
 The shell SHALL mount plugin frames hidden with no top navigation, popups, modals,
@@ -71,6 +90,16 @@ only after receiving a valid `plugin/ready`.
 
 - **WHEN** a message shaped like `plugin/ready` arrives from the expected origin but not from the mounted frame's window
 - **THEN** it is dropped and counts toward the frame's protocol-violation budget
+
+#### Scenario: Frame fails to load
+
+- **WHEN** the iframe fires `error` or the document never loads
+- **THEN** the shell reports `loading-failed`, removes the frame and rolls back partial state
+
+#### Scenario: Repeated origin violations
+
+- **WHEN** a frame sends three messages from the wrong origin
+- **THEN** the shell removes it with `protocol-violation`
 
 ### Requirement: Registration phase
 
@@ -110,6 +139,12 @@ registration frame after acknowledging.
 
 - **WHEN** a manifest declares three editors and the plugin registers one of them
 - **THEN** only that editor becomes active and the other two remain available but unregistered
+
+#### Scenario: No contributions
+
+- **WHEN** a plugin registers nothing and completes
+- **THEN** it is recorded as a configuration-only or event-only plugin and no
+  editor is created for it
 
 #### Scenario: Invalid glob
 
@@ -179,9 +214,11 @@ directory and treating a leading `/` as workspace-absolute.
 ### Requirement: Dirty state and save flow
 
 The shell SHALL track dirty state only from `plugin/dirty`, SHALL allow at most
-one in-flight save request plus one queued request, SHALL write with the version
-it last delivered, and SHALL leave the document dirty when the write conflicts or
-times out.
+one in-flight save request plus one queued request, SHALL accept
+`plugin/save-content` only when it answers the live `shell/request-save`, SHALL
+treat the content as opaque text or bytes without parsing it, SHALL echo the
+request id in `shell/save-result`, SHALL write with the version it last delivered,
+and SHALL leave the document dirty when the write conflicts or times out.
 
 #### Scenario: Dirty drives the tab
 
@@ -203,10 +240,69 @@ times out.
 - **WHEN** the plugin does not answer `shell/request-save` within 5 seconds
 - **THEN** the save fails with `timeout`, no write occurs, and the tab remains dirty
 
+#### Scenario: Unsolicited save content
+
+- **WHEN** a handler sends `plugin/save-content` without a live `shell/request-save`
+- **THEN** the shell performs no write, ignores the content, and counts a protocol violation
+
+#### Scenario: Save result correlation
+
+- **WHEN** the shell accepts save content
+- **THEN** `shell/save-result` carries a `replyTo` equal to the request's `id`
+
+#### Scenario: Content is opaque
+
+- **WHEN** `plugin/save-content` arrives
+- **THEN** the shell writes the text or bytes unchanged and never parses, formats or validates the editor's syntax
+
 #### Scenario: Own save ordering
 
 - **WHEN** a save succeeds
 - **THEN** `shell/save-result` is delivered before the corresponding `workspace/file-changed` event
+
+### Requirement: External change notification
+
+The shell SHALL notify a handler when it observes a change to that handler's
+document, SHALL identify the kind (`changed`, `deleted` or `renamed`) and the new
+version when one exists, and SHALL NOT auto-reload a dirty buffer.
+
+#### Scenario: External write
+
+- **WHEN** the open file changes outside the handler
+- **THEN** the handler receives the new path and version and decides whether to
+  reload, keep its buffer or ask the user
+
+#### Scenario: Dirty buffer is not replaced
+
+- **WHEN** a dirty handler receives an external-change notification
+- **THEN** the shell leaves the buffer and the dirty state untouched
+
+#### Scenario: Deleted file
+
+- **WHEN** the open file is deleted
+- **THEN** the handler is notified with `deleted` and a later save fails with
+  `not-found` instead of recreating the file silently
+
+### Requirement: Error reporting
+
+The shell SHALL report protocol failures as `shell/error` with a stable code from
+`unsupported-message`, `unsupported-version`, `protocol-violation`, `timeout`,
+`loading-failed`, `permission-denied`, `not-found`, `not-a-file`, `too-large`,
+`conflict`, `rate-limited` or `internal`, SHALL include a user-safe message at
+most, and SHALL NOT expose stack traces, provider text or paths outside the
+requested scope.
+
+#### Scenario: Reserved path
+
+- **WHEN** a handler requests `/exo.json`
+- **THEN** the error code is `permission-denied` and the message contains no
+  content or metadata from the file
+
+#### Scenario: Internal failure
+
+- **WHEN** the provider fails for an unexpected reason
+- **THEN** the plugin receives `internal` and the provider's message stays in the
+  shell log
 
 ### Requirement: Disposal and cancellation
 

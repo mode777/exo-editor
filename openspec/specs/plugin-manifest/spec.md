@@ -1,12 +1,11 @@
-# Spec Delta
+# plugin-manifest Specification
 
 ## Purpose
-
 Defines how a workspace declares plugins, what a plugin is allowed to claim, how
 its entry page is bound to its manifest, and how user consent is captured and
 invalidated.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Workspace plugin declaration
 
@@ -48,9 +47,11 @@ with no credentials and no fragment, and an optional `enabled` flag defaulting t
 
 ### Requirement: Manifest validation
 
-The shell SHALL fetch each manifest with credentials omitted, a 5-second timeout
-and a 256 KiB response cap, SHALL validate the entire document against the v1
-manifest schema before any UI beyond a loading row or any frame, and SHALL treat
+The shell SHALL fetch each manifest with credentials omitted, a 5-second timeout,
+a 256 KiB response cap and a JSON-compatible `Content-Type`, SHALL validate the
+entire document against the shared v1 manifest schema before any UI beyond a
+loading row or any frame, including rejecting unknown fields, SHALL reject
+`contributes.configuration` until layer 7 activates it, and SHALL treat
 validation as all-or-nothing.
 
 #### Scenario: Required identity fields
@@ -65,24 +66,54 @@ validation as all-or-nothing.
   `workspace:write` or `events:subscribe`, or lists duplicates
 - **THEN** validation fails instead of granting a subset
 
+#### Scenario: Write implies read
+
+- **WHEN** a manifest grants `workspace:write` without `workspace:read`
+- **THEN** validation fails rather than silently adding or dropping a permission
+
 #### Scenario: Glob vocabulary
 
 - **WHEN** a `fileEditors` glob contains negation, a regex construct, a leading
-  slash, `..` or NUL
+  slash, `..` or NUL, or is longer than 200 characters
 - **THEN** validation rejects that contribution with `invalid-glob`
+
+#### Scenario: Contribution limit
+
+- **WHEN** a manifest declares more than 20 `fileEditors` contributions
+- **THEN** validation fails with `invalid-manifest` and none of the excess
+  contributions are registered
 
 #### Scenario: Editor entry is required and relative
 
-- **WHEN** a `fileEditors` contribution omits `entry`, uses an absolute URL or
-  contains a fragment or query
+- **WHEN** a `fileEditors` contribution omits `entry`, uses an absolute URL,
+  contains a fragment, a query or a `..` segment, or does not name an HTML page
 - **THEN** validation rejects that contribution with `invalid-manifest` and the
   contribution is not registered
 
+#### Scenario: Unknown manifest fields
+
+- **WHEN** a manifest contains an unknown field at any level
+- **THEN** validation fails with `invalid-manifest` and no field is ignored or
+  preserved as trusted data
+
+#### Scenario: Reserved configuration contribution
+
+- **WHEN** a v1 manifest declares `contributes.configuration`
+- **THEN** validation fails with `invalid-manifest` and the plugin is not loaded
+
+#### Scenario: Content type is not JSON
+
+- **WHEN** the manifest response omits `Content-Type` or serves a non-JSON media
+  type
+- **THEN** the plugin is reported with `invalid-manifest` before the body is parsed
+
 #### Scenario: Transport failures
 
-- **WHEN** the manifest request times out, is blocked by CORS, returns a
-  non-success status or exceeds the size cap
-- **THEN** the plugin is reported with `timeout`, `cors`, `http-status` or `too-large` and no frame is created
+- **WHEN** the manifest request fails at the network layer, times out, is blocked
+  by CORS, returns a non-success status or exceeds the size cap
+- **THEN** the plugin is reported with `network`, `timeout`, `cors`,
+  `http-status`, `too-large` or `invalid-json` as applicable and no frame is
+  created
 
 #### Scenario: Redirect origin
 
@@ -91,13 +122,13 @@ validation as all-or-nothing.
 
 ### Requirement: Entry pages are bound to the plugin root
 
-The shell SHALL resolve `runtime.entry` and every
-`contributes.fileEditors[].entry` against the final manifest URL, SHALL require
-each resolved entry to share the manifest's origin, and SHALL confine every page
-the plugin loads to the directory tree rooted at the resolved controller entry
-(siblings and descendants allowed, parents and unrelated directories rejected).
-The entry origin MAY equal the shell origin; when it does, the shell SHALL apply
-the stricter sandbox and state that in consent.
+The shell SHALL require `runtime.entry` and every
+`contributes.fileEditors[].entry` to be a relative HTML path with no query,
+fragment or `..` segment, SHALL resolve each entry against the final manifest URL,
+SHALL require each resolved entry to share the manifest's origin, and SHALL
+confine every page the plugin loads to the directory tree rooted at the resolved
+controller entry (siblings and descendants allowed, parents and unrelated
+directories rejected).
 
 #### Scenario: Cross-origin editor page is rejected
 
@@ -129,6 +160,36 @@ the stricter sandbox and state that in consent.
 
 - **WHEN** a manifest or entry uses `http` on a host other than `localhost`
 - **THEN** validation fails and the error names the insecure URL
+
+### Requirement: Same-origin plugin entries
+
+The entry origin MAY equal the shell origin. When it does, the shell SHALL apply
+the stricter sandbox (`allow-scripts` only) and SHALL state in consent that the
+plugin runs without storage access and cannot be isolated by origin.
+
+#### Scenario: First-party entry is sandboxed
+
+- **WHEN** `runtime.entry` resolves to the shell origin
+- **THEN** the registration frame is mounted without `allow-same-origin` and the
+  consent prompt explains the consequence
+
+### Requirement: Editor selection and priority
+
+When more than one registered file editor matches an open document, the shell
+SHALL choose the highest `priority`, then the earliest registration, SHALL keep
+the other matches available through "Open with...", and SHALL apply the same
+resolution to every document regardless of whether the editor is first-party.
+
+#### Scenario: Highest priority wins
+
+- **WHEN** two plugins register matching globs with priorities `10` and `0`
+- **THEN** the `10` editor opens the document and the other remains available
+  through "Open with..."
+
+#### Scenario: Equal priority falls back to registration order
+
+- **WHEN** two matching registrations share a priority
+- **THEN** the earlier registration is selected and the choice is deterministic
 
 ### Requirement: Consent gates code loading
 
@@ -172,9 +233,11 @@ the workspace, and whether it shares the shell origin.
 ### Requirement: Consent fingerprint
 
 The shell SHALL persist consent machine-wide, keyed by manifest origin and plugin
-id, together with a fingerprint computed over the plugin id, entry origin, plugin
-root path, sorted permissions, and sorted editor globs and priorities. A
-different fingerprint SHALL be treated as consent not granted.
+id, together with a fingerprint computed over exactly the plugin id, entry
+origin, plugin root path, sorted permissions, and sorted editor globs and
+priorities. A different fingerprint SHALL be treated as consent not granted, and
+a manifest field that changes plugin behaviour SHALL be added to the fingerprint
+input in the same change that introduces it.
 
 #### Scenario: Cosmetic release keeps consent
 

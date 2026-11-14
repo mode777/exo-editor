@@ -44,6 +44,11 @@ after resolution rather than before.
 - **WHEN** a path contains a backslash
 - **THEN** the session rejects it instead of converting it to a separator
 
+#### Scenario: Rejected path has one code
+
+- **WHEN** a path fails normalization or containment
+- **THEN** the caller receives `permission-denied` and no provider operation starts
+
 #### Scenario: Case-insensitive reserved path
 
 - **WHEN** the provider is case-insensitive and a plugin requests `EXO.JSON`
@@ -83,10 +88,11 @@ version differs.
 
 ### Requirement: Deterministic teardown
 
-The session SHALL expose `dispose()` that aborts in-flight operations and
-watchers, tears down plugin handler sessions and registrations, clears caches,
-tabs and workspace-scoped settings, releases the provider, and then prevents any
-late callback from the disposed generation from mutating shell state.
+The session SHALL expose `dispose()` that, in order, aborts in-flight operations
+and stops watchers, tears down plugin handler sessions and then registrations,
+unsubscribes event topics and resets their sequence numbers, clears caches, tabs
+and workspace-scoped settings, releases the provider, and then prevents any late
+callback from the disposed generation from mutating shell state.
 
 #### Scenario: Switch mid-operation
 
@@ -115,10 +121,21 @@ capability as unsupported rather than weaken the contract.
 - **WHEN** the folder provider declares `watchable: false`
 - **THEN** the session re-stats open documents on focus and visibility change and the shell does not claim live watching
 
+#### Scenario: Picker cancelled
+
+- **WHEN** the user cancels the folder picker
+- **THEN** the open operation rejects with `aborted`, no workspace is created and
+  no error toast claims a failure
+
 #### Scenario: Test parity
 
 - **WHEN** the provider conformance suite runs
 - **THEN** the same path, error, conflict and teardown cases pass against the memory provider and the folder provider
+
+#### Scenario: Memory provider is deterministic
+
+- **WHEN** the conformance suite runs the memory provider twice with the same operations and injected clock
+- **THEN** it observes the same paths, versions, mtimes and watch callback order both times
 
 ### Requirement: Persisted workspace restore
 

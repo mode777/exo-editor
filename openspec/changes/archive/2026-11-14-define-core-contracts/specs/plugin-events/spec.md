@@ -11,9 +11,9 @@ keep one slow subscriber from affecting the shell or another plugin.
 ### Requirement: Subscription API
 
 The shell SHALL deliver events only to handler frames whose plugin holds the
-`events:subscribe` permission, SHALL treat subscription as idempotent, SHALL
-reject unknown topics without wildcard matching, and SHALL cap a frame at 32
-topics.
+`events:subscribe` permission, SHALL treat subscription as idempotent, SHALL stop
+delivery to a frame after `plugin/unsubscribe`, SHALL reject unknown topics
+without wildcard matching, and SHALL cap a frame at 32 topics.
 
 #### Scenario: Permission required
 
@@ -40,12 +40,26 @@ topics.
 - **WHEN** a frame is disposed and a new frame is created
 - **THEN** the new frame starts with no subscriptions and must subscribe again
 
+#### Scenario: Unsubscribe stops delivery
+
+- **WHEN** a frame unsubscribes from a topic
+- **THEN** no later event on that topic is delivered to it and other subscribers
+  are unaffected
+
+#### Scenario: Topic limit
+
+- **WHEN** a frame subscribes to a 33rd topic
+- **THEN** the shell rejects that subscription without dropping existing ones
+
 ### Requirement: V1 topic catalog
 
 The shell SHALL expose exactly `theme/changed` with `{ theme }`,
 `workspace/file-changed` with `{ path, kind, version? }`, `workspace/closed` with
 `{ reason }` and `config/changed` with `{ pluginId, values }`, and SHALL reject
-topic names outside the `<namespace>/<event>` form.
+topic names outside the lowercase `<namespace>/<event>` form made of
+`[a-z0-9-]` segments and at most 64 characters. `config/changed` is reserved in
+v1: there is no producer until layer 7, but subscribing to it is valid and
+remains silent until settings exist.
 
 #### Scenario: Theme payload
 
@@ -62,10 +76,21 @@ topic names outside the `<namespace>/<event>` form.
 - **WHEN** the shell releases a workspace
 - **THEN** subscribers may receive `workspace/closed` with `switch` or `close` before disposal, and the shell does not rely on that delivery
 
+#### Scenario: Configuration change is reserved in v1
+
+- **WHEN** a plugin subscribes to `config/changed` before layer 7 ships
+- **THEN** the subscription is accepted and no event is delivered
+
 #### Scenario: Configuration change
 
-- **WHEN** a plugin's contributed settings change
+- **WHEN** a plugin's contributed settings change after layer 7
 - **THEN** its live frames receive `config/changed` with its plugin id and the new values
+
+#### Scenario: Malformed topic name
+
+- **WHEN** a plugin subscribes to a topic containing uppercase letters,
+  characters outside `[a-z0-9-]`, more than one slash or more than 64 characters
+- **THEN** the shell replies `unsupported-topic` and delivers nothing
 
 ### Requirement: Delivery semantics
 
@@ -125,12 +150,31 @@ before its `workspace/file-changed` event.
 - **WHEN** a plugin saves its own document
 - **THEN** its `shell/save-result` arrives before the `workspace/file-changed` event for that write
 
+### Requirement: Event versioning
+
+The shell SHALL version topics by name only, SHALL allow additive payload fields
+within protocol major 1, SHALL require a protocol major change for a breaking
+payload change on an existing topic, and SHALL keep the v1 catalog closed so a
+plugin cannot publish topics.
+
+#### Scenario: Additive field
+
+- **WHEN** an event payload gains an optional field within protocol major 1
+- **THEN** existing subscribers continue to work and must tolerate the unknown
+  field
+
+#### Scenario: Plugin publication
+
+- **WHEN** a plugin attempts to publish a topic
+- **THEN** the shell rejects the message as unsupported and delivers nothing
+
 ### Requirement: Limits and failure isolation
 
 The shell SHALL cap queued events at 1000 per topic per frame and payloads at
-1 MiB, SHALL drop the oldest queued events and report `rate-limited` once on
-overflow, SHALL never let event delivery throw into the render path, and SHALL
-remove a subscriber that fails three deliveries.
+1 MiB, SHALL publish at most 100 events per second per topic except for a
+coalescing burst, SHALL drop the oldest queued events and report `rate-limited`
+once on overflow, SHALL never let event delivery throw into the render path, and
+SHALL remove a subscriber that fails three deliveries.
 
 #### Scenario: Slow subscriber
 
