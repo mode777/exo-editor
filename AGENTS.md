@@ -4,10 +4,11 @@ Exo Editor is a frontend-only, serverless editor shell. **The shell is the
 product; editors are plugins.** Plugins are untrusted cross-origin iframes; the
 shell owns the workbench, workspace access and consent.
 
-**Current state:** layer 0 is complete and the contracts are ratified; there is
-still no `package.json`, no app and no build. Layer 1 creates them. Do not
-scaffold code ahead of the [roadmap](./ROADMAP.md) layer you were asked to work
-on, and do not invent commands or scripts that do not exist yet.
+**Current state:** layers 0 and 1 are complete. The contracts are ratified, and
+the shell app (`apps/shell`) builds, tests and deploys to GitHub Pages through
+CI. Layer 2 (workspace provider) is next. Do not scaffold code ahead of the
+[roadmap](./ROADMAP.md) layer you were asked to work on, and do not invent
+commands or scripts that do not exist yet.
 
 ## Read this first
 
@@ -102,6 +103,7 @@ npm install        # npm ci in CI
 | Build | `npm run build` |
 | Bundle budget | `npm run budget` |
 | Deployed CSP check | `npm run check:dist-csp` (after a build) |
+| Custom elements check | `npm run check:dist-elements` (after a build) |
 
 Dev server: `npm run dev` serves `http://localhost:5173/exo-editor/`.
 

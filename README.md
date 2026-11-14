@@ -12,9 +12,9 @@ content is a plugin: a cross-origin iframe talking to the shell over a versioned
 
 ## Status
 
-Layer 0 is complete: the five core contracts are ratified OpenSpec specs in
-`openspec/specs/`, and no decision blocks layers 2 or 4. The repository still
-holds no application code; the shell starts at layer 1 of the
+Layer 0 and layer 1 are complete: the five contracts are ratified OpenSpec specs
+and the shell is deployed at `https://mode777.github.io/exo-editor/` through the
+GitHub Pages workflow. Layer 2 (workspace provider) is next in the
 [roadmap](./ROADMAP.md).
 
 ## How it fits together

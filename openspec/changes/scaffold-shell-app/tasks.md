@@ -23,14 +23,14 @@
 
 ## 5. CI and deploy
 
-- [ ] 5.1 Add the verify workflow (npm ci, lint, format check, typecheck, unit tests, build, budget check, grep of `dist/index.html` for the meta CSP) running on every pull request and push to `main` with concurrency cancellation; verify the run is green on a PR containing these tasks
-- [ ] 5.2 Add the Pages deploy job on push to `main`, gated on verify, using `upload-pages-artifact` + `deploy-pages` with the production `base`; verify a merge deploys and the project-site URL loads the shell with base-relative assets
+- [x] 5.1 Add the verify workflow (npm ci, lint, format check, typecheck, unit tests, build, budget check, grep of `dist/index.html` for the meta CSP) running on every pull request and push to `main` with concurrency cancellation; verify the run is green on a PR containing these tasks
+- [x] 5.2 Add the Pages deploy job on push to `main`, gated on verify, using `upload-pages-artifact` + `deploy-pages` with the production `base`; verify a merge deploys and the project-site URL loads the shell with base-relative assets
 - [ ] 5.3 Verify the gate blocks: open a PR that breaks lint, then typecheck, then a unit test and confirm the required check goes red each time without deploying; verify the budget job fails when `budget.json` limits are temporarily lowered
 
 ## 6. Documentation and exit-criteria pass
 
 - [x] 6.1 Replace `AGENTS.md`'s verification placeholder with the real scripts and the full pre-PR gate, matching `package.json` exactly; verify every documented command runs as written from a clean checkout
-- [ ] 6.2 Run the exit-criteria smoke pass against the deployed URL and record results in the PR: renders at 1440x900 and narrow width with no body scroll, keyboard navigation reaches the primary surfaces and opens/closes the palette, theme toggle applies immediately, reload restores layout and theme, `dist/` contains no plugin or Monaco code; verify each checklist item is demonstrated
+- [x] 6.2 Run the exit-criteria smoke pass against the deployed URL and record results in the PR: renders at 1440x900 and narrow width with no body scroll, keyboard navigation reaches the primary surfaces and opens/closes the palette, theme toggle applies immediately, reload restores layout and theme, `dist/` contains no plugin or Monaco code; verify each checklist item is demonstrated
 
 ## Workflow follow-up
 
