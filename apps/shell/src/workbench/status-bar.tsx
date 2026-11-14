@@ -1,7 +1,9 @@
 import { useWorkbenchStore } from 'vscode-workbench'
+import { StatusBar } from 'vscode-workbench/react'
 
-// Status bar content is Exo-owned. It reports the two global facts layer 1 has:
-// no workspace is open, and which theme is active. The command-palette button is
+// The preset expects the statusBar prop to be the row itself. Compose the kit's
+// StatusBar primitive so the row keeps its fixed height; a bare div here becomes
+// a flex sibling and collapses the workbench body. The command-palette button is
 // the keyboard path to the palette: the kit's menu bar does not move focus into
 // its context menu on open, so a menu entry is pointer-only in 0.1.3.
 export function ExoStatusBar() {
@@ -9,18 +11,22 @@ export function ExoStatusBar() {
   const setQuickOpen = useWorkbenchStore((state) => state.setQuickOpen)
 
   return (
-    <div className="exo-status-bar">
-      <span className="exo-status-item" title="No workspace is open">
-        No workspace
-      </span>
-      <button
-        type="button"
-        className="exo-status-button"
-        onClick={() => setQuickOpen(true, 'commands')}
-      >
-        Command Palette
-      </button>
-      <span className="exo-status-item">Theme: {theme}</span>
-    </div>
+    <StatusBar
+      left={
+        <>
+          <span className="status-item" title="No workspace is open">
+            No workspace
+          </span>
+          <button
+            type="button"
+            className="status-item exo-status-button"
+            onClick={() => setQuickOpen(true, 'commands')}
+          >
+            Command Palette
+          </button>
+        </>
+      }
+      right={<span className="status-item">Theme: {theme}</span>}
+    />
   )
 }

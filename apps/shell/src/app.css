@@ -16,39 +16,24 @@
   font-size: 12px;
 }
 
-.exo-status-bar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  height: 100%;
-  padding: 0 8px;
-  font-size: 12px;
-}
-
-.exo-status-item {
-  white-space: nowrap;
-}
-
 .exo-status-button {
   border: 0;
-  padding: 0;
   background: transparent;
-  color: inherit;
   font: inherit;
   cursor: pointer;
 }
 
-.exo-status-button:hover,
 .exo-status-button:focus-visible {
   text-decoration: underline;
 }
 
 .exo-empty-editor {
   display: flex;
+  flex: 1;
+  min-height: 0;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 100%;
   gap: 8px;
   color: var(--vscode-descriptionForeground);
   text-align: center;
