@@ -33,15 +33,17 @@
         const data = event.data
         if (!data || data.exo !== 1 || data.type !== 'shell/init') return
         if (mode !== 'register') return
-        parent.postMessage(
-          {
-            exo: 1,
-            type: 'plugin/register',
-            payload: { fileEditors: [{ glob: '**/*.txt', entry: 'sibling.html' }] },
-          },
-          host,
-        )
-        parent.postMessage({ exo: 1, type: 'plugin/register-complete', payload: {} }, host)
+        setTimeout(() => {
+          parent.postMessage(
+            {
+              exo: 1,
+              type: 'plugin/register',
+              payload: { fileEditors: [{ glob: '**/*.txt', entry: 'sibling.html' }] },
+            },
+            host,
+          )
+          parent.postMessage({ exo: 1, type: 'plugin/register-complete', payload: {} }, host)
+        }, 600)
       })
 
       if (host && sessionId) {
