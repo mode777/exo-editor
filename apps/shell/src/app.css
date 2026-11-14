@@ -234,6 +234,7 @@
 .exo-document {
   display: flex;
   flex: 1;
+  height: 100%;
   min-height: 0;
   flex-direction: column;
   background: var(--vscode-editor-background);
