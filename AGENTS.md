@@ -116,6 +116,7 @@ npm test
 npm run build
 node apps/shell/scripts/check-bundle-budget.mjs apps/shell/dist apps/shell/budget.json
 node apps/shell/scripts/check-dist-csp.mjs apps/shell/dist/index.html
+node apps/shell/scripts/check-dist-elements.mjs apps/shell/dist
 ```
 
 Specs and change proposals still validate with `openspec validate --all`.

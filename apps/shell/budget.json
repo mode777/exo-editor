@@ -1,7 +1,7 @@
 {
   "comment": "Gzip byte budgets for everything under dist/, including copied vendor assets such as codicons. Measured by scripts/check-bundle-budget.mjs.",
   "limits": {
-    "js": 100000,
+    "js": 115000,
     "css": 14000
   }
 }

@@ -177,6 +177,10 @@ headless Chrome is a later hardening item, not a layer 1 deliverable.
   when opened] → Exo's status bar carries a keyboard-focusable "Command
   Palette" button, and the palette itself is fully keyboard operable (Escape
   closes, Enter runs). Re-check on kit upgrades.
+- [The bundler drops the kit's side-effect element imports (verified with Vite
+  8 and vscode-workbench 0.1.3), leaving `vscode-*` tags unupgraded] → the
+  shell registers the peer package's tags explicitly in `main.tsx`, and
+  `check-dist-elements.mjs` fails the pipeline if the bundle loses them.
 - [GitHub Pages base-path 404s] → base-relative assets via the fixed `base`,
   plus the manual smoke pass on the deployed URL.
 - [Upstream ships a breaking minor] → minor pin `~0.1.3`; the upgrade is a

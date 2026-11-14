@@ -13,6 +13,7 @@
     "test": "vitest run",
     "budget": "npm run build && node scripts/check-bundle-budget.mjs",
     "check:dist-csp": "node scripts/check-dist-csp.mjs dist/index.html",
+    "check:dist-elements": "node scripts/check-dist-elements.mjs dist",
     "build": "npm run prepare:codicons && tsc --noEmit && vite build"
   },
   "dependencies": {

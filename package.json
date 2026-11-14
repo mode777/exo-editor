@@ -20,6 +20,7 @@
     "test": "npm run test --workspace @exo/shell",
     "budget": "npm run budget --workspace @exo/shell",
     "check:dist-csp": "npm run check:dist-csp --workspace @exo/shell",
+    "check:dist-elements": "npm run check:dist-elements --workspace @exo/shell",
     "build": "npm run build --workspace @exo/shell"
   }
 }
