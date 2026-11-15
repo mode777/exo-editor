@@ -1,13 +1,15 @@
 # Exo Editor - Roadmap
 
 Status: layers 0-6 are complete and archived. Layer 7 (`plugin-settings`) is
-next. The parallel Stratofold provider track (P1) is archived as
-`2026-11-15-add-stratofold-provider` and does not gate the numbered layers. Its
-0.12.0 follow-on, P2 `adopt-stratofold-0-12`, is implemented, verified against
-the deployed shell and archived. P3 `add-remote-recents` is implemented,
-verified against the deployed shell and archived. Each layer is one OpenSpec change. A layer is done
-when its change is archived and its exit criteria are demonstrated against the
-deployed shell - never from a local dev server or local build.
+implemented and verified against the deployed shell; its archive is pending.
+Layer 8 (`plugin-sdk-template`) is next. The parallel Stratofold provider track
+(P1) is archived as `2026-11-15-add-stratofold-provider` and does not gate the
+numbered layers. Its 0.12.0 follow-on, P2 `adopt-stratofold-0-12`, is implemented,
+verified against the deployed shell and archived. P3 `add-remote-recents` is
+implemented, verified against the deployed shell and archived. Each layer is one
+OpenSpec change. A layer is done when its change is archived and its exit
+criteria are demonstrated against the deployed shell - never from a local dev
+server or local build.
 
 ## Sequencing rationale
 
@@ -472,6 +474,9 @@ registration and handler code were the real artifacts.
 
 ## Layer 7 - `plugin-settings`
 
+**Status:** complete - implemented and verified against the deployed shell on
+2026-11-15; archive pending.
+
 **Goal:** a plugin can declare configuration and the shell renders it in the same
 settings surface as shell settings.
 
@@ -484,12 +489,42 @@ settings surface as shell settings.
 - Delivery through `shell/init` and `config/changed`; reset on workspace switch.
 - A plugin cannot read another plugin's settings.
 
-**Exit criteria**
+**Exit criteria (met)**
 
-- Adding a plugin with a configuration contribution renders inputs in settings.
-- Changing a value reaches the plugin's frame without a reload.
-- Values survive reload for the same workspace and vanish for another workspace.
-- Invalid stored values fall back to defaults with a visible warning.
+- Met: adding a plugin with a configuration contribution renders string, boolean
+  and enum inputs with the declared defaults and descriptions.
+- Met: changing a value reaches the plugin's subscribed frame without a reload as
+  one targeted `config/changed` with the full value map; a newly opened handler
+  receives the new values in `shell/init`.
+- Met: values survive reload for the same workspace and vanish for another
+  workspace; switching back restores the first workspace's values.
+- Met: an invalid stored value falls back to the default with a visible warning
+  for that setting while the plugin receives the default.
+
+**Deployed verification (2026-11-15):** Chrome for Testing 131.0.6778.264 drove
+`https://mode777.github.io/exo-editor/` with folder workspaces served from OPFS
+handles through a `showDirectoryPicker` stub, as in layers 5 and 6. The deployed
+shell, fixture manifest, registration and handler code were the real artifacts.
+No local build or dev server was used.
+
+- The fixture's settings block rendered `fixture.greeting` (string),
+  `fixture.repeat` (boolean) and `fixture.size` (number enum) with the manifest
+  defaults and descriptions.
+- Changing the string, boolean and enum produced `config/changed` events with
+  sequence numbers 1, 2 and 3, each carrying the full map; a handler opened
+  afterwards received `{ greeting: 'deployed hello', repeat: true, size: 3 }` in
+  `shell/init`.
+- A reload restored the same values in the settings surface and `shell/init`. A
+  second workspace showed the defaults, and switching back restored the first
+  workspace's values.
+- Seeding `fixture.size = 9` in the `exo-plugin-settings` IndexedDB record and
+  reloading showed the invalid-stored warning, the settings select showed `1`,
+  and the plugin's `shell/init` carried `size: 1` with the other values intact.
+- No setting change rewrote `exo.json`, added a workspace file or opened an
+  `exo.json` document tab. A manifest without `events:subscribe` showed the
+  no-live-update hint and received no `config/changed` event.
+- The local gate passed: 579 tests, bundle budget 149,603/152,000 gzip bytes
+  (CSS 12,991/14,000), and the dist CSP and custom-element checks.
 
 ---
 

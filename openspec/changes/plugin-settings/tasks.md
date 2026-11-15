@@ -41,12 +41,12 @@
 
 - [x] 6.1 Run the full local gate: `npm ci`, `npm run lint`, `npm run format:check`, `npm run typecheck`, `npm test`, `npm run build`, `node apps/shell/scripts/check-bundle-budget.mjs apps/shell/dist apps/shell/budget.json`, `node apps/shell/scripts/check-dist-csp.mjs apps/shell/dist/index.html` and `node apps/shell/scripts/check-dist-elements.mjs apps/shell/dist`, and confirm every command passes
 - [x] 6.2 Measure the bundle delta, confirm `apps/shell/budget.json` still passes, and record the measured gzip sizes and headroom
-- [ ] 6.3 Against `https://mode777.github.io/exo-editor/`, open the fixture plugin's settings and confirm the string, boolean and enum controls render with the manifest defaults and descriptions
-- [ ] 6.4 Against the deployed shell, open a `*.events.txt` handler, change `fixture.greeting`, and confirm the frame records exactly one `config/changed` with the full new values; confirm the value also appears in a newly opened handler's `shell/init`
-- [ ] 6.5 Against the deployed shell, reload with the same workspace and confirm the changed value is restored in settings and `shell/init`; switch to a second workspace and confirm the defaults are used and the first workspace's value is not shown or delivered
-- [ ] 6.6 Against the deployed shell, seed an invalid stored value for one setting in the `exo-plugin-settings` IndexedDB record through DevTools, reload and confirm the settings surface warns for that key while the plugin receives the default and the workspace stays usable
-- [ ] 6.7 Against the deployed shell, confirm no setting change writes `exo.json`, creates a workspace file or opens a document tab, and that a plugin without `events:subscribe` receives no live `config/changed` (the isolation and subscription gates are also covered by unit tests)
-- [ ] 6.8 Update `ROADMAP.md` layer 7 status and exit criteria with the deployed evidence, re-run `openspec validate --all`, and confirm the delta specs and contracts stay consistent
+- [x] 6.3 Against `https://mode777.github.io/exo-editor/`, open the fixture plugin's settings and confirm the string, boolean and enum controls render with the manifest defaults and descriptions
+- [x] 6.4 Against the deployed shell, open a `*.events.txt` handler, change `fixture.greeting`, and confirm the frame records exactly one `config/changed` with the full new values; confirm the value also appears in a newly opened handler's `shell/init`
+- [x] 6.5 Against the deployed shell, reload with the same workspace and confirm the changed value is restored in settings and `shell/init`; switch to a second workspace and confirm the defaults are used and the first workspace's value is not shown or delivered
+- [x] 6.6 Against the deployed shell, seed an invalid stored value for one setting in the `exo-plugin-settings` IndexedDB record through DevTools, reload and confirm the settings surface warns for that key while the plugin receives the default and the workspace stays usable
+- [x] 6.7 Against the deployed shell, confirm no setting change writes `exo.json`, creates a workspace file or opens a document tab, and that a plugin without `events:subscribe` receives no live `config/changed` (the isolation and subscription gates are also covered by unit tests)
+- [x] 6.8 Update `ROADMAP.md` layer 7 status and exit criteria with the deployed evidence, re-run `openspec validate --all`, and confirm the delta specs and contracts stay consistent
 
 ## Workflow follow-up
 
