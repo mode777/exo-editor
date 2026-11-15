@@ -33,9 +33,11 @@ the sandbox denies `localStorage`; that is expected for a same-origin plugin
 mounted with `allow-scripts` only, and `available` for a cross-origin plugin with
 `allow-scripts allow-same-origin`.
 
-The controller registers `sibling.html` for `**/*.txt`. `sibling.html` is inside
-the plugin root but is not one of the manifest's declared editor pages, so it
-also exercises the "page inside the approved root" rule.
+The controller registers every declared editor glob with its page. The
+`**/*.sibling.txt` contribution maps to `sibling.html`, which is inside the
+plugin root but deliberately implements no handler protocol, so the
+"page inside the approved root" rule and the ready timeout are observable
+without breaking the other variants.
 
 ## File editors
 

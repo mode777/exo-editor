@@ -4,9 +4,15 @@
   "name": "Exo Host Fixture",
   "version": "1.1.0",
   "description": "A stub plugin used to verify the Exo plugin host and file editors.",
-  "publisher": { "name": "Exo" },
-  "engines": { "exo": ">=0.1.0" },
-  "runtime": { "entry": "plugin.html" },
+  "publisher": {
+    "name": "Exo"
+  },
+  "engines": {
+    "exo": ">=0.1.0"
+  },
+  "runtime": {
+    "entry": "plugin.html"
+  },
   "permissions": ["workspace:read", "workspace:write"],
   "contributes": {
     "fileEditors": [
@@ -33,6 +39,12 @@
         "entry": "editor.html",
         "label": "Fixture Text",
         "priority": 0
+      },
+      {
+        "glob": "**/*.sibling.txt",
+        "entry": "sibling.html",
+        "label": "Fixture Sibling",
+        "priority": 5
       }
     ]
   }

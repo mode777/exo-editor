@@ -42,7 +42,15 @@
             {
               exo: 1,
               type: 'plugin/register',
-              payload: { fileEditors: [{ glob: '**/*.txt', entry: 'sibling.html' }] },
+              payload: {
+                fileEditors: [
+                  { glob: '**/*.repeat.txt', entry: 'editor-repeat.html' },
+                  { glob: '**/*.append.txt', entry: 'editor-append.html' },
+                  { glob: '**/*.neverack.txt', entry: 'editor-never-ack.html' },
+                  { glob: '**/*.txt', entry: 'editor.html' },
+                  { glob: '**/*.sibling.txt', entry: 'sibling.html' },
+                ],
+              },
             },
             host,
           )

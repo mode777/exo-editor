@@ -19,7 +19,7 @@ describe('deployed plugin fixture', () => {
     )
     expect(result.ok).toBe(true)
     if (!result.ok) return
-    expect(result.manifest.fileEditors).toHaveLength(4)
+    expect(result.manifest.fileEditors).toHaveLength(5)
     for (const editor of result.manifest.fileEditors) {
       const file = resolve(fixtureDir, editor.entry)
       expect(existsSync(file), editor.entry).toBe(true)
@@ -37,5 +37,6 @@ describe('deployed plugin fixture', () => {
     expect(byGlob.get('**/*.append.txt')?.priority).toBeGreaterThan(0)
     expect(byGlob.get('**/*.neverack.txt')?.priority).toBeGreaterThan(0)
     expect(byGlob.get('**/*.txt')?.entry).toBe('editor.html')
+    expect(byGlob.get('**/*.sibling.txt')?.entry).toBe('sibling.html')
   })
 })
