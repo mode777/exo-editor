@@ -430,7 +430,7 @@ registration and handler code were the real artifacts.
   in the shell UI; covered by `runtime.test.ts`), the 33rd-topic cap and queue
   overflow (v1 has four topics and no manual path to 1000 queued events; covered
   by `events.test.ts`).
-- The local gate passed: 528 tests, bundle budget 145,728/148,000 gzip bytes, and
+- The local gate passed: 529 tests, bundle budget 145,878/148,000 gzip bytes, and
   the dist CSP and custom-element checks.
 
 ---
