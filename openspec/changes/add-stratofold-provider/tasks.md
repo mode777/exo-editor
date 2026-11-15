@@ -43,9 +43,9 @@
 
 - [x] 7.1 Run the full local gate (`npm ci`, `lint`, `format:check`, `typecheck`, `test`, `build`, bundle budget, dist CSP, dist elements) and confirm every command passes
 - [x] 7.2 Measure the bundle delta from `@stratofold/client` and record it in the change; verify `npm run budget` passes with any limit change justified by the measured number
-- [ ] 7.3 Against `https://mode777.github.io/exo-editor/`, connect a real Stratofold vdir, browse, open and save a text file, reload and restore, switch away, and assert a viewer/public workspace is read-only; verify the network log shows no token in a URL and the bundle contains none
-- [ ] 7.4 Revoke the deployed token server-side and confirm the reconnect state appears with no silent retry; record the observed behaviour
-- [ ] 7.5 Check remote mode in Chromium and Firefox (Safari if reachable) and record the browser matrix result; if the deployed acceptance checks cannot be completed, leave this group open rather than substituting a local dev server
+- [x] 7.3 Against `https://mode777.github.io/exo-editor/`, connect a real Stratofold vdir, browse, open and save a text file, reload and restore, switch away, and assert a viewer/public workspace is read-only; verify the network log shows no token in a URL and the bundle contains none
+- [x] 7.4 Revoke the deployed token server-side and confirm the reconnect state appears with no silent retry; record the observed behaviour
+- [x] 7.5 Check remote mode in Chromium and Firefox (Safari if reachable) and record the browser matrix result; if the deployed acceptance checks cannot be completed, leave this group open rather than substituting a local dev server
 
 ## Workflow follow-up
 

@@ -1,7 +1,8 @@
 # Stratofold workspace provider
 
-Status: implemented by the OpenSpec change `add-stratofold-provider`; deployed
-verification is recorded in that change. The adapter and the connect flow are in
+Status: implemented by the OpenSpec change `add-stratofold-provider` and verified
+against the deployed shell on 2026-11-15 (Chromium and Firefox; viewer read-only
+and a live token revocation). The adapter and the connect flow are in
 `apps/shell/src/workspace/providers/stratofold/`.
 
 Upstream: `@stratofold/client` 0.11.0, published on the public npm registry and
@@ -187,12 +188,24 @@ and the `filesystem-api`, `client-library` and `file-server` specs.
   - the session still denies `/exo.json` and `/.exo/**` through `forPlugin`, and
     the credential is absent from the snapshot, the plugin host state and the
     plugin config state.
-- **Deployed verification.** Against `https://mode777.github.io/exo-editor/`:
-  connect to a Stratofold vdir, browse, open a text file, edit/save, reload and
-  restore, switch away, revoke the token, and confirm a viewer/public workspace
-  is read-only. Inspect the network log: no token in URLs; no token in the
-  bundle; no plugin message receives one. Never use a local dev server or local
-  build as evidence.
+- **Deployed verification (passed 2026-11-15).** Against
+  `https://mode777.github.io/exo-editor/` and a real vdir on
+  `stratofold.alexklingenbeck.de`:
+  - Chromium 131 (chrome-headless-shell): connect, browse, open, edit, save,
+    reload and restore the saved bytes; 21 requests reached the server, the
+    credential appeared only in `Authorization` headers, never in a URL, the DOM
+    or the bundle; no page errors.
+  - Firefox 132 (Playwright build; the host's Firefox is a snap wrapper that
+    cannot run headless): the same flow. This run found the HTTP-cache gap below;
+    after the `Cache-Control: no-cache` fix it passes.
+  - Viewer token: explorer mutation actions unavailable, no save action, the
+    document is read-only, typing changes nothing, zero mutation requests.
+  - Live revocation: with a remembered connection whose token was revoked
+    server-side, the deployed shell mounted no workspace, named the rejected
+    connection, offered reconnect or disconnect, made no automatic retry, and
+    prefilled the dialog from the stored connection.
+  - Not verified: Safari (no driver on the verification host) and public-vdir
+    mode (the test vdir is not public).
 - **Packaging.** A clean `npm ci` from the registry, the CI `verify` job, the
   bundle budget and the CSP checks. Measured: the deployed bundle grew from
   130,600 to 135,376 gzip bytes (+4,776 - the client plus the adapter, connect

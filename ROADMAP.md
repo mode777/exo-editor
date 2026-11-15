@@ -55,7 +55,7 @@ composition.
 
 | # | Change | Outcome | Depends on | Status |
 | --- | --- | --- | --- | --- |
-| P1 | `add-stratofold-provider` | Stratofold vdir as a workspace: connect/restore, browse, read/write/save, viewer/public read-only | 0, 2, 3 | implementation complete; deployed verification open |
+| P1 | `add-stratofold-provider` | Stratofold vdir as a workspace: connect/restore, browse, read/write/save, viewer/public read-only | 0, 2, 3 | implemented; verified on the deployed shell with Chromium and Firefox |
 
 P1 is not part of the numbered v1 critical path. It started after layer 3 and
 lands alongside layers 4-10 without gating one. It integrated through
@@ -86,13 +86,14 @@ shell a workspace path that does not depend on the File System Access API.
   `npm ci`, pinned exactly; no vendoring exception was needed.
 - Met: provider conformance plus the documented edge tests pass against a
   deterministic fake server using the published client.
-- Against the deployed shell: connect, browse, open a text file, edit/save,
-  reload and restore; a viewer/public workspace is read-only; revoking the token
-  surfaces an explicit reconnect state; no token appears in network URLs or the
-  bundle.
-- Switching workspaces leaves no session state, and plugin-originated access to
-  `/exo.json` and `/.exo/**` is denied.
-- The normal `verify` gate, bundle budget and CSP checks pass.
+- Met (2026-11-15): against the deployed shell, connect, browse, open a text
+  file, edit/save, reload and restore, in Chromium and Firefox; a viewer
+  workspace is read-only; a server-side revocation surfaces the explicit
+  reconnect state; no token appears in network URLs, the DOM or the bundle.
+  Public-vdir mode and Safari remain unverified.
+- Met: switching workspaces leaves no session state, and plugin-originated access
+  to `/exo.json` and `/.exo/**` is denied.
+- Met: the normal `verify` gate, bundle budget and CSP checks pass.
 
 **Not in this track:** multi-root workspaces, sync/offline, file watching,
 remote providers beyond Stratofold, OAuth or token brokering.
