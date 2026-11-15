@@ -299,10 +299,15 @@ shell/file-changed    { path, kind: 'changed' | 'deleted' | 'renamed', version? 
 ```
 
 Sent when the shell observes a change to the open file (poll on focus, or the
-provider's watcher). `version` is present for `changed` and `renamed`, absent for
-`deleted`. The plugin decides whether to reload, keep its buffer, or ask the
-user. The shell does not auto-reload a dirty tab. A save after deletion fails with
-`not-found` and does not recreate the file.
+provider's watcher). This is the immediate, targeted notification for the bound
+document; it is not a topic subscription event and does not require
+`events:subscribe`. The same observation also feeds the coalesced
+`workspace/file-changed` topic for subscribed frames
+([`events.md`](./events.md#4-topic-catalog-v1)). `version` is present for
+`changed` and `renamed`, absent for `deleted`. The plugin decides whether to
+reload, keep its buffer, or ask the user. The shell does not auto-reload a dirty
+tab. A save after deletion fails with `not-found` and does not recreate the
+file.
 
 ### 5.5 Disposal
 

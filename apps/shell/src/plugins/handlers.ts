@@ -16,8 +16,11 @@ import {
   type HandlerSaveRequest,
 } from './handler'
 import { hasWorkspaceRead } from './manifest'
+import { EventBus, type EventTopic, type ThemeName } from './events'
 import { MAX_HANDLER_FRAMES } from './protocol'
 import type { EditorCandidate } from './registry'
+
+export type { ThemeName }
 
 export interface HandlerPoolHost {
   match(path: string): EditorCandidate[]
@@ -46,8 +49,6 @@ export interface HandlerOpenInput {
 export type HandlerOpenResult =
   { ok: true } | { ok: false; reason: 'cap' | 'failed'; message?: string }
 
-export type ThemeName = 'dark' | 'light' | 'high-contrast'
-
 export interface HandlerPoolOptions {
   transport?: FrameTransport
   shellVersion?: string
@@ -58,6 +59,8 @@ export interface HandlerPoolOptions {
   setTimeoutImpl?: typeof setTimeout
   clearTimeoutImpl?: typeof clearTimeout
   maxRequestBytes?: number
+  /** Injectable bus; tests and the runtime can share one. */
+  events?: EventBus
   /** A handler closed for a reason other than tab close, e.g. plugin removal. */
   onHandlerClosed?: (path: WorkspacePath, reason: HandlerDisposeReason) => void
 }
@@ -98,6 +101,7 @@ function metadataFor(file: FileStat): {
  * cap and the teardown order cannot drift from the registry.
  */
 export class HandlerPool {
+  readonly events: EventBus
   private readonly transport: FrameTransport
   private readonly ownsTransport: boolean
   private readonly shellVersion: string
@@ -115,6 +119,12 @@ export class HandlerPool {
 
   constructor(options: HandlerPoolOptions = {}) {
     this.transport = options.transport ?? new DomFrameTransport()
+    this.events =
+      options.events ??
+      new EventBus({
+        onSubscriberRemoved: (label, topic, code) =>
+          this.attachOptions?.host.logHandler(label, 'handler-events', code, topic),
+      })
     this.ownsTransport = options.transport === undefined
     this.shellVersion = options.shellVersion ?? SHELL_VERSION
     this.shellOrigin =
@@ -131,6 +141,7 @@ export class HandlerPool {
   }
 
   attach(options: HandlerPoolAttachOptions): void {
+    this.events.reset()
     this.attachOptions = options
   }
 
@@ -139,6 +150,7 @@ export class HandlerPool {
     this.records.clear()
     this.attachOptions = null
     await Promise.all(sessions.map((record) => record.session.dispose('workspace-switch')))
+    this.events.reset()
   }
 
   candidates(path: WorkspacePath): EditorCandidate[] {
@@ -186,6 +198,7 @@ export class HandlerPool {
       workspaceName: attached.workspaceName,
       theme: this.theme(),
       locale: this.locale,
+      events: this.events,
       canWrite: capabilities.writable,
       maxFileSize: capabilities.maxFileSize ?? DEFAULT_MAX_REQUEST_BYTES,
       maxRequestBytes: this.maxRequestBytes,
@@ -266,6 +279,14 @@ export class HandlerPool {
       this.records.get(change.path) ??
       (change.kind === 'renamed' ? this.records.get(change.previousPath) : undefined)
     record?.session.notifyChange(change)
+  }
+
+  publish(topic: EventTopic, payload: unknown, options: { burst?: boolean } = {}): boolean {
+    return this.events.publish(topic, payload, options)
+  }
+
+  publishWorkspaceClosed(reason: 'switch' | 'close'): void {
+    this.events.publishImmediate('workspace/closed', { reason })
   }
 
   save(path: WorkspacePath): Promise<HandlerSaveRequest> {

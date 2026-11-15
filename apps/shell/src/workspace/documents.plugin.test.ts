@@ -48,6 +48,7 @@ class FakeEditors implements DocumentEditorHost {
   completed: Array<{ path: string; result: HandlerSaveCompletion }> = []
   changes: WorkspaceChange[] = []
   renamed: Array<[string, string]> = []
+  order: string[] = []
 
   candidates(): EditorCandidate[] {
     return this.list
@@ -73,6 +74,7 @@ class FakeEditors implements DocumentEditorHost {
   }
 
   completeSave(path: string, result: HandlerSaveCompletion): void {
+    this.order.push('save-result')
     this.completed.push({ path, result })
   }
 
@@ -105,12 +107,17 @@ async function setup(files: Record<string, string> = { '/a.txt': 'one' }) {
     baseVersion: baseStat.version,
   }
   const dirty: Array<[string, boolean]> = []
+  const saved: WorkspaceChange[] = []
   const store = new DocumentStore({
     getSession: () => session,
     onDirtyChange: (path, value) => dirty.push([path, value]),
+    onSaved: (change) => {
+      editors.order.push('file-changed')
+      saved.push(change)
+    },
     editors,
   })
-  return { provider, handle, session, store, editors, dirty }
+  return { provider, handle, session, store, editors, dirty, saved }
 }
 
 async function activate(editors: FakeEditors) {
@@ -175,6 +182,16 @@ describe('plugin-backed documents', () => {
     const written = new TextDecoder().decode(await session.read('/a.txt'))
     expect(written).toBe('edited')
     expect(store.get('/a.txt')).toMatchObject({ dirty: false, pluginError: undefined })
+  })
+
+  it('reports a successful save before the file-change notification', async () => {
+    const { store, editors, saved } = await setup()
+    await store.open('/a.txt')
+    await activate(editors)
+    editors.callbacks?.onDirty(true)
+    expect(await store.save('/a.txt')).toBe(true)
+    expect(editors.order).toEqual(['save-result', 'file-changed'])
+    expect(saved).toEqual([{ kind: 'changed', path: '/a.txt', stat: expect.any(Object) }])
   })
 
   it('stays dirty when the plugin reports again during the write', async () => {

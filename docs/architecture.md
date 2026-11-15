@@ -65,7 +65,7 @@ preview.
 | Plugin manifests, consent | Exo plugin host | Consent is machine-wide, keyed by origin and capability fingerprint |
 | Plugin lifecycle | Exo plugin host | Registration frames and handler frames are both short-lived |
 | Plugin content, dirty state | Plugin iframe | The shell never parses editor content |
-| Themes, file change notifications | Exo event bus | Topics are the only shell-to-plugin push channel |
+| Themes, file change notifications | Exo event bus | Topics are the only workspace-wide push channel; the open-document `shell/file-changed` message is targeted and separate |
 | Persistence (handle, consent, settings, layout) | Shell | IndexedDB for handles and workspace state, `localStorage` for consent |
 
 ## 3. Workspace lifecycle
@@ -92,7 +92,8 @@ and runs before the next workspace is opened:
 1. Abort every in-flight workspace operation and stop all watchers.
 2. Dispose every file handler session, then every plugin registration and its
    registry entries.
-3. Unsubscribe all event topics and reset per-workspace sequence numbers.
+3. Unsubscribe all event topics, cancel pending coalesced changes and reset
+   per-workspace sequence numbers.
 4. Drop workspace-scoped settings, open tabs and file caches.
 5. Release the provider (drop handles, stop polling).
 6. Persist the new workspace identity and provider state.

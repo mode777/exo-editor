@@ -51,10 +51,17 @@ document title so a hidden frame remains inspectable in devtools.
 
 | File glob           | Page                    | Behaviour                                                                      |
 | ------------------- | ----------------------- | ------------------------------------------------------------------------------ |
+| `**/*.events.txt`   | `editor-events.html`    | Subscribes to the four v1 topics and records sequences and events              |
 | `**/*.txt`          | `editor.html`           | Read, report dirty, save with a `[fixture save N]` marker, acknowledge dispose |
 | `**/*.append.txt`   | `editor-append.html`    | Same, with an `[fixture append N]` marker and a second visible edit signal     |
 | `**/*.repeat.txt`   | `editor-repeat.html`    | Requests the same file twice and records both versions in `#observation`       |
 | `**/*.neverack.txt` | `editor-never-ack.html` | Ignores `shell/dispose` so the 1 s teardown timeout is observable              |
+
+The `events` mode subscribes to `theme/changed`, `workspace/file-changed`,
+`workspace/closed` and `config/changed` after `shell/init`. `#observation`
+records `init` (theme and workspace name), `subscriptions` (the `shell/subscribed`
+replies with their sequence numbers) and `events` (the `shell/event` payloads).
+The other modes do not subscribe, so they receive no topic events.
 
 ## Manual checks against the deployed shell
 
@@ -72,5 +79,20 @@ document title so a hidden frame remains inspectable in devtools.
    removed after the timeout) and a clean document falls back to the text editor.
 7. A plugin with only `workspace:read` gets an editor with no Save action; a
    read-only workspace behaves the same.
+8. Open `events.events.txt` with the events editor. `#observation` shows
+   `subscriptions` with `seq: 0` for all four topics and `init.theme` matches the
+   current theme. Toggling the theme appends one `theme/changed` event; a `.txt`
+   opened with the default editor records none.
+9. Save the open document twice quickly: the frame gets `shell/save-result`
+   before one coalesced `workspace/file-changed`, and an external write is
+   recorded as another `workspace/file-changed` with the new version.
+10. Switch or close the workspace: the events frame records `workspace/closed`
+    with `switch` or `close` before `shell/dispose`, and `#observation` stops
+    changing afterwards.
+11. Enable `readonly-manifest.json` instead: its events editor opens and every
+    subscription is answered with `permission-denied` in `errors`.
+
+Changes are only observed for open documents plus the shell's own writes; both
+providers are non-watchable, so an unopened file is not reported.
 
 No secrets, backend or build step are involved.

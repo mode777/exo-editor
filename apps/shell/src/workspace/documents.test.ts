@@ -15,11 +15,13 @@ async function setup(files: Record<string, string | Uint8Array> = { '/a.txt': 'o
     isVisible: () => true,
   })
   const dirty: Array<[string, boolean]> = []
+  const saved: WorkspaceChange[] = []
   const store = new DocumentStore({
     getSession: () => session,
     onDirtyChange: (path, value) => dirty.push([path, value]),
+    onSaved: (change) => saved.push(change),
   })
-  return { provider, handle, session, store, dirty }
+  return { provider, handle, session, store, dirty, saved }
 }
 
 function stat(path: string, version: string, size: number): FileStat {
@@ -105,7 +107,7 @@ describe('document open pipeline', () => {
 
 describe('document editing and saving', () => {
   it('saves exact bytes and updates the version', async () => {
-    const { handle, store } = await setup()
+    const { handle, store, saved } = await setup()
     await store.open('/a.txt')
     const before = store.get('/a.txt')?.version
 
@@ -117,6 +119,13 @@ describe('document editing and saving', () => {
     expect(document?.dirty).toBe(false)
     expect(document?.version).not.toBe(before)
     expect(decoder.decode(await handle.read('/a.txt'))).toBe('edited')
+    expect(saved).toEqual([
+      {
+        kind: 'changed',
+        path: '/a.txt',
+        stat: expect.objectContaining({ version: document?.version }),
+      },
+    ])
   })
 
   it('clears dirty when the text is reverted', async () => {

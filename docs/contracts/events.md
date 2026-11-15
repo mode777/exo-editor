@@ -7,7 +7,11 @@ requirements are mirrored in `openspec/specs/plugin-events/spec.md`.
 
 Shell-to-plugin notifications - theme changes, file changes, workspace closure,
 plugin configuration - travel over a topic subscription API carried by the same
-envelope as the plugin protocol. There is no second channel and no polling.
+envelope as the plugin protocol. Workspace-wide notifications use topics only;
+the targeted `shell/file-changed` message for an open document (section 5.4 of
+[`plugin-protocol.md`](./plugin-protocol.md#54-external-changes)) stays a
+protocol message and is not a second subscription channel. Both forms derive
+from the same observation.
 
 Events are **push, not RPC**: a topic has no request/response pair, the shell
 does not wait for a plugin to handle one, and a slow plugin cannot block another.
@@ -89,6 +93,21 @@ then disposes the session; a plugin must not rely on receiving it and must treat
   result, so a plugin sees `save-result` before `file-changed` for its own file.
 - A dirty handler is never auto-reloaded. The plugin decides what to do with the
   notification.
+- The targeted `shell/file-changed` message is sent to the bound document's
+  handler immediately for every observed change, without coalescing. A
+  subscribed frame also receives the coalesced `workspace/file-changed` event;
+  both carry the same `path`, `kind` and, where present, `version`.
+- A shell write records its path and version for one second. A watcher or poll
+  report with the same path and version in that window is an echo and is not
+  published again; a different version is a real external change.
+
+### Observable scope
+
+Both providers report `watchable: false` in v1, so the session observes changes
+to open documents through its focus/visibility poll; a future watchable provider
+feeds the same callback. A change to a file that is neither open nor written by
+the shell is not observed and produces no event. Whole-tree watching is a
+provider capability, not an event-bus feature.
 
 ## 5. Initial state
 
@@ -107,7 +126,11 @@ subscribing. `config/changed` is then incremental.
 
 - On queue overflow the shell drops the oldest events and sends one
   `shell/error` with `rate-limited` and the topic name. It does not tear down the
-  frame for overflow.
+  frame for overflow. The queue is drained in a microtask and is a burst bound,
+  not backpressure: `postMessage` has no acknowledgement.
+- Non-coalesced topics publish at most 100 events per rolling second; events
+  beyond that are dropped and not replayed. Coalesced file changes are exempt
+  from that gate because they are already merged per path.
 - A frame that repeatedly sends invalid subscription messages is treated as a
   protocol violation under
   [`plugin-protocol.md`](./plugin-protocol.md#6-errors).

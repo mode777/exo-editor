@@ -42,6 +42,10 @@ export function hasWorkspaceWrite(permissions: PluginPermission[]): boolean {
   return permissions.includes('workspace:write')
 }
 
+export function hasEventsSubscribe(permissions: PluginPermission[]): boolean {
+  return permissions.includes('events:subscribe')
+}
+
 export const MANIFEST_REQUIRED_FIELDS = [
   'schemaVersion',
   'id',

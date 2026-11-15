@@ -17,6 +17,12 @@
   "contributes": {
     "fileEditors": [
       {
+        "glob": "**/*.events.txt",
+        "entry": "editor-events.html",
+        "label": "Fixture Events",
+        "priority": 30
+      },
+      {
         "glob": "**/*.repeat.txt",
         "entry": "editor-repeat.html",
         "label": "Fixture Repeat",

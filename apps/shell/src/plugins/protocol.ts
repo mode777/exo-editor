@@ -135,8 +135,8 @@ function sizeOf(value: unknown, limit: number, seen: Set<object>): number {
   return 0
 }
 
-export function payloadTooLarge(payload: unknown): boolean {
-  return sizeOf(payload, MAX_MESSAGE_BYTES, new Set()) > MAX_MESSAGE_BYTES
+export function payloadTooLarge(payload: unknown, limit = MAX_MESSAGE_BYTES): boolean {
+  return sizeOf(payload, limit, new Set()) > limit
 }
 
 export function postEnvelope(

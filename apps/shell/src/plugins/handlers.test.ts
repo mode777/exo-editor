@@ -162,6 +162,47 @@ describe('handler pool', () => {
     })
   })
 
+  it('publishes only to subscribed frames and delivers workspace closure', async () => {
+    const context = await harness({ '/src/a.ts': 'a', '/src/b.ts': 'b' })
+    const list = [candidate(undefined, { permissions: ['workspace:read', 'events:subscribe'] })]
+    ;(context.host as unknown as { match: (path: string) => EditorCandidate[] }).match = () => list
+    await open(context, '/src/a.ts')
+    await open(context, '/src/b.ts')
+    const [first, second] = context.transport.frames
+    for (const frame of [first, second]) {
+      frame.emit(
+        {
+          exo: 1,
+          type: 'plugin/ready',
+          payload: { protocolVersion: '1', sessionId: 'session-1' },
+        },
+        PLUGIN_ORIGIN,
+      )
+    }
+    first.emit(
+      { exo: 1, type: 'plugin/subscribe', id: 's1', payload: { topic: 'theme/changed' } },
+      PLUGIN_ORIGIN,
+    )
+
+    context.pool.publish('theme/changed', { theme: 'light' })
+    context.pool.events.flush()
+    const delivered = (frame: typeof first) =>
+      frame.posted
+        .map((entry) => entry.message as { type?: string })
+        .filter((message) => message.type === 'shell/event')
+    expect(delivered(first)).toHaveLength(1)
+    expect(delivered(second)).toHaveLength(0)
+
+    first.emit(
+      { exo: 1, type: 'plugin/subscribe', id: 's2', payload: { topic: 'workspace/closed' } },
+      PLUGIN_ORIGIN,
+    )
+    context.pool.publishWorkspaceClosed('switch')
+    expect(delivered(first).at(-1)).toMatchObject({
+      payload: { topic: 'workspace/closed', payload: { reason: 'switch' } },
+    })
+  })
+
   it('awaits disposal of every handler when detaching', async () => {
     vi.useFakeTimers()
     const context = await harness({ '/src/a.ts': 'a' })

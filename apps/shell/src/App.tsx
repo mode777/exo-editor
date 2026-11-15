@@ -274,7 +274,7 @@ function Shell({ runtime }: { runtime: WorkspaceRuntime }) {
 
   return (
     <>
-      <ThemeSync />
+      <ThemeSync onChange={(theme) => runtime.publishTheme(theme)} />
       <VSCodeWorkbench
         config={workbenchConfig}
         views={workbenchViews}

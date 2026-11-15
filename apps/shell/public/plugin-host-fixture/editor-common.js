@@ -13,6 +13,9 @@
     origin: location.origin,
     phase: 'starting',
     file: null,
+    init: null,
+    subscriptions: [],
+    events: [],
     reads: [],
     dirty: false,
     disposed: 'pending',
@@ -25,7 +28,7 @@
   function render() {
     state.origin = location.origin
     observation.textContent = JSON.stringify(state)
-    document.title = `Exo fixture ${fixtureMode} ${state.phase}`
+    document.title = `Exo fixture ${fixtureMode} ${state.phase} events:${state.events.length}`
   }
 
   function post(type, payload, replyTo, id) {
@@ -48,9 +51,38 @@
     state.permissions = payload.permissions
     state.capabilities = payload.capabilities
     state.limits = payload.limits
+    state.init = {
+      theme: payload.theme,
+      workspace: payload.workspace,
+      permissions: payload.permissions,
+    }
+    if (fixtureMode === 'events') subscribeAll()
     render()
     // Delay the first read so a verifier can observe init without content.
     setTimeout(() => requestFile('read-1'), 500)
+  }
+
+  function subscribeAll() {
+    for (const topic of [
+      'theme/changed',
+      'workspace/file-changed',
+      'workspace/closed',
+      'config/changed',
+    ]) {
+      post('plugin/subscribe', { topic }, undefined, `sub-${topic}`)
+    }
+  }
+
+  function onSubscribed(payload) {
+    state.subscriptions.push(payload)
+    console.log('EXO_EDITOR subscribed', payload && payload.topic, payload && payload.seq)
+    render()
+  }
+
+  function onEvent(payload) {
+    state.events.push(payload)
+    console.log('EXO_EDITOR event', payload && payload.topic, payload && payload.seq)
+    render()
   }
 
   function onContent(payload) {
@@ -149,6 +181,12 @@
           post('plugin/dirty', { dirty: true })
         }
         render()
+        break
+      case 'shell/subscribed':
+        onSubscribed(data.payload || {})
+        break
+      case 'shell/event':
+        onEvent(data.payload || {})
         break
       case 'shell/dispose':
         onDispose(data.payload)

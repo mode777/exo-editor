@@ -3,6 +3,7 @@ import { MemoryWorkspaceProvider } from '../workspace/providers/memory'
 import { Session } from '../workspace/session'
 import type { FileStat, WorkspacePath, WorkspaceSession } from '../workspace/contract'
 import { FakeFrameTransport, type FakeFrame } from './frame-test-support'
+import { EventBus } from './events'
 import {
   HandlerSession,
   resolveHandlerReadPath,
@@ -62,6 +63,7 @@ interface Started {
   versions: string[]
   session: WorkspaceSession
   stat: FileStat
+  events: EventBus
 }
 
 async function start(
@@ -75,6 +77,7 @@ async function start(
   const failures: HandlerFailure[] = []
   const logs: Array<{ phase: string; code?: string }> = []
   const versions: string[] = []
+  const events = new EventBus()
   const options: HandlerSessionOptions = {
     candidate: candidate(),
     file: {
@@ -95,6 +98,7 @@ async function start(
     canWrite: true,
     maxFileSize: 10 * 1024 * 1024,
     maxRequestBytes: 16 * 1024 * 1024,
+    events,
     createSessionId: () => 'session-1',
     onDirty: (value) => dirty.push(value),
     onFailure: (failure) => failures.push(failure),
@@ -105,7 +109,7 @@ async function start(
   const handler = new HandlerSession(options)
   handler.start()
   const frame = transport.frames[0] as FakeFrame
-  return { transport, frame, handler, dirty, failures, logs, versions, session, stat }
+  return { transport, frame, handler, dirty, failures, logs, versions, session, stat, events }
 }
 
 function ready(context: Started, origin = PLUGIN_ORIGIN) {
@@ -481,19 +485,149 @@ describe('handler session', () => {
     expect(context.frame.closed).toBe(true)
   })
 
-  it('answers subscribe with unsupported-message without a violation', async () => {
+  it('handles subscription messages', async () => {
     const context = await start()
+    ready(context)
+    context.frame.emit(
+      { exo: 1, type: 'plugin/subscribe', id: 's1', payload: { topic: 'theme/changed' } },
+      PLUGIN_ORIGIN,
+    )
+    expect(postedType(context.frame, 'shell/error')).toMatchObject({
+      payload: { code: 'permission-denied' },
+      replyTo: 's1',
+    })
+    context.frame.emit({ exo: 1, type: 'plugin/dirty', payload: { dirty: true } }, PLUGIN_ORIGIN)
+    expect(context.dirty).toEqual([true])
+  })
+})
+
+describe('handler subscriptions', () => {
+  const subscribed = () => candidate({ permissions: ['workspace:read', 'events:subscribe'] })
+
+  function messages(frame: FakeFrame, type: string) {
+    return frame.posted
+      .map((entry) => entry.message as { type: string; payload?: unknown; replyTo?: string })
+      .filter((message) => message.type === type)
+  }
+
+  it('grants a subscribe and delivers topic events', async () => {
+    const context = await start({ candidate: subscribed() })
+    ready(context)
+    context.frame.emit(
+      { exo: 1, type: 'plugin/subscribe', id: 's1', payload: { topic: 'theme/changed' } },
+      PLUGIN_ORIGIN,
+    )
+    expect(messages(context.frame, 'shell/subscribed').at(-1)).toMatchObject({
+      payload: { topic: 'theme/changed', seq: 0 },
+      replyTo: 's1',
+    })
+
+    context.events.publish('theme/changed', { theme: 'light' })
+    context.events.flush()
+    expect(messages(context.frame, 'shell/event').at(-1)).toMatchObject({
+      payload: {
+        topic: 'theme/changed',
+        seq: 1,
+        payload: { theme: 'light' },
+      },
+    })
+  })
+
+  it('reports the current sequence on a repeated subscribe', async () => {
+    const context = await start({ candidate: subscribed() })
+    ready(context)
+    for (const id of ['s1', 's2']) {
+      context.frame.emit(
+        { exo: 1, type: 'plugin/subscribe', id, payload: { topic: 'theme/changed' } },
+        PLUGIN_ORIGIN,
+      )
+    }
+    context.events.publish('theme/changed', { theme: 'dark' })
+    context.events.flush()
+    context.frame.emit(
+      { exo: 1, type: 'plugin/subscribe', id: 's3', payload: { topic: 'theme/changed' } },
+      PLUGIN_ORIGIN,
+    )
+    expect(messages(context.frame, 'shell/subscribed').at(-1)).toMatchObject({
+      payload: { topic: 'theme/changed', seq: 1 },
+      replyTo: 's3',
+    })
+    expect(messages(context.frame, 'shell/event')).toHaveLength(1)
+  })
+
+  it('rejects an unknown topic and delivers nothing for it', async () => {
+    const context = await start({ candidate: subscribed() })
+    ready(context)
+    context.frame.emit(
+      { exo: 1, type: 'plugin/subscribe', id: 's1', payload: { topic: 'workspace/*' } },
+      PLUGIN_ORIGIN,
+    )
+    expect(messages(context.frame, 'shell/subscribed').at(-1)).toMatchObject({
+      payload: { topic: 'workspace/*', code: 'unsupported-topic' },
+    })
+    context.events.publish('workspace/file-changed', { path: '/a.txt', kind: 'changed' })
+    context.events.flush()
+    expect(messages(context.frame, 'shell/event')).toHaveLength(0)
+  })
+
+  it('stops delivery after unsubscribe', async () => {
+    const context = await start({ candidate: subscribed() })
+    ready(context)
+    context.frame.emit(
+      { exo: 1, type: 'plugin/subscribe', id: 's1', payload: { topic: 'theme/changed' } },
+      PLUGIN_ORIGIN,
+    )
+    context.frame.emit(
+      { exo: 1, type: 'plugin/unsubscribe', payload: { topic: 'theme/changed' } },
+      PLUGIN_ORIGIN,
+    )
+    context.events.publish('theme/changed', { theme: 'dark' })
+    context.events.flush()
+    expect(messages(context.frame, 'shell/event')).toHaveLength(0)
+  })
+
+  it('drops subscriptions and queued events on dispose', async () => {
+    const context = await start({ candidate: subscribed() })
+    ready(context)
+    context.frame.emit(
+      { exo: 1, type: 'plugin/subscribe', id: 's1', payload: { topic: 'theme/changed' } },
+      PLUGIN_ORIGIN,
+    )
+    context.events.publish('theme/changed', { theme: 'dark' })
+    await context.handler.dispose('closed')
+    context.events.flush()
+    expect(messages(context.frame, 'shell/event')).toHaveLength(0)
+
+    context.events.publish('theme/changed', { theme: 'light' })
+    context.events.flush()
+    expect(messages(context.frame, 'shell/event')).toHaveLength(0)
+  })
+
+  it('accepts the reserved config topic and keeps it silent', async () => {
+    const context = await start({ candidate: subscribed() })
+    ready(context)
+    context.frame.emit(
+      { exo: 1, type: 'plugin/subscribe', id: 's1', payload: { topic: 'config/changed' } },
+      PLUGIN_ORIGIN,
+    )
+    expect(messages(context.frame, 'shell/subscribed').at(-1)).toMatchObject({
+      payload: { topic: 'config/changed', seq: 0 },
+    })
+    context.events.flush()
+    expect(messages(context.frame, 'shell/event')).toHaveLength(0)
+  })
+
+  it('treats a malformed subscription as a protocol violation', async () => {
+    const context = await start({ candidate: subscribed() })
     ready(context)
     context.frame.emit(
       { exo: 1, type: 'plugin/subscribe', id: 's1', payload: { topics: ['theme/changed'] } },
       PLUGIN_ORIGIN,
     )
     expect(postedType(context.frame, 'shell/error')).toMatchObject({
-      payload: { code: 'unsupported-message' },
+      payload: { code: 'protocol-violation' },
       replyTo: 's1',
     })
-    context.frame.emit({ exo: 1, type: 'plugin/dirty', payload: { dirty: true } }, PLUGIN_ORIGIN)
-    expect(context.dirty).toEqual([true])
   })
 })
 

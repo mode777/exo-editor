@@ -1,7 +1,7 @@
 # Exo Editor - Roadmap
 
-Status: layers 0-5 are complete and archived. Layer 6 (`plugin-events`) is next.
-The parallel Stratofold provider track (P1) is archived as
+Status: layers 0-5 are complete and archived. Layer 6 (`plugin-events`) is
+implemented and awaiting deployed verification. The parallel Stratofold provider track (P1) is archived as
 `2026-11-15-add-stratofold-provider` and does not gate the numbered layers. Its
 0.12.0 follow-on, P2 `adopt-stratofold-0-12`, is implemented and verified against
 the deployed shell; archive pending. Each layer is one OpenSpec change. A layer
@@ -381,6 +381,9 @@ artifacts.
 ---
 
 ## Layer 6 - `plugin-events`
+
+**Status:** implemented; local gate, bundle budget and dist checks pass. Deployed
+verification pending.
 
 **Goal:** plugins learn about shell state changes without polling or coupling.
 

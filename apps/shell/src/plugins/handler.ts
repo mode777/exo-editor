@@ -7,7 +7,8 @@ import {
 } from '../workspace/contract'
 import { basename, dirname, isReservedPath, normalizePath } from '../workspace/paths'
 import type { FrameHandle, FrameTransport, PluginMessage } from './frame'
-import { hasWorkspaceRead, hasWorkspaceWrite } from './manifest'
+import { hasEventsSubscribe, hasWorkspaceRead, hasWorkspaceWrite } from './manifest'
+import type { EventBus, EventSubscriber } from './events'
 import type { EditorCandidate } from './registry'
 import {
   DISPOSE_TIMEOUT_MS,
@@ -80,6 +81,7 @@ export interface HandlerSessionOptions {
   workspaceName: string
   theme: 'dark' | 'light' | 'high-contrast'
   locale: string
+  events: EventBus
   /** `workspace:write` and a writable session; checked again at save time. */
   canWrite: boolean
   maxFileSize: number
@@ -211,6 +213,7 @@ export class HandlerSession {
   private readonly clearTimeoutImpl: typeof clearTimeout
   private readonly readings = new Map<WorkspacePath, CachedFile>()
   private readonly violations: ViolationBudget
+  private readonly subscription: EventSubscriber
   private frame: FrameHandle | null = null
   private phase: Phase = 'mounting'
   private file: HandlerFileMetadata
@@ -236,6 +239,22 @@ export class HandlerSession {
     this.clearTimeoutImpl =
       options.clearTimeoutImpl ?? (clearTimeout.bind(globalThis) as typeof clearTimeout)
     this.violations = new ViolationBudget(() => this.fail('protocol-violation', 'editor'))
+    this.subscription = options.events.createSubscriber({
+      label: options.candidate.pluginId,
+      deliver: (event) => {
+        postEnvelope(this.frame, this.boundary.targetOrigin, 'shell/event', event)
+      },
+      onError: (topic, code) => {
+        sendShellError(
+          this.frame,
+          this.boundary.targetOrigin,
+          code,
+          undefined,
+          `Event queue overflow for ${topic}.`,
+        )
+        this.log('handler-events', code, topic)
+      },
+    })
   }
 
   get path(): WorkspacePath {
@@ -288,6 +307,7 @@ export class HandlerSession {
   async dispose(reason: HandlerDisposeReason): Promise<void> {
     if (this.phase === 'closed') return
     if (this.phase === 'disposing') return this.disposePromise ?? Promise.resolve()
+    this.subscription.close()
     this.clearTimers()
     this.failLiveSave('internal')
     if (!this.frame) {
@@ -309,6 +329,7 @@ export class HandlerSession {
   close(): void {
     if (this.phase === 'closed') return
     this.phase = 'closed'
+    this.subscription.close()
     this.clearTimers()
     this.failLiveSave('internal')
     this.readings.clear()
@@ -405,6 +426,7 @@ export class HandlerSession {
     if (this.phase === 'closed' || this.failureSent) return
     this.failureSent = true
     this.phase = 'closed'
+    this.subscription.close()
     this.clearTimers()
     this.failLiveSave('internal')
     this.frame?.close()
@@ -427,6 +449,7 @@ export class HandlerSession {
   private finishDispose(): void {
     if (this.phase === 'closed') return
     this.phase = 'closed'
+    this.subscription.close()
     this.clearTimers()
     this.failLiveSave('internal')
     this.readings.clear()
@@ -505,9 +528,10 @@ export class HandlerSession {
       case 'plugin/dispose-ack':
         return
       case 'plugin/subscribe':
+        this.handleSubscribe(envelope)
+        return
       case 'plugin/unsubscribe':
-        // Events arrive in layer 6; a probing plugin is not a protocol violation.
-        if (envelope.id) this.sendError('unsupported-message', envelope.id)
+        this.handleUnsubscribe(envelope)
         return
       case 'plugin/register':
       case 'plugin/register-complete':
@@ -571,6 +595,60 @@ export class HandlerSession {
     })
     this.options.onActive?.()
     this.log('handler', 'open')
+  }
+
+  private handleSubscribe(envelope: Envelope): void {
+    const payload = envelope.payload
+    if (
+      !isPlainObject(payload) ||
+      typeof payload.topic !== 'string' ||
+      payload.topic.length === 0
+    ) {
+      this.violation(envelope)
+      return
+    }
+    if (!hasEventsSubscribe(this.options.candidate.permissions)) {
+      this.sendError('permission-denied', envelope.id)
+      this.log('handler-events', 'permission-denied', payload.topic)
+      return
+    }
+    const result = this.subscription.subscribe(payload.topic)
+    if (result.ok) {
+      postEnvelope(
+        this.frame,
+        this.boundary.targetOrigin,
+        'shell/subscribed',
+        { topic: payload.topic, seq: result.seq },
+        envelope.id,
+      )
+      this.log('handler-events', 'subscribed', payload.topic)
+      return
+    }
+    if (result.code === 'unsupported-topic') {
+      postEnvelope(
+        this.frame,
+        this.boundary.targetOrigin,
+        'shell/subscribed',
+        { topic: payload.topic, code: 'unsupported-topic' },
+        envelope.id,
+      )
+      return
+    }
+    this.sendError('rate-limited', envelope.id)
+    this.log('handler-events', result.code, payload.topic)
+  }
+
+  private handleUnsubscribe(envelope: Envelope): void {
+    const payload = envelope.payload
+    if (
+      !isPlainObject(payload) ||
+      typeof payload.topic !== 'string' ||
+      payload.topic.length === 0
+    ) {
+      this.violation(envelope)
+      return
+    }
+    this.subscription.unsubscribe(payload.topic)
   }
 
   private handleDirty(envelope: Envelope): void {

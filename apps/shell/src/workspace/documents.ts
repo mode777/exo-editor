@@ -92,6 +92,8 @@ export interface DocumentState {
 export interface DocumentStoreOptions {
   getSession: () => WorkspaceSession | null
   onDirtyChange?: (path: WorkspacePath, dirty: boolean) => void
+  /** A successful write from either surface; the event bus publishes it. */
+  onSaved?: (change: WorkspaceChange) => void
   editors?: DocumentEditorHost
 }
 
@@ -264,6 +266,7 @@ export class DocumentStore {
         this.syncOpenDocuments()
         this.emit(path)
         this.options.onDirtyChange?.(path, dirty)
+        this.options.onSaved?.({ kind: 'changed', path, stat })
         return true
       } catch (error) {
         if (generation !== this.generation) return false
@@ -354,6 +357,7 @@ export class DocumentStore {
         this.syncOpenDocuments()
         this.emit(path)
         this.options.onDirtyChange?.(path, dirty)
+        this.options.onSaved?.({ kind: 'changed', path, stat })
         return true
       } finally {
         this.saveControllers.delete(path)

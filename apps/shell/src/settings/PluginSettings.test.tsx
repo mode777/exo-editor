@@ -131,6 +131,10 @@ class FakePluginPool implements DocumentEditorHost {
   closeFor(): void {}
   attach(): void {}
   async detach(): Promise<void> {}
+  publish(): boolean {
+    return true
+  }
+  publishWorkspaceClosed(): void {}
   disposeTransport(): void {}
 }
 

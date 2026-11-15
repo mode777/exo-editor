@@ -3,7 +3,9 @@ import {
   asWorkspaceError,
   isAborted,
   workspaceErrorMessage,
+  type FileStat,
   type WorkspaceCapabilities,
+  type WorkspaceChange,
   type WorkspaceDescriptor,
   type WorkspaceErrorCode,
   type WorkspaceHandle,
@@ -17,6 +19,7 @@ import { isReservedPath, normalizePath } from './paths'
 import { PluginConfigStore } from '../plugins/store'
 import { PluginHost } from '../plugins/host'
 import { HandlerPool } from '../plugins/handlers'
+import { FileChangeCoalescer, SelfWriteEcho, type ThemeName } from '../plugins/events'
 import { FolderWorkspaceProvider } from './providers/folder/provider'
 import { IndexedDbHandleStore, type HandleStore } from './providers/folder/handle-store'
 import { supportsFolderWorkspaces } from './providers/folder/fsa'
@@ -106,6 +109,8 @@ export class WorkspaceRuntime {
   readonly pluginHost: PluginHost
   readonly handlers: HandlerPool
 
+  private readonly fileChanges: FileChangeCoalescer
+  private readonly echoes: SelfWriteEcho
   private readonly options: WorkspaceRuntimeOptions
   private readonly handleStore: HandleStore
   private readonly activeStore: ActiveWorkspaceStore
@@ -143,9 +148,16 @@ export class WorkspaceRuntime {
         onHandlerClosed: (path) => this.documents.handleHandlerClosed(path),
       })
     this.pluginHost.setHandlerLifecycle(this.handlers)
+    this.fileChanges = new FileChangeCoalescer({
+      publish: (payload) => {
+        this.handlers.publish('workspace/file-changed', payload, { burst: true })
+      },
+    })
+    this.echoes = new SelfWriteEcho(() => this.now())
     this.documents = new DocumentStore({
       getSession: () => this.session,
       onDirtyChange: (path, dirty) => setTabDirty(path, dirty),
+      onSaved: (change) => this.publishShellChange(change),
       editors: this.handlers,
     })
   }
@@ -171,6 +183,11 @@ export class WorkspaceRuntime {
 
   setReservedDocumentHandler(handler: ((path: WorkspacePath) => void) | null): void {
     this.reservedDocumentHandler = handler
+  }
+
+  /** The workbench theme is global, so this does not depend on a workspace. */
+  publishTheme(theme: ThemeName): void {
+    this.handlers.publish('theme/changed', { theme })
   }
 
   start(): Promise<void> {
@@ -247,7 +264,7 @@ export class WorkspaceRuntime {
   async disconnect(): Promise<void> {
     if (this.disposed) return
     const hadWorkspace = this.session !== null
-    await this.deactivate()
+    await this.deactivate('close')
     this.generationCount += 1
     this.remote = null
     this.remoteError = null
@@ -322,13 +339,15 @@ export class WorkspaceRuntime {
     return this.documents.save(path)
   }
 
-  renameOpenPath(
-    previousPath: WorkspacePath,
-    nextPath: WorkspacePath,
-    stat: { version: string; size: number },
-  ): void {
+  renameOpenPath(previousPath: WorkspacePath, nextPath: WorkspacePath, stat: FileStat): void {
     this.documents.rename(previousPath, nextPath, stat)
     updateTabPath(previousPath, nextPath)
+    this.publishShellChange({
+      kind: 'renamed',
+      previousPath,
+      path: nextPath,
+      stat,
+    })
   }
 
   deletePath(path: WorkspacePath): void {
@@ -347,7 +366,7 @@ export class WorkspaceRuntime {
     this.pluginHost.dispose()
     this.handlers.disposeTransport()
     this.pluginConfig.detach()
-    await this.deactivate()
+    await this.deactivate('close')
     this.documents.clear()
     this.listeners.clear()
     this.startPromise = null
@@ -471,7 +490,7 @@ export class WorkspaceRuntime {
     this.session = session
     this.provider = provider
     this.externalRegistration = session.onExternalChange((change) => {
-      this.documents.applyExternal(change)
+      this.publishExternalChange(change)
       if (change.kind === 'renamed') {
         updateTabPath(change.previousPath, change.path)
       }
@@ -497,8 +516,28 @@ export class WorkspaceRuntime {
     })
   }
 
-  private async deactivate(): Promise<void> {
+  private publishExternalChange(change: WorkspaceChange): void {
+    this.documents.applyExternal(change)
+    if (this.echoes.isEcho(change)) return
+    this.fileChanges.push(change)
+  }
+
+  private publishShellChange(change: WorkspaceChange): void {
+    if (change.kind !== 'deleted') {
+      this.echoes.record(change.path, change.stat.version)
+    }
+    this.fileChanges.push(change)
+  }
+
+  private now(): number {
+    return (this.options.now ?? (() => Date.now()))()
+  }
+
+  private async deactivate(reason: 'switch' | 'close' = 'switch'): Promise<void> {
+    this.handlers.publishWorkspaceClosed(reason)
     await this.handlers.detach()
+    this.fileChanges.reset()
+    this.echoes.reset()
     this.pluginHost.detach()
     this.pluginConfig.detach()
     this.externalRegistration?.dispose()
