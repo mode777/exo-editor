@@ -1,7 +1,8 @@
 # Exo Editor - Roadmap
 
 Status: layers 0-5 are complete and archived. Layer 6 (`plugin-events`) is
-implemented and awaiting deployed verification. The parallel Stratofold provider track (P1) is archived as
+implemented and verified against the deployed shell; its change is awaiting
+archive, after which layer 7 (`plugin-settings`) starts. The parallel Stratofold provider track (P1) is archived as
 `2026-11-15-add-stratofold-provider` and does not gate the numbered layers. Its
 0.12.0 follow-on, P2 `adopt-stratofold-0-12`, is implemented and verified against
 the deployed shell; archive pending. Each layer is one OpenSpec change. A layer
@@ -382,8 +383,8 @@ artifacts.
 
 ## Layer 6 - `plugin-events`
 
-**Status:** implemented; local gate, bundle budget and dist checks pass. Deployed
-verification pending.
+**Status:** complete - implemented and verified against the deployed shell on
+2026-11-15; archive pending.
 
 **Goal:** plugins learn about shell state changes without polling or coupling.
 
@@ -397,15 +398,40 @@ verification pending.
   after save results.
 - Initial state in `shell/init` so no replay is needed.
 
-**Exit criteria**
+**Exit criteria (met)**
 
-- Toggling the theme reaches a subscribed frame and not an unsubscribed one.
-- An external file change reaches the handler for the open file and is coalesced
-  under rapid writes.
-- A frame that closes does not receive events; a disposed frame's late events are
-  dropped.
-- Event delivery cannot throw into the shell render path (test with a throwing
-  subscriber).
+- Met: toggling the theme reaches a subscribed frame and not an unsubscribed one.
+- Met: an external file change reaches the handler for the open file; three rapid
+  external writes reach it as one observed `workspace/file-changed`.
+- Met: a frame that closes receives no later event; a disposed frame's late
+  events are dropped (`handler.test.ts`, `events.test.ts`).
+- Met: a throwing subscriber is contained, removed after three failures and never
+  throws into the render path (`events.test.ts`).
+
+**Deployed verification (2026-11-15):** Chrome for Testing 131.0.6778.264 drove
+the deployed shell with the folder workspace served from an OPFS handle through a
+`showDirectoryPicker` stub, as in layer 5. The deployed shell, plugin manifest,
+registration and handler code were the real artifacts.
+
+- The events fixture opened on `/events.events.txt` reported `shell/subscribed`
+  with `seq: 0` for `theme/changed`, `workspace/file-changed`,
+  `workspace/closed` and `config/changed`; `shell/init` already carried
+  `theme: dark` and `workspace.name`.
+- Toggling the theme produced one `theme/changed` in the subscribed frame; an
+  unsubscribed `.txt` editor produced no event.
+- A shell save produced `shell/save-result` before `workspace/file-changed`; an
+  external write produced the targeted `shell/file-changed` plus one topic event,
+  and three rapid writes were observed as a single event.
+- Switching to a workspace whose manifest lacked `events:subscribe` returned
+  `permission-denied` for all four subscriptions and delivered no event; the old
+  subscribed frame recorded `workspace/closed` with `switch` before disposal and
+  received nothing afterwards.
+- Not deploy-verified: the `close` reason (folder workspaces have no close action
+  in the shell UI; covered by `runtime.test.ts`), the 33rd-topic cap and queue
+  overflow (v1 has four topics and no manual path to 1000 queued events; covered
+  by `events.test.ts`).
+- The local gate passed: 528 tests, bundle budget 145,728/148,000 gzip bytes, and
+  the dist CSP and custom-element checks.
 
 ---
 

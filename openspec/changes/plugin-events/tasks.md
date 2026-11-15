@@ -46,12 +46,12 @@
 
 - [x] 7.1 Run the full local gate (`npm ci`, `npm run lint`, `npm run format:check`, `npm run typecheck`, `npm test`, `npm run build`, bundle budget, dist CSP, dist elements) and confirm every command passes
 - [x] 7.2 Measure the bundle delta, confirm `apps/shell/budget.json` still passes, and record any deliberate limit change with the measured number and headroom
-- [ ] 7.3 Against `https://mode777.github.io/exo-editor/`, open the events fixture on a `.events.txt` file and confirm `shell/subscribed` reports sequence 0 for the four topics and `shell/init` already carries theme and workspace name; record the observation
-- [ ] 7.4 Against the deployed shell, toggle the theme and confirm the subscribed frame records one `theme/changed` while an unsubscribed editor frame records none; record both observations
-- [ ] 7.5 Against the deployed shell, change the open file externally and save it twice quickly, then confirm the bound handler got its targeted `shell/file-changed` and the subscribed frame got the coalesced `workspace/file-changed` after `shell/save-result`; record the event log
-- [ ] 7.6 Against the deployed shell, switch and then close the workspace and confirm the subscribed frame recorded `workspace/closed` with `switch` and `close` before disposal, and received nothing afterwards; record the observations
-- [ ] 7.7 Confirm a plugin without `events:subscribe` is denied, a 33rd subscription is rejected and queue overflow reports one `rate-limited`; record the fixture evidence
-- [ ] 7.8 Update `ROADMAP.md` layer 6 status and exit criteria with the deployed evidence, and confirm `openspec validate --all` passes
+- [x] 7.3 Against `https://mode777.github.io/exo-editor/`, open the events fixture on a `.events.txt` file and confirm `shell/subscribed` reports sequence 0 for the four topics and `shell/init` already carries theme and workspace name; record the observation
+- [x] 7.4 Against the deployed shell, toggle the theme and confirm the subscribed frame records one `theme/changed` while an unsubscribed editor frame records none; record both observations
+- [x] 7.5 Against the deployed shell, change the open file externally, write it three times rapidly, then save; confirmed the bound handler got its targeted `shell/file-changed`, the burst produced one observed `workspace/file-changed`, and the save's event followed `shell/save-result`; recorded the event log
+- [x] 7.6 Against the deployed shell, switch the workspace and confirmed the subscribed frame recorded `workspace/closed` with `switch` before disposal and received no event afterwards; the `close` reason is covered by `runtime.test.ts` because the deployed UI has no close action for folder workspaces
+- [x] 7.7 Confirmed on the deployed shell that a plugin without `events:subscribe` is denied every subscription; the 33rd-topic cap and queue overflow are covered by `events.test.ts` because v1's four-topic catalog and manual runs cannot reach them
+- [x] 7.8 Update `ROADMAP.md` layer 6 status and exit criteria with the deployed evidence, and confirm `openspec validate --all` passes
 
 ## Workflow follow-up
 
