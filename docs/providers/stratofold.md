@@ -248,6 +248,21 @@ plus the `filesystem-api`, `client-library`, `vdir-access-tokens` and
     prefilled the dialog from the stored connection.
   - Not verified: Safari (no driver on the verification host) and public-vdir
     mode (the test vdir is not public).
+- **Deployed verification - 0.12.0 (passed 2026-11-15).** Against the deployed
+  shell and a 0.12.0 server (the E2E harness over an HTTPS tunnel; `Home` vdir,
+  editor token):
+  - A minted connection string filled the server and token, cleared the raw
+    field and mounted the workspace; the raw string and token appeared in no
+    request URL, DOM text, local storage or remembered record, and the record
+    held only the decomposed fields.
+  - A malformed value failed locally with zero remote requests.
+  - A value with `https://stale.invalid` mounted after correcting the server
+    field, using the string's directory and token.
+  - A session-only connection was not restored after reload.
+  - New File created `empty-check.txt` at size 0 and it opened empty; saving
+    `remote content\n` wrote exactly those bytes and rotated the version, and
+    saving empty content truncated the file with another version rotation.
+  - 42 remote requests and zero page errors.
 - **Packaging.** A clean `npm ci` from the registry, the CI `verify` job, the
   bundle budget and the CSP checks. Measured after 0.12.0 and the
   connection-string dialog: `js` 143,622 gzip bytes against a 145,000 limit

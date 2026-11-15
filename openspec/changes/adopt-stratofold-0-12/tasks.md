@@ -20,10 +20,10 @@
 
 - [x] 3.1 Run the full local gate (`npm ci`, `npm run lint`, `npm run format:check`, `npm run typecheck`, `npm test`, `npm run build`, bundle budget, dist CSP, dist elements) and confirm every command passes
 - [x] 3.2 Measure the bundle delta from 0.12.0 plus the dialog work; either confirm the existing `apps/shell/budget.json` limit still passes or raise it with the recorded measured number and headroom
-- [ ] 3.3 Against `https://mode777.github.io/exo-editor/` and a real 0.12.0 Stratofold instance, paste a minted connection string, confirm the workspace mounts with the correct server, directory and role, and record that the raw string appears in no request URL, DOM text or stored record
-- [ ] 3.4 Against the deployed shell, paste a malformed connection string and a string with a corrected server origin; confirm the first fails locally with no request and the second mounts through the corrected origin
-- [ ] 3.5 Against the deployed shell, use New File in a writable remote workspace, open the empty file, save non-empty content and then save empty content over it; confirm size 0, the rotated version and the expected bytes at each step
-- [ ] 3.6 Update `ROADMAP.md` with the `adopt-stratofold-0-12` provider-track row, status and exit criteria, update the verification section of `docs/providers/stratofold.md`, and confirm `openspec validate --all` passes
+- [x] 3.3 Against `https://mode777.github.io/exo-editor/` and a real 0.12.0 Stratofold instance, paste a minted connection string, confirm the workspace mounts with the correct server, directory and role, and record that the raw string appears in no request URL, DOM text or stored record
+- [x] 3.4 Against the deployed shell, paste a malformed connection string and a string with a corrected server origin; confirm the first fails locally with no request and the second mounts through the corrected origin
+- [x] 3.5 Against the deployed shell, use New File in a writable remote workspace, open the empty file, save non-empty content and then save empty content over it; confirm size 0, the rotated version and the expected bytes at each step
+- [x] 3.6 Update `ROADMAP.md` with the `adopt-stratofold-0-12` provider-track row, status and exit criteria, update the verification section of `docs/providers/stratofold.md`, and confirm `openspec validate --all` passes
 
 ## Workflow follow-up
 

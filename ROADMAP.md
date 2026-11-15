@@ -4,10 +4,11 @@ Status: layers 0-4 are complete and archived. Layer 5 (`plugin-file-editors`) is
 implemented and verified against the deployed shell; its change is awaiting
 archive, after which layer 6 (`plugin-events`) starts. The parallel Stratofold
 provider track (P1) is archived as
-`2026-11-15-add-stratofold-provider` and does not gate the numbered layers. Each
-layer is one OpenSpec change. A layer is done when its change is archived and its exit criteria
-are demonstrated against the deployed shell - never from a local dev server or
-local build.
+`2026-11-15-add-stratofold-provider` and does not gate the numbered layers. Its
+0.12.0 follow-on, P2 `adopt-stratofold-0-12`, is implemented and verified against
+the deployed shell; archive pending. Each layer is one OpenSpec change. A layer
+is done when its change is archived and its exit criteria are demonstrated
+against the deployed shell - never from a local dev server or local build.
 
 ## Sequencing rationale
 
@@ -58,12 +59,13 @@ composition.
 | # | Change | Outcome | Depends on | Status |
 | --- | --- | --- | --- | --- |
 | P1 | `add-stratofold-provider` | Stratofold vdir as a workspace: connect/restore, browse, read/write/save, viewer/public read-only | 0, 2, 3 | archived 2026-11-15; verified on the deployed shell with Chromium and Firefox |
+| P2 | `adopt-stratofold-0-12` | Client 0.12.0: connection-string connect and zero-byte remote files | P1 | implemented; verified 2026-11-15 on the deployed shell; archive pending |
 
 P1 is not part of the numbered v1 critical path. It started after layer 3 and
 lands alongside layers 4-10 without gating one. It integrated through
 `WorkspaceRuntime` and the app composition after layer 4, as planned. See
 [`docs/providers/stratofold.md`](./docs/providers/stratofold.md) for the contract
-mapping, the verified 0.11.0 package surface, residual gaps and upstream asks.
+mapping, the verified 0.12.0 package surface, residual gaps and upstream asks.
 
 **Goal:** prove the provider abstraction with a real remote store and give the
 shell a workspace path that does not depend on the File System Access API.
@@ -99,6 +101,30 @@ shell a workspace path that does not depend on the File System Access API.
 
 **Not in this track:** multi-root workspaces, sync/offline, file watching,
 remote providers beyond Stratofold, OAuth or token brokering.
+
+### P2 - `adopt-stratofold-0-12`
+
+P2 upgrades the same provider to `@stratofold/client` 0.12.0. It adds the
+connection-string input and relies on the server-side zero-byte fix without
+adding a provider method or changing the session contract. The connect form
+parses the string locally, keeps the raw value out of storage and requests, and
+leaves the editable server field as the stale-origin override. Empty files use
+the normal upload path and need a 0.12.0 server.
+
+**Exit criteria**
+
+- Met: `@stratofold/client` 0.12.0 installs from the registry in a clean
+  `npm ci`, pinned exactly.
+- Met (2026-11-15): against the deployed shell, a minted connection string
+  prefilled the server and token, cleared the raw field and mounted the
+  workspace; a malformed value failed locally with zero requests; a stale origin
+  mounted after correcting the server field; the raw string appeared in no
+  request URL, DOM text, local storage or remembered record.
+- Met (2026-11-15): New File created a zero-byte remote file, it opened empty,
+  saving text wrote the exact bytes and rotated the version, and saving empty
+  content truncated it with another version rotation; 42 remote requests and
+  zero page errors.
+- Met: the `verify` gate, bundle budget, CSP and custom-element checks pass.
 
 ---
 
