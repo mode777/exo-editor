@@ -49,7 +49,8 @@
     state.capabilities = payload.capabilities
     state.limits = payload.limits
     render()
-    requestFile('read-1')
+    // Delay the first read so a verifier can observe init without content.
+    setTimeout(() => requestFile('read-1'), 500)
   }
 
   function onContent(payload) {

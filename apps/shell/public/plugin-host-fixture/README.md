@@ -24,6 +24,8 @@ This serves `http://localhost:5174/` with `Access-Control-Allow-Origin: *` and
 
 The deployed same-origin copy lives at
 `https://mode777.github.io/exo-editor/plugin-host-fixture/exo-manifest.json`.
+`readonly-manifest.json` declares the same editors with only `workspace:read`, so
+a save must not be offered.
 
 ## Controller observations
 
