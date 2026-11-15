@@ -116,6 +116,9 @@ and the `filesystem-api`, `client-library` and `file-server` specs.
 | Post-write stat | Upload returns `{path,size}` only | `stat` after a successful write/move | A network failure after the server applied the change can look like a failed save; a retry needs care |
 | Symlinks | `ls` uses `Lstat`; `stat`/`read` follow | Accept for v1; do not claim symlink parity | A symlinked directory can appear as a file; versions can differ between `ls` and `stat` |
 | External edits | Detected by size and whole-second mtime | None; document it | An external same-size edit in the same second is invisible (Stratofold's documented residual) |
+| HTTP cache | `/files` responses carry no explicit cache policy, so a browser may reuse a stale body after a save (observed in Firefox 132) | `read` sends `Cache-Control: no-cache` | A proxy that ignores the request directive could still serve stale bytes |
+| Empty files | A zero-byte upload returns `503 "Remote host unavailable."`, verified against the test instance on 2026-11-15 | None; the shell's New File surfaces the failure | A new empty file cannot be created in a remote workspace; seed the file elsewhere or write content first |
+| Credential revocation | Immediate, server-side | None | Revoking a token outside the shell is only visible on the next operation, which then enters the reconnect state |
 
 ## 5. Credentials, security and browser behavior
 
@@ -201,6 +204,7 @@ and the `filesystem-api`, `client-library` and `file-server` specs.
 | Priority | Ask | Why |
 | --- | --- | --- |
 | P1 | `vdir` optional for discovery, or a vdir-independent `whoami` | Removes the sentinel-vdir workaround and the coupling to constructor validation |
+| P1 | Accept a zero-byte upload (create an empty file) | The shell's New File cannot create a file in a remote workspace today |
 | P1 | `rm { recursive: false }` plus `{ removed: boolean }` | Non-recursive delete and `not-found` without a pre-list race |
 | P1 | `mv { overwrite: false }` returning 409/412 | No-clobber rename; the current default silently replaces the destination |
 | P1 | `AbortSignal` on `list`, `mkdir`, `move`, `remove` | Contract-conformant teardown and workspace switches |

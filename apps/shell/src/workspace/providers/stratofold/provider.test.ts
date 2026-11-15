@@ -121,6 +121,17 @@ describe('stratofold provider reads', () => {
     expect(server.requests.every((request) => !request.url.includes('/files/'))).toBe(true)
   })
 
+  it('asks the browser not to serve a cached body', async () => {
+    const server = seededServer()
+    server.seedFile('a.txt', 'alpha')
+    const { provider } = providerFor(server)
+    const handle = await provider.open()
+
+    await handle.read('/a.txt')
+    const read = server.requests.find((request) => request.url.includes('/files/'))
+    expect(read?.headers['cache-control']).toBe('no-cache')
+  })
+
   it('returns independent buffers for repeated reads', async () => {
     const server = seededServer()
     server.seedFile('a.txt', 'alpha')

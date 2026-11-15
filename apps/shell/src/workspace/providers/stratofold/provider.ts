@@ -155,6 +155,9 @@ class StratofoldHandle implements WorkspaceHandle {
       }
       const response = await this.client.read(this.remote(target), {
         signal: options.signal,
+        // The server does not always send a cache policy, and a cached body
+        // after a save or an external change is a wrong read.
+        headers: { 'cache-control': 'no-cache' },
       })
       if (options.maxBytes !== undefined) {
         const declared = Number(response.headers.get('content-length') ?? Number.NaN)
