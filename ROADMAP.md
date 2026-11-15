@@ -331,7 +331,11 @@ the shell understanding the format.
 - Switching workspaces mid-save cancels the write and leaves the old file
   untouched.
 
-**Deployed verification (2026-11-15):**
+**Deployed verification (2026-11-15):** the native directory picker is not
+drivable headlessly, so the checks served the folder workspace from the deployed
+origin's OPFS handle through a `showDirectoryPicker` stub in Chrome for Testing.
+The deployed shell, plugin manifest, registration and handler code were the real
+artifacts.
 
 - Opening `second.txt` mounted exactly one hidden `editor.html` frame with
   `sandbox="allow-scripts"`; the document area held no textarea. The handler's
