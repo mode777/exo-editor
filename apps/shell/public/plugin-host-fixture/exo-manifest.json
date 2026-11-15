@@ -2,14 +2,32 @@
   "schemaVersion": 1,
   "id": "com.example.exo.fixture",
   "name": "Exo Host Fixture",
-  "version": "1.0.0",
-  "description": "A stub plugin used to verify the Exo plugin host.",
+  "version": "1.1.0",
+  "description": "A stub plugin used to verify the Exo plugin host and file editors.",
   "publisher": { "name": "Exo" },
   "engines": { "exo": ">=0.1.0" },
   "runtime": { "entry": "plugin.html" },
-  "permissions": ["workspace:read"],
+  "permissions": ["workspace:read", "workspace:write"],
   "contributes": {
     "fileEditors": [
+      {
+        "glob": "**/*.repeat.txt",
+        "entry": "editor-repeat.html",
+        "label": "Fixture Repeat",
+        "priority": 20
+      },
+      {
+        "glob": "**/*.append.txt",
+        "entry": "editor-append.html",
+        "label": "Fixture Append",
+        "priority": 20
+      },
+      {
+        "glob": "**/*.neverack.txt",
+        "entry": "editor-never-ack.html",
+        "label": "Fixture NeverAck",
+        "priority": 20
+      },
       {
         "glob": "**/*.txt",
         "entry": "editor.html",

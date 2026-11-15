@@ -196,6 +196,10 @@ RegistrationRejection  = 'not-declared' | 'permission-denied' | 'invalid-glob' |
   glob. A supplied label must be 1-40 characters; otherwise the contribution is
   rejected with `invalid-contribution`. Priority is not part of the registration
   message: it always comes from the manifest contribution for the glob.
+- A plugin must declare `workspace:read` or `workspace:write` to contribute a
+  file editor. A manifest that declares `contributes.fileEditors` without either
+  permission still validates, but every editor registration from it is rejected
+  with `permission-denied` and the plugin contributes no editor.
 - Identical `glob` and `entry` pairs registered more than once before completion
   produce one registry contribution.
 - `shell/register-ack` is the last message the plugin receives. `accepted`
@@ -234,6 +238,11 @@ interface FileMetadata {
 ```
 
 Content is **not** included. The plugin requests it.
+
+Selection is format-agnostic: the shell does not decode, sniff or apply its text
+size limit before mounting a handler. The shell text surface's binary, UTF-8 and
+10 MiB verdicts apply only when no plugin editor matches. Reads are still subject
+to `limits.maxRequestBytes`.
 
 ### 5.2 Reading
 
@@ -275,6 +284,10 @@ shell/save-result     { ok: true, version } | { ok: false, code, message? }
   `shell/init` or `file-content`. A `conflict` result means the file changed
   underneath; the shell reports it and leaves the tab dirty. The plugin may
   re-request the file and retry.
+- A save requires `workspace:write` and a writable workspace session. The shell
+  offers no save action for a read-only editor or a read-only workspace, and
+  answers any save attempt with `permission-denied` without writing; the document
+  stays dirty.
 - On success the shell updates the tab's base version, clears dirty state only if
   the plugin has not reported dirty again in the meantime, and emits
   `workspace/file-changed` with kind `changed`.
@@ -371,6 +384,8 @@ for repeated violations, tears down the frame.
 - Never send `file-content` for a path the frame did not request with a live id.
 - Never pass `FileSystemHandle`, `File`, or `Blob` objects to a frame.
 - Never include another document's path in an error message.
+- Re-check `workspace:read` and `workspace:write` at the handler boundary; a
+  registry entry is not a capability.
 - Normalize every path before the reserved-path and containment checks; check
   after resolution, not before.
 - Drop messages after `shell/dispose` even if the frame is still alive.

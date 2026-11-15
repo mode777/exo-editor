@@ -298,6 +298,38 @@ describe('registration session', () => {
     }
   })
 
+  it('rejects editor contributions from a plugin without read permission', () => {
+    const context = start({
+      manifest: manifest({ permissions: ['events:subscribe'] }),
+    })
+    ready(context)
+    register(context, [{ glob: '**/*.ts', entry: 'other.html' }])
+    complete(context)
+    const ack = postedType(context.frame, 'shell/register-ack')?.payload as {
+      accepted: string[]
+      rejected: Array<{ index: number; reason: string }>
+    }
+    expect(ack.accepted).toEqual([])
+    expect(ack.rejected).toEqual([{ index: 0, reason: 'permission-denied' }])
+    const outcome = context.outcomes[0]
+    expect(outcome.kind).toBe('active')
+    if (outcome.kind === 'active') expect(outcome.editors).toEqual([])
+  })
+
+  it('treats workspace:write as read permission', () => {
+    const context = start({
+      manifest: manifest({ permissions: ['workspace:write'] }),
+    })
+    ready(context)
+    register(context, [{ glob: '**/*.ts', entry: 'other.html' }])
+    complete(context)
+    const outcome = context.outcomes[0]
+    expect(outcome.kind).toBe('active')
+    if (outcome.kind === 'active') {
+      expect(outcome.editors.map((editor) => editor.glob)).toEqual(['**/*.ts'])
+    }
+  })
+
   it('deduplicates identical glob and entry pairs', () => {
     const context = start()
     ready(context)

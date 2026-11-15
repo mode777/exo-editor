@@ -1,9 +1,25 @@
+import type { PluginPermission } from './manifest'
 import { compileGlob, matchGlob } from './glob'
 import type { RegisteredEditor } from './registration'
+
+export interface EditorPluginInfo {
+  identity: string
+  pluginOrder: number
+  pluginName: string
+  pluginId: string
+  pluginVersion: string
+  origin: string
+  permissions: PluginPermission[]
+}
 
 export interface EditorCandidate extends RegisteredEditor {
   identity: string
   pluginOrder: number
+  pluginName: string
+  pluginId: string
+  pluginVersion: string
+  origin: string
+  permissions: PluginPermission[]
 }
 
 interface Entry {
@@ -20,17 +36,26 @@ interface Entry {
 export class EditorRegistry {
   private readonly byPlugin = new Map<string, Entry[]>()
 
-  add(identity: string, pluginOrder: number, editors: RegisteredEditor[]): void {
+  add(plugin: EditorPluginInfo, editors: RegisteredEditor[]): void {
     const entries: Entry[] = []
     for (const editor of editors) {
       const compiled = compileGlob(editor.glob)
       if (!compiled.ok) continue
       entries.push({
-        candidate: { ...editor, identity, pluginOrder },
+        candidate: {
+          ...editor,
+          identity: plugin.identity,
+          pluginOrder: plugin.pluginOrder,
+          pluginName: plugin.pluginName,
+          pluginId: plugin.pluginId,
+          pluginVersion: plugin.pluginVersion,
+          origin: plugin.origin,
+          permissions: plugin.permissions,
+        },
         regex: compiled.regex,
       })
     }
-    this.byPlugin.set(identity, entries)
+    this.byPlugin.set(plugin.identity, entries)
   }
 
   remove(identity: string): void {

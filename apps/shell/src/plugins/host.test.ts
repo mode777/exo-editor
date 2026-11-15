@@ -546,4 +546,51 @@ describe('plugin host', () => {
     expect(session.forPlugin).not.toHaveBeenCalled()
     host.dispose()
   })
+
+  it('closes handler sessions before dropping a disabled plugin', async () => {
+    const { host, transport, config } = createHost()
+    const closeFor = vi.fn()
+    host.setHandlerLifecycle({ closeFor })
+    config.setEntries(entries(MANIFEST_URL))
+    await waitForRecord(host, MANIFEST_URL, 'awaiting-consent')
+    const identity = host.getSnapshot().consentRequest?.identity
+    expect(identity).toBe('https://plugins.example.com::com.example.monaco')
+    if (identity) host.approveConsent(identity)
+    await activate(host, transport)
+    expect(host.match('/src/a.ts')).toHaveLength(1)
+
+    config.setEntries([{ index: 0, manifest: MANIFEST_URL, enabled: false }])
+    await vi.waitFor(() =>
+      expect(closeFor).toHaveBeenCalledWith(
+        'https://plugins.example.com::com.example.monaco',
+        'plugin-removed',
+      ),
+    )
+    expect(host.match('/src/a.ts')).toEqual([])
+    host.dispose()
+  })
+
+  it('records handler phases without file content', async () => {
+    const { host, transport, config } = createHost()
+    host.setHandlerLifecycle({ closeFor: vi.fn() })
+    config.setEntries(entries(MANIFEST_URL))
+    await waitForRecord(host, MANIFEST_URL, 'awaiting-consent')
+    const identity = host.getSnapshot().consentRequest?.identity
+    if (identity) host.approveConsent(identity)
+    await activate(host, transport)
+    host.logHandler(
+      'https://plugins.example.com::com.example.monaco',
+      'handler-save',
+      'conflict',
+      '/src/a.ts',
+    )
+    const entry = host.getSnapshot().log.at(-1)
+    expect(entry).toMatchObject({
+      pluginId: 'com.example.monaco',
+      phase: 'handler-save',
+      code: 'conflict',
+      message: '/src/a.ts',
+    })
+    host.dispose()
+  })
 })

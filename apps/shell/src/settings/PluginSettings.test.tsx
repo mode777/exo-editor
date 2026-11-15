@@ -6,7 +6,11 @@ import { App } from '../App'
 import { WorkspaceRuntime } from '../workspace/runtime'
 import { MemoryWorkspaceProvider } from '../workspace/providers/memory'
 import { MemoryHandleStore } from '../workspace/providers/folder/handle-store'
-import type { WorkspaceProvider } from '../workspace/contract'
+import type { FileStat, WorkspacePath, WorkspaceProvider } from '../workspace/contract'
+import type { HandlerPool } from '../plugins/handlers'
+import type { HandlerSaveRequest } from '../plugins/handler'
+import type { EditorCandidate } from '../plugins/registry'
+import type { DocumentEditorHost, PluginCallbacks } from '../workspace/documents'
 import { clearWorkspaceTabs, configurePresetStore } from '../workbench/tabs'
 import { EXO_CONFIG_PATH } from '../plugins/config'
 import { ConsentStore, type ConsentStorage, type Digest } from '../plugins/consent'
@@ -92,9 +96,47 @@ function configJson(manifests: string[]): string {
   )}\n`
 }
 
+class FakePluginPool implements DocumentEditorHost {
+  list: EditorCandidate[] = []
+  callbacks: PluginCallbacks | null = null
+  saveFailure: HandlerSaveRequest | null = null
+  baseVersion = ''
+
+  candidates(): EditorCandidate[] {
+    return this.list
+  }
+  open(
+    _input: { path: WorkspacePath; file: FileStat; candidate: EditorCandidate },
+    callbacks: PluginCallbacks,
+  ) {
+    this.callbacks = callbacks
+    return { ok: true } as const
+  }
+  close(): void {}
+  save(): Promise<HandlerSaveRequest> {
+    if (this.saveFailure) return Promise.resolve(this.saveFailure)
+    return Promise.resolve({
+      ok: true,
+      requestId: 'save-1',
+      content: { text: 'edited' },
+      baseVersion: this.baseVersion,
+    })
+  }
+  completeSave(): void {}
+  notifyChange(): void {}
+  rename(): void {}
+  dirtySequence(): number {
+    return 0
+  }
+  closeFor(): void {}
+  attach(): void {}
+  async detach(): Promise<void> {}
+  disposeTransport(): void {}
+}
+
 async function mount(
   files: Record<string, string | Uint8Array>,
-  options: { writable?: boolean; open?: boolean } = {},
+  options: { writable?: boolean; open?: boolean; editors?: FakePluginPool } = {},
 ) {
   const provider = new MemoryWorkspaceProvider({
     now: () => 1,
@@ -109,6 +151,7 @@ async function mount(
     eventTarget: new EventTarget(),
     now: () => 1,
     pluginHost: host.host,
+    handlerPool: options.editors as unknown as HandlerPool | undefined,
   })
   await runtime.start()
   if (options.open !== false) await runtime.openFolder()
@@ -125,6 +168,7 @@ async function mount(
     handle: await provider.open(),
     host: host.host,
     fetchImpl: host.fetchImpl,
+    editors: options.editors,
   }
 }
 
@@ -451,6 +495,103 @@ describe('plugin settings surface', () => {
       await act(async () => root.unmount())
       container.remove()
       await runtime.dispose()
+    }
+  })
+
+  it('prompts before disabling a plugin with dirty documents', async () => {
+    const editors = new FakePluginPool()
+    editors.list = [
+      {
+        identity: 'https://plugins.example.com::com.example.test',
+        pluginOrder: 0,
+        pluginName: 'Test Plugin',
+        pluginId: 'com.example.test',
+        pluginVersion: '1.0.0',
+        origin: 'https://plugins.example.com',
+        permissions: ['workspace:read'],
+        glob: '**/*.txt',
+        entry: 'editor.html',
+        entryUrl: 'https://plugins.example.com/editor.html',
+        label: 'Text',
+        priority: 0,
+        registrationOrder: 0,
+      },
+    ]
+    const workspace = await mount(
+      {
+        '/a.txt': 'one',
+        '/exo.json': configJson(['https://plugins.example.com/exo-manifest.json']),
+      },
+      { editors },
+    )
+    try {
+      await vi.waitFor(() =>
+        expect(workspace.host.getSnapshot().records[0]?.identity).toBe(
+          'https://plugins.example.com::com.example.test',
+        ),
+      )
+      await act(async () => workspace.runtime.openDocument('/a.txt'))
+      await act(async () => editors.callbacks?.onActive())
+      await act(async () => editors.callbacks?.onDirty(true))
+      await openPluginSettings(workspace)
+      const toggle = workspace.container.querySelector<HTMLInputElement>('input[type="checkbox"]')
+      expect(toggle?.checked).toBe(true)
+      await act(async () => toggle?.click())
+      expect(workspace.container.textContent).toContain('Unsaved changes')
+      await act(async () => click(button(workspace.container, 'Cancel')))
+      expect(workspace.container.textContent).not.toContain('Unsaved changes')
+      expect(toggle?.checked).toBe(true)
+    } finally {
+      await unmount(workspace)
+    }
+  })
+
+  it('keeps the plugin intact when the guarded save fails', async () => {
+    const editors = new FakePluginPool()
+    editors.list = [
+      {
+        identity: 'https://plugins.example.com::com.example.test',
+        pluginOrder: 0,
+        pluginName: 'Test Plugin',
+        pluginId: 'com.example.test',
+        pluginVersion: '1.0.0',
+        origin: 'https://plugins.example.com',
+        permissions: ['workspace:read'],
+        glob: '**/*.txt',
+        entry: 'editor.html',
+        entryUrl: 'https://plugins.example.com/editor.html',
+        label: 'Text',
+        priority: 0,
+        registrationOrder: 0,
+      },
+    ]
+    const workspace = await mount(
+      {
+        '/a.txt': 'one',
+        '/exo.json': configJson(['https://plugins.example.com/exo-manifest.json']),
+      },
+      { editors },
+    )
+    try {
+      await vi.waitFor(() =>
+        expect(workspace.host.getSnapshot().records[0]?.identity).toBe(
+          'https://plugins.example.com::com.example.test',
+        ),
+      )
+      await act(async () => workspace.runtime.openDocument('/a.txt'))
+      await act(async () => editors.callbacks?.onActive())
+      await act(async () => editors.callbacks?.onDirty(true))
+      await openPluginSettings(workspace)
+      const toggle = workspace.container.querySelector<HTMLInputElement>('input[type="checkbox"]')
+      await act(async () => toggle?.click())
+      editors.saveFailure = { ok: false, code: 'timeout' }
+      await act(async () => click(button(workspace.container, 'Save and close')))
+      await vi.waitFor(() =>
+        expect(workspace.container.textContent).toContain('Could not save /a.txt'),
+      )
+      expect(toggle?.checked).toBe(true)
+    } finally {
+      await unmount(workspace)
     }
   })
 

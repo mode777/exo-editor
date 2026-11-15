@@ -33,6 +33,15 @@ export const PLUGIN_PERMISSIONS = ['workspace:read', 'workspace:write', 'events:
 
 export type PluginPermission = (typeof PLUGIN_PERMISSIONS)[number]
 
+/** `workspace:write` implies read, so either permission grants reads. */
+export function hasWorkspaceRead(permissions: PluginPermission[]): boolean {
+  return permissions.includes('workspace:read') || permissions.includes('workspace:write')
+}
+
+export function hasWorkspaceWrite(permissions: PluginPermission[]): boolean {
+  return permissions.includes('workspace:write')
+}
+
 export const MANIFEST_REQUIRED_FIELDS = [
   'schemaVersion',
   'id',

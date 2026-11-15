@@ -5,13 +5,10 @@
     <title>Exo fixture editor</title>
   </head>
   <body>
-    <pre id="observation">editor</pre>
+    <pre id="observation">starting</pre>
     <script>
-      const observation = {
-        mode: new URLSearchParams(location.hash.slice(1)).get('exo-mode'),
-        origin: location.origin,
-      }
-      document.getElementById('observation').textContent = JSON.stringify(observation)
+      window.EXO_FIXTURE_MODE = 'default'
     </script>
+    <script src="editor-common.js"></script>
   </body>
 </html>

@@ -7,6 +7,7 @@ const NO_WORKSPACE: CommandContext = {
   writable: false,
   hasSelection: false,
   hasActiveDocument: false,
+  hasEditorChoice: false,
   remote: false,
 }
 
@@ -20,6 +21,7 @@ function setup(context: CommandContext = NO_WORKSPACE) {
     disconnect: vi.fn(),
     restoreAccess: vi.fn(),
     saveActive: vi.fn(),
+    openWith: vi.fn(),
     newFile: vi.fn(),
     newFolder: vi.fn(),
     rename: vi.fn(),
@@ -78,6 +80,7 @@ describe('exo command registry', () => {
       writable: true,
       hasSelection: false,
       hasActiveDocument: false,
+      hasEditorChoice: false,
       remote: false,
     })
     const ids = writable.registry.list().map((command) => command.id)
@@ -96,6 +99,7 @@ describe('exo command registry', () => {
       writable: true,
       hasSelection: true,
       hasActiveDocument: true,
+      hasEditorChoice: false,
       remote: false,
     })
     const selectedIds = withSelection.registry.list().map((command) => command.id)
@@ -110,6 +114,7 @@ describe('exo command registry', () => {
       writable: false,
       hasSelection: false,
       hasActiveDocument: false,
+      hasEditorChoice: false,
       remote: false,
     })
     expect(readOnly.registry.list().map((command) => command.id)).toContain(
@@ -121,6 +126,7 @@ describe('exo command registry', () => {
       writable: true,
       hasSelection: false,
       hasActiveDocument: false,
+      hasEditorChoice: false,
       remote: false,
     })
     expect(writable.registry.list().map((command) => command.id)).not.toContain(

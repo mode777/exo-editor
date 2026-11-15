@@ -133,7 +133,12 @@ copy is at `https://mode777.github.io/exo-editor/plugin-host-fixture/exo-manifes
 `/no-cors/exo-manifest.json`, `never-ready-manifest.json`,
 `widened-manifest.json` and `duplicate-manifest.json` are the negative fixtures.
 The controller page reports its storage observation and registration-mode state in
-its title and `#observation` element.
+its title and `#observation` element. The fixture also implements file editors:
+`**/*.txt` reads, reports dirty and saves with a marker; `**/*.repeat.txt`,
+`**/*.append.txt` and `**/*.neverack.txt` select the repeated-read, append-marker
+and ignored-dispose variants. Editor state is mirrored into the page title and
+`#observation`; see `apps/shell/public/plugin-host-fixture/README.md` for the
+manual checks.
 
 The deployed verification surface is
 `https://mode777.github.io/exo-editor/`. Every push to `main` runs the gate below

@@ -30,8 +30,15 @@ function DocumentSurface({ path }: { path: WorkspacePath }) {
     )
   }
 
+  const plugin = document.surface === 'plugin'
+  const pluginFailed = plugin && document.pluginPhase === 'failed'
   const readOnly =
-    snapshot.writable === false || document.readOnly || document.external === 'deleted'
+    snapshot.writable === false ||
+    document.readOnly ||
+    document.external === 'deleted' ||
+    (plugin && !pluginFailed && document.editor?.canWrite === false)
+  const canSave =
+    !readOnly && (document.status === 'ready' || (plugin && document.pluginPhase === 'active'))
 
   return (
     <div className="exo-document">
@@ -40,9 +47,14 @@ function DocumentSurface({ path }: { path: WorkspacePath }) {
           {document.title}
         </span>
         <span className="exo-document-meta">
-          {document.status === 'ready' ? formatBytes(document.size) : ''}
+          {document.status === 'ready' || plugin ? formatBytes(document.size) : ''}
         </span>
-        {document.status === 'ready' && !readOnly && (
+        {plugin && document.editor && (
+          <span className="exo-document-editor-label" title={document.editor.entryUrl}>
+            {document.editor.label} · {document.editor.pluginName}
+          </span>
+        )}
+        {canSave && (
           <button
             type="button"
             className="exo-document-save"
@@ -52,8 +64,22 @@ function DocumentSurface({ path }: { path: WorkspacePath }) {
             Save
           </button>
         )}
-        {snapshot.writable === false && <span className="exo-document-readonly">Read-only</span>}
+        {!plugin && snapshot.writable === false && (
+          <span className="exo-document-readonly">Read-only</span>
+        )}
+        {plugin && snapshot.writable === false && (
+          <span className="exo-document-readonly">Read-only workspace</span>
+        )}
+        {plugin && snapshot.writable !== false && document.editor?.canWrite === false && (
+          <span className="exo-document-readonly">Read-only editor</span>
+        )}
       </div>
+
+      {document.pluginNotice && (
+        <div className="exo-document-banner" role="status">
+          {document.pluginNotice}
+        </div>
+      )}
 
       {document.external === 'deleted' && (
         <div className="exo-document-banner is-error" role="alert">
@@ -97,6 +123,12 @@ function DocumentSurface({ path }: { path: WorkspacePath }) {
         </div>
       )}
 
+      {document.pluginError && document.pluginPhase !== 'failed' && (
+        <div className="exo-document-banner is-error" role="alert">
+          {pluginErrorMessage(document.pluginError)}
+        </div>
+      )}
+
       {document.status === 'error' && (
         <div className="exo-document-state">
           {workspaceErrorMessage(document.error ?? 'io', path)}
@@ -121,8 +153,63 @@ function DocumentSurface({ path }: { path: WorkspacePath }) {
           onChange={(event) => runtime.documents.updateText(path, event.target.value)}
         />
       )}
+
+      {plugin && document.pluginPhase === 'mounting' && (
+        <div className="exo-document-state">
+          <h2>Starting plugin editor</h2>
+          <p>{document.editor?.pluginName} is opening this file.</p>
+        </div>
+      )}
+
+      {pluginFailed && (
+        <div className="exo-document-state">
+          <h2>The plugin editor could not start</h2>
+          <p>
+            {document.pluginError ? pluginErrorMessage(document.pluginError) : 'The editor failed.'}
+          </p>
+          {document.dirty && (
+            <p>
+              This editor reported unsaved changes. They live only inside the plugin frame and
+              cannot be recovered after it closes.
+            </p>
+          )}
+          <div className="exo-document-actions">
+            <button type="button" onClick={() => void runtime.documents.reload(path)}>
+              Retry editor
+            </button>
+            <button type="button" onClick={() => void runtime.documents.openInText(path)}>
+              Open in text editor
+            </button>
+          </div>
+        </div>
+      )}
+
+      {plugin && document.pluginPhase === 'active' && !document.dirty && (
+        <p className="exo-document-plugin-idle" role="status">
+          Opened with {document.editor?.label}. Edits are reported by the plugin.
+        </p>
+      )}
     </div>
   )
+}
+
+function pluginErrorMessage(error: { code: string; message?: string }): string {
+  switch (error.code) {
+    case 'permission-denied':
+      return 'The plugin is not allowed to save this file.'
+    case 'timeout':
+      return 'The plugin did not answer the save request in time. Your changes are still in the editor and the tab stays dirty.'
+    case 'conflict':
+      return 'The file changed on disk. The newer content was kept and the tab stays dirty.'
+    case 'not-found':
+      return 'The file no longer exists. Saving will not recreate it.'
+    case 'rate-limited':
+      return 'The plugin sent messages too quickly. Try again.'
+    case 'protocol-violation':
+      return 'The plugin broke the editor protocol and was stopped.'
+    default:
+      return error.message ?? 'The plugin editor failed.'
+  }
 }
 
 function noEditorText(

@@ -17,6 +17,7 @@ export const workbenchMenus: MenuDefinition[] = [
         commandId: 'exo.file.save',
         keybinding: 'Ctrl+S',
       },
+      { label: 'Open With…', commandId: 'exo.file.openWith' },
     ],
   },
   {

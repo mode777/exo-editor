@@ -16,6 +16,7 @@ import { Session } from './session'
 import { isReservedPath, normalizePath } from './paths'
 import { PluginConfigStore } from '../plugins/store'
 import { PluginHost } from '../plugins/host'
+import { HandlerPool } from '../plugins/handlers'
 import { FolderWorkspaceProvider } from './providers/folder/provider'
 import { IndexedDbHandleStore, type HandleStore } from './providers/folder/handle-store'
 import { supportsFolderWorkspaces } from './providers/folder/fsa'
@@ -87,6 +88,7 @@ export interface WorkspaceRuntimeOptions {
   now?: () => number
   createSession?: (handle: WorkspaceHandle) => WorkspaceSession
   pluginHost?: PluginHost
+  handlerPool?: HandlerPool
 }
 
 const INITIAL_SNAPSHOT: WorkspaceSnapshot = {
@@ -102,6 +104,7 @@ export class WorkspaceRuntime {
   readonly documents: DocumentStore
   readonly pluginConfig: PluginConfigStore
   readonly pluginHost: PluginHost
+  readonly handlers: HandlerPool
 
   private readonly options: WorkspaceRuntimeOptions
   private readonly handleStore: HandleStore
@@ -134,9 +137,16 @@ export class WorkspaceRuntime {
       isVisible: options.isVisible,
     })
     this.pluginHost = options.pluginHost ?? new PluginHost()
+    this.handlers =
+      options.handlerPool ??
+      new HandlerPool({
+        onHandlerClosed: (path) => this.documents.handleHandlerClosed(path),
+      })
+    this.pluginHost.setHandlerLifecycle(this.handlers)
     this.documents = new DocumentStore({
       getSession: () => this.session,
       onDirtyChange: (path, dirty) => setTabDirty(path, dirty),
+      editors: this.handlers,
     })
   }
 
@@ -335,6 +345,7 @@ export class WorkspaceRuntime {
     this.disposed = true
     this.reservedDocumentHandler = null
     this.pluginHost.dispose()
+    this.handlers.disposeTransport()
     this.pluginConfig.detach()
     await this.deactivate()
     this.documents.clear()
@@ -479,9 +490,15 @@ export class WorkspaceRuntime {
     })
     void this.pluginConfig.attach(session)
     this.pluginHost.attach({ session, config: this.pluginConfig })
+    this.handlers.attach({
+      session,
+      host: this.pluginHost,
+      workspaceName: handle.descriptor.name,
+    })
   }
 
   private async deactivate(): Promise<void> {
+    await this.handlers.detach()
     this.pluginHost.detach()
     this.pluginConfig.detach()
     this.externalRegistration?.dispose()
@@ -490,10 +507,12 @@ export class WorkspaceRuntime {
     const previousProvider = this.provider
     this.session = null
     this.provider = null
+    // Cancel in-flight saves and drop document state before the old session is
+    // released, so no write can reach the previous workspace.
+    this.documents.clear()
+    clearWorkspaceTabs()
     await previousSession?.dispose()
     previousProvider?.dispose()
-    clearWorkspaceTabs()
-    this.documents.clear()
   }
 
   private async persistActive(kind: string, id: string): Promise<void> {

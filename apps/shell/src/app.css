@@ -223,6 +223,49 @@
   cursor: pointer;
 }
 
+.exo-open-with-path {
+  margin: 0 0 10px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.exo-open-with-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.exo-open-with-list button {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: 2px;
+  border: 1px solid var(--vscode-widget-border);
+  padding: 6px 8px;
+  background: transparent;
+  color: var(--vscode-foreground);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.exo-open-with-list button.is-current {
+  border-color: var(--vscode-focusBorder);
+}
+
+.exo-open-with-label {
+  font-weight: 600;
+}
+
+.exo-open-with-plugin {
+  color: var(--vscode-descriptionForeground);
+  font-size: 11px;
+}
+
 .exo-close-list {
   max-height: 140px;
   overflow: auto;
@@ -276,6 +319,35 @@
 .exo-document-save:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+.exo-document-editor-label {
+  overflow: hidden;
+  color: var(--vscode-descriptionForeground);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.exo-document-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.exo-document-actions button {
+  border: 1px solid var(--vscode-button-border, transparent);
+  padding: 4px 10px;
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  font: inherit;
+  cursor: pointer;
+}
+
+.exo-document-plugin-idle {
+  margin: 0;
+  padding: 6px 10px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
 }
 
 .exo-document-banner {

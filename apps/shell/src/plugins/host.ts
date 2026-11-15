@@ -67,9 +67,17 @@ export interface PluginHostAttachOptions {
   config: PluginConfigStore
 }
 
+export interface HandlerLifecycle {
+  closeFor(
+    identity: string,
+    reason: 'closed' | 'workspace-switch' | 'plugin-removed' | 'error',
+  ): void
+}
+
 export interface PluginHostOptions {
   fetchImpl?: typeof fetch
   transport?: FrameTransport
+  handlerLifecycle?: HandlerLifecycle
   consentStore?: ConsentStore
   consentStorage?: ConsentStorage | null
   digest?: Digest
@@ -146,6 +154,7 @@ export class PluginHost {
   private readonly locale: string
   private readonly now: () => number
   private readonly createSessionId: (() => string) | undefined
+  private handlerLifecycleValue: HandlerLifecycle | undefined
   private readonly setTimeoutImpl: typeof setTimeout | undefined
   private readonly clearTimeoutImpl: typeof clearTimeout | undefined
   private readonly fetchLimit: number
@@ -191,6 +200,7 @@ export class PluginHost {
       options.locale ?? (typeof navigator === 'undefined' ? 'en' : navigator.language || 'en')
     this.now = options.now ?? (() => Date.now())
     this.createSessionId = options.createSessionId
+    this.handlerLifecycleValue = options.handlerLifecycle
     this.setTimeoutImpl = options.setTimeoutImpl
     this.clearTimeoutImpl = options.clearTimeoutImpl
     this.fetchLimit = options.fetchConcurrency ?? 4
@@ -408,7 +418,18 @@ export class PluginHost {
         record.error = undefined
         this.enqueueManifest(record)
       } else if (record.identity && record.phase === 'active') {
-        this.registry.add(record.identity, record.entryIndex, record.registrations)
+        this.registry.add(
+          {
+            identity: record.identity,
+            pluginOrder: record.entryIndex,
+            pluginName: record.manifest?.name ?? record.manifestUrl,
+            pluginId: record.manifest?.id ?? record.identity,
+            pluginVersion: record.manifest?.version ?? '0.0.0',
+            origin: record.manifest?.manifestOrigin ?? '',
+            permissions: record.manifest?.permissions ?? [],
+          },
+          record.registrations,
+        )
       }
     }
 
@@ -660,7 +681,18 @@ export class PluginHost {
       record.registrations = outcome.editors
       record.error = undefined
       record.consent = 'granted'
-      this.registry.add(identity, record.entryIndex, outcome.editors)
+      this.registry.add(
+        {
+          identity,
+          pluginOrder: record.entryIndex,
+          pluginName: record.manifest?.name ?? record.manifestUrl,
+          pluginId: record.manifest?.id ?? identity,
+          pluginVersion: record.manifest?.version ?? '0.0.0',
+          origin: record.manifest?.manifestOrigin ?? '',
+          permissions: record.manifest?.permissions ?? [],
+        },
+        outcome.editors,
+      )
       this.log('register', record, 'active', `${outcome.editors.length} editor(s)`)
     } else {
       record.phase = 'failed'
@@ -711,6 +743,7 @@ export class PluginHost {
     if (this.mounted.delete(identity)) {
       this.registrationActive = Math.max(0, this.registrationActive - 1)
     }
+    this.handlerLifecycleValue?.closeFor(identity, 'plugin-removed')
     this.registry.remove(identity)
     this.registrationQueue = this.registrationQueue.filter((entry) => entry !== record)
   }
@@ -745,6 +778,15 @@ export class PluginHost {
     this.fetchActive = 0
     this.registrationActive = 0
     this.consentRequest = null
+  }
+
+  setHandlerLifecycle(lifecycle: HandlerLifecycle | undefined): void {
+    this.handlerLifecycleValue = lifecycle
+  }
+
+  logHandler(identity: string, phase: string, code?: string, message?: string): void {
+    this.log(phase, this.findByIdentity(identity), code, message)
+    this.publish()
   }
 
   private log(phase: string, record?: PluginHostRecord, code?: string, message?: string): void {

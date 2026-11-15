@@ -1,13 +1,36 @@
 import { compileGlob } from './glob'
-import { resolvePluginEntry, type ManifestFileEditor, type PluginManifest } from './manifest'
+import {
+  hasWorkspaceRead,
+  resolvePluginEntry,
+  type ManifestFileEditor,
+  type PluginManifest,
+} from './manifest'
 import type { FrameHandle, FrameSandbox, FrameTransport, PluginMessage } from './frame'
+import {
+  ACK_CLOSE_DELAY_MS,
+  PROTOCOL_VERSION,
+  READY_TIMEOUT_MS,
+  REGISTRATION_TIMEOUT_MS,
+  ViolationBudget,
+  buildFrameUrl,
+  defaultSessionId,
+  frameBoundary,
+  isPlainObject,
+  parseEnvelope,
+  payloadTooLarge,
+  postEnvelope,
+  sendShellError,
+  type Envelope,
+} from './protocol'
 
-export const PROTOCOL_VERSION = '1'
-export const READY_TIMEOUT_MS = 10_000
-export const REGISTRATION_TIMEOUT_MS = 10_000
-export const ACK_CLOSE_DELAY_MS = 250
-export const MAX_PROTOCOL_VIOLATIONS = 3
-export const MAX_MESSAGE_BYTES = 16 * 1024 * 1024
+export {
+  ACK_CLOSE_DELAY_MS,
+  MAX_MESSAGE_BYTES,
+  MAX_PROTOCOL_VIOLATIONS,
+  PROTOCOL_VERSION,
+  READY_TIMEOUT_MS,
+  REGISTRATION_TIMEOUT_MS,
+} from './protocol'
 
 export type RegistrationPhase = 'ready' | 'register'
 
@@ -44,27 +67,7 @@ export type RegistrationOutcome =
   | { kind: 'active'; editors: RegisteredEditor[]; ack: RegistrationAck }
   | { kind: 'failed'; code: RegistrationErrorCode; phase: RegistrationPhase; message?: string }
 
-export type ShellErrorCode =
-  | 'unsupported-message'
-  | 'unsupported-version'
-  | 'protocol-violation'
-  | 'timeout'
-  | 'loading-failed'
-  | 'permission-denied'
-  | 'not-found'
-  | 'not-a-file'
-  | 'too-large'
-  | 'conflict'
-  | 'rate-limited'
-  | 'internal'
-
-interface Envelope {
-  exo: 1
-  type: string
-  id?: string
-  replyTo?: string
-  payload?: unknown
-}
+export type ShellErrorCode = import('./protocol').ShellErrorCode
 
 export interface RegistrationSessionOptions {
   manifest: PluginManifest
@@ -81,65 +84,6 @@ export interface RegistrationSessionOptions {
 }
 
 type Phase = 'mounting' | 'awaiting-ready' | 'awaiting-register' | 'complete' | 'closed'
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-function defaultSessionId(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID()
-  }
-  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
-    const bytes = crypto.getRandomValues(new Uint8Array(16))
-    return [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('')
-  }
-  return `exo-${Date.now()}-${Math.random().toString(16).slice(2)}`
-}
-
-function parseEnvelope(data: unknown): Envelope | null {
-  if (!isPlainObject(data) || data.exo !== 1) return null
-  if (typeof data.type !== 'string' || data.type.length === 0) return null
-  if (data.id !== undefined && (typeof data.id !== 'string' || data.id.length > 64)) return null
-  if (
-    data.replyTo !== undefined &&
-    (typeof data.replyTo !== 'string' || data.replyTo.length > 64)
-  ) {
-    return null
-  }
-  return data as unknown as Envelope
-}
-
-function sizeOf(value: unknown, limit: number, seen: Set<object>): number {
-  if (typeof value === 'string') return value.length * 2
-  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') return 8
-  if (value === null || value === undefined) return 0
-  if (value instanceof ArrayBuffer) return value.byteLength
-  if (ArrayBuffer.isView(value)) return value.byteLength
-  if (Array.isArray(value)) {
-    let total = 0
-    for (const item of value) {
-      total += sizeOf(item, limit - total, seen)
-      if (total > limit) return total
-    }
-    return total
-  }
-  if (typeof value === 'object') {
-    if (seen.has(value)) return 0
-    seen.add(value)
-    let total = 0
-    for (const [key, item] of Object.entries(value)) {
-      total += key.length * 2 + sizeOf(item, limit - total, seen)
-      if (total > limit) return total
-    }
-    return total
-  }
-  return 0
-}
-
-function payloadTooLarge(payload: unknown): boolean {
-  return sizeOf(payload, MAX_MESSAGE_BYTES, new Set()) > MAX_MESSAGE_BYTES
-}
 
 function manifestEditorFor(manifest: PluginManifest, glob: string): ManifestFileEditor | undefined {
   return manifest.fileEditors.find((editor) => editor.glob === glob)
@@ -163,7 +107,13 @@ export class RegistrationSession {
   private readyTimer: ReturnType<typeof setTimeout> | null = null
   private registrationTimer: ReturnType<typeof setTimeout> | null = null
   private closeTimer: ReturnType<typeof setTimeout> | null = null
-  private violations = 0
+  private readonly violations = new ViolationBudget(() => {
+    if (this.outcomeSent) {
+      this.close()
+    } else {
+      this.fail('protocol-violation', this.phaseName())
+    }
+  })
   private outcomeSent = false
   private contributionIndex = 0
   private registrationOrder = 0
@@ -173,9 +123,10 @@ export class RegistrationSession {
   constructor(options: RegistrationSessionOptions) {
     this.options = options
     this.sessionId = (options.createSessionId ?? defaultSessionId)()
-    this.opaque = options.manifest.manifestOrigin === options.shellOrigin
-    this.sandbox = this.opaque ? 'allow-scripts' : 'allow-scripts allow-same-origin'
-    this.targetOrigin = this.opaque ? '*' : options.manifest.manifestOrigin
+    const boundary = frameBoundary(options.manifest.manifestOrigin, options.shellOrigin)
+    this.opaque = boundary.opaque
+    this.sandbox = boundary.sandbox
+    this.targetOrigin = boundary.targetOrigin
     this.setTimeoutImpl =
       options.setTimeoutImpl ?? (setTimeout.bind(globalThis) as typeof setTimeout)
     this.clearTimeoutImpl =
@@ -184,17 +135,16 @@ export class RegistrationSession {
 
   start(): void {
     if (this.phase !== 'mounting') return
-    const url = new URL(this.options.manifest.controllerUrl)
-    const params = new URLSearchParams()
-    params.set('exo-host', this.options.shellOrigin)
-    params.set('exo-mode', 'register')
-    params.set('exo-session', this.sessionId)
-    url.hash = params.toString()
 
     let frame: FrameHandle
     try {
       frame = this.options.transport.open({
-        url: url.href,
+        url: buildFrameUrl(
+          this.options.manifest.controllerUrl,
+          this.options.shellOrigin,
+          'register',
+          this.sessionId,
+        ),
         sandbox: this.sandbox,
         onMessage: (message) => this.handleMessage(message),
         onLoadError: () => this.fail('loading-failed', this.phaseName()),
@@ -254,26 +204,16 @@ export class RegistrationSession {
 
   private send(type: string, payload?: unknown, replyTo?: string): void {
     if (this.phase === 'closed') return
-    const envelope: Envelope = { exo: 1, type }
-    if (replyTo !== undefined) envelope.replyTo = replyTo
-    if (payload !== undefined) envelope.payload = payload
-    this.frame?.window?.postMessage(envelope, this.targetOrigin)
+    postEnvelope(this.frame, this.targetOrigin, type, payload, replyTo)
   }
 
   private sendError(code: ShellErrorCode, replyTo?: string, message?: string): void {
-    this.send('shell/error', { code, ...(message ? { message } : {}) }, replyTo)
+    sendShellError(this.frame, this.targetOrigin, code, replyTo, message)
   }
 
   private violation(envelope?: Envelope, reply = true): void {
-    this.violations += 1
     if (reply) this.sendError('protocol-violation', envelope?.id)
-    if (this.violations >= MAX_PROTOCOL_VIOLATIONS) {
-      if (this.outcomeSent) {
-        this.close()
-      } else {
-        this.fail('protocol-violation', this.phaseName())
-      }
-    }
+    this.violations.record()
   }
 
   private handleMessage(message: PluginMessage): void {
@@ -433,6 +373,9 @@ export class RegistrationSession {
     const declared = manifestEditorFor(this.options.manifest, raw.glob)
     if (!declared) {
       return { reason: 'not-declared' }
+    }
+    if (!hasWorkspaceRead(this.options.manifest.permissions)) {
+      return { reason: 'permission-denied' }
     }
     const entry = resolvePluginEntry(
       raw.entry,

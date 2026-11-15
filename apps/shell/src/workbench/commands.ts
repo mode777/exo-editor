@@ -26,6 +26,8 @@ export interface CommandContext {
   writable: boolean
   hasSelection: boolean
   hasActiveDocument: boolean
+  /** More than one registered editor matches the active document. */
+  hasEditorChoice: boolean
   /** The active workspace is a remote connection. */
   remote: boolean
 }
@@ -39,6 +41,7 @@ export interface ExoCommandHandlers {
   disconnect: () => void
   restoreAccess: () => void
   saveActive: () => void
+  openWith: () => void
   newFile: () => void
   newFolder: () => void
   rename: () => void
@@ -112,6 +115,12 @@ export function createExoCommands(handlers: ExoCommandHandlers): WorkbenchComman
       run: handlers.saveActive,
     },
     {
+      id: 'exo.file.openWith',
+      title: 'Open With…',
+      category: 'File',
+      run: handlers.openWith,
+    },
+    {
       id: 'exo.theme.toggle',
       title: 'Toggle Theme',
       category: 'Preferences',
@@ -149,6 +158,7 @@ const AVAILABILITY: Record<string, (context: CommandContext) => boolean> = {
     context.hasWorkspace && context.writable && context.hasSelection,
   'exo.explorer.refresh': (context) => context.hasWorkspace,
   'exo.file.save': (context) => context.hasActiveDocument,
+  'exo.file.openWith': (context) => context.hasActiveDocument && context.hasEditorChoice,
 }
 
 /**

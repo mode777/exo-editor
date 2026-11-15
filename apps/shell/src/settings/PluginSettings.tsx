@@ -6,6 +6,8 @@ import {
   useWorkspaceSnapshot,
 } from '../workspace/context'
 import type { PluginHostRecord, PluginLogEntry } from '../plugins/host'
+import type { WorkspacePath } from '../workspace/contract'
+import { ClosePromptDialog } from '../components/ClosePromptDialog'
 import {
   emptyExoConfig,
   serializeExoConfig,
@@ -176,6 +178,11 @@ export function PluginSettings() {
   const [rawDirty, setRawDirty] = useState(false)
   const [rawIssues, setRawIssues] = useState<PluginConfigIssue[]>([])
   const [rawChangedExternally, setRawChangedExternally] = useState(false)
+  const [pendingPluginAction, setPendingPluginAction] = useState<{
+    paths: WorkspacePath[]
+    run: () => Promise<void> | void
+    error: string | null
+  } | null>(null)
   const rawSavedText = useRef(EMPTY_TEMPLATE)
   const configText = config.text ?? (config.status === 'absent' ? EMPTY_TEMPLATE : '')
 
@@ -229,16 +236,55 @@ export function PluginSettings() {
     }
   }
 
-  const toggle = async (entry: PluginConfigEntry) => {
-    if (!canMutate) return
-    setIssues([])
-    recordIssues(await store.setEnabled(entry.index, !entry.enabled))
+  const identityFor = (manifestUrl: string) =>
+    host.records.find((record) => record.manifestUrl === manifestUrl)?.identity
+
+  const guardPluginAction = (identity: string | undefined, run: () => Promise<void> | void) => {
+    const paths = identity ? runtime.documents.dirtyPathsFor(identity) : []
+    if (paths.length === 0) {
+      void run()
+      return
+    }
+    setPendingPluginAction({ paths, run, error: null })
   }
 
-  const remove = async (entry: PluginConfigEntry) => {
+  const toggle = (entry: PluginConfigEntry) => {
     if (!canMutate) return
     setIssues([])
-    recordIssues(await store.removeEntry(entry.index))
+    guardPluginAction(identityFor(entry.manifest), async () => {
+      recordIssues(await store.setEnabled(entry.index, !entry.enabled))
+    })
+  }
+
+  const remove = (entry: PluginConfigEntry) => {
+    if (!canMutate) return
+    setIssues([])
+    guardPluginAction(identityFor(entry.manifest), async () => {
+      recordIssues(await store.removeEntry(entry.index))
+    })
+  }
+
+  const savePendingPluginAction = async () => {
+    if (!pendingPluginAction) return
+    for (const path of pendingPluginAction.paths) {
+      if (!(await runtime.documents.save(path))) {
+        setPendingPluginAction({
+          ...pendingPluginAction,
+          error: `Could not save ${path}. The plugin was not changed.`,
+        })
+        return
+      }
+    }
+    const run = pendingPluginAction.run
+    setPendingPluginAction(null)
+    await run()
+  }
+
+  const discardPendingPluginAction = () => {
+    if (!pendingPluginAction) return
+    const run = pendingPluginAction.run
+    setPendingPluginAction(null)
+    void run()
   }
 
   const saveRaw = async () => {
@@ -274,163 +320,178 @@ export function PluginSettings() {
   }
 
   return (
-    <section className="exo-settings-section" aria-labelledby="exo-settings-plugins">
-      <h3 id="exo-settings-plugins" tabIndex={-1}>
-        Plugins
-      </h3>
+    <>
+      <section className="exo-settings-section" aria-labelledby="exo-settings-plugins">
+        <h3 id="exo-settings-plugins" tabIndex={-1}>
+          Plugins
+        </h3>
 
-      {workspace.phase !== 'ready' ? (
-        <p className="exo-settings-hint">Open a folder to configure workspace plugins.</p>
-      ) : (
-        <>
-          {!writable && (
-            <p className="exo-settings-warning" role="status">
-              This workspace is read-only. Plugin configuration can be viewed but not changed.
-            </p>
-          )}
+        {workspace.phase !== 'ready' ? (
+          <p className="exo-settings-hint">Open a folder to configure workspace plugins.</p>
+        ) : (
+          <>
+            {!writable && (
+              <p className="exo-settings-warning" role="status">
+                This workspace is read-only. Plugin configuration can be viewed but not changed.
+              </p>
+            )}
 
-          {config.status === 'idle' || config.status === 'loading' ? (
-            <p className="exo-settings-hint" role="status">
-              Loading exo.json…
-            </p>
-          ) : null}
+            {config.status === 'idle' || config.status === 'loading' ? (
+              <p className="exo-settings-hint" role="status">
+                Loading exo.json…
+              </p>
+            ) : null}
 
-          {config.status === 'absent' && (
-            <p className="exo-settings-hint">
-              No plugins are declared. Adding one creates exo.json.
-            </p>
-          )}
+            {config.status === 'absent' && (
+              <p className="exo-settings-hint">
+                No plugins are declared. Adding one creates exo.json.
+              </p>
+            )}
 
-          {config.status === 'invalid' && <IssueList issues={config.issues} />}
+            {config.status === 'invalid' && <IssueList issues={config.issues} />}
 
-          {config.status === 'valid' && (
-            <ul className="exo-plugin-list" aria-label="Declared plugins">
-              {config.entries.map((entry) => (
-                <li className="exo-plugin-entry" key={`${entry.index}:${entry.manifest}`}>
-                  <code className="exo-plugin-manifest">{entry.manifest}</code>
-                  <div className="exo-plugin-actions">
-                    <label className="exo-settings-option">
-                      <input
-                        type="checkbox"
-                        checked={entry.enabled}
+            {config.status === 'valid' && (
+              <ul className="exo-plugin-list" aria-label="Declared plugins">
+                {config.entries.map((entry) => (
+                  <li className="exo-plugin-entry" key={`${entry.index}:${entry.manifest}`}>
+                    <code className="exo-plugin-manifest">{entry.manifest}</code>
+                    <div className="exo-plugin-actions">
+                      <label className="exo-settings-option">
+                        <input
+                          type="checkbox"
+                          checked={entry.enabled}
+                          disabled={!canMutate}
+                          onChange={() => void toggle(entry)}
+                        />
+                        Enabled
+                      </label>
+                      <button
+                        type="button"
+                        className="exo-plugin-remove"
                         disabled={!canMutate}
-                        onChange={() => void toggle(entry)}
-                      />
-                      Enabled
-                    </label>
-                    <button
-                      type="button"
-                      className="exo-plugin-remove"
-                      disabled={!canMutate}
-                      onClick={() => void remove(entry)}
-                    >
-                      Remove
-                    </button>
-                  </div>
-                  <RuntimeRow
-                    record={host.records.find((record) => record.manifestUrl === entry.manifest)}
-                    onReview={(identity) => runtime.pluginHost.requestConsent(identity)}
-                    onRevoke={(identity) => runtime.pluginHost.revokeConsent(identity)}
-                  />
-                </li>
-              ))}
-            </ul>
-          )}
+                        onClick={() => void remove(entry)}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                    <RuntimeRow
+                      record={host.records.find((record) => record.manifestUrl === entry.manifest)}
+                      onReview={(identity) => runtime.pluginHost.requestConsent(identity)}
+                      onRevoke={(identity) =>
+                        guardPluginAction(identity, () =>
+                          runtime.pluginHost.revokeConsent(identity),
+                        )
+                      }
+                    />
+                  </li>
+                ))}
+              </ul>
+            )}
 
-          {(config.status === 'valid' || config.status === 'absent') && (
-            <form className="exo-plugin-add" onSubmit={(event) => void submit(event)}>
-              <label htmlFor="exo-plugin-add-url">Manifest URL</label>
-              <div className="exo-plugin-add-row">
-                <input
-                  id="exo-plugin-add-url"
-                  type="text"
-                  inputMode="url"
-                  placeholder="https://plugins.example.com/exo-manifest.json"
-                  value={url}
-                  disabled={!canMutate}
+            {(config.status === 'valid' || config.status === 'absent') && (
+              <form className="exo-plugin-add" onSubmit={(event) => void submit(event)}>
+                <label htmlFor="exo-plugin-add-url">Manifest URL</label>
+                <div className="exo-plugin-add-row">
+                  <input
+                    id="exo-plugin-add-url"
+                    type="text"
+                    inputMode="url"
+                    placeholder="https://plugins.example.com/exo-manifest.json"
+                    value={url}
+                    disabled={!canMutate}
+                    onChange={(event) => {
+                      setUrl(event.target.value)
+                      setIssues([])
+                    }}
+                  />
+                  <button type="submit" disabled={!canMutate || url.trim().length === 0}>
+                    Add
+                  </button>
+                </div>
+                <p className="exo-settings-hint">
+                  Adding records the URL and starts loading the manifest. The plugin still needs
+                  your consent before a frame is mounted.
+                </p>
+              </form>
+            )}
+
+            <IssueList issues={issues} />
+
+            <div className="exo-plugin-raw-toggle">
+              <button type="button" onClick={openRaw} disabled={config.status === 'loading'}>
+                Open exo.json
+              </button>
+            </div>
+
+            <p className="exo-settings-hint">
+              Saving rewrites exo.json as canonical 2-space JSON. Comments, formatting and key order
+              are not preserved; comments are not valid JSON.
+            </p>
+
+            {rawOpen && (
+              <div className="exo-plugin-raw">
+                <label htmlFor="exo-plugin-raw-text">exo.json content</label>
+                <textarea
+                  id="exo-plugin-raw-text"
+                  aria-label="exo.json content"
+                  value={rawText}
+                  readOnly={!writable || notReadable || config.busy}
                   onChange={(event) => {
-                    setUrl(event.target.value)
-                    setIssues([])
+                    setRawText(event.target.value)
+                    setRawDirty(event.target.value !== rawSavedText.current)
+                    setRawIssues([])
+                    setRawChangedExternally(false)
                   }}
                 />
-                <button type="submit" disabled={!canMutate || url.trim().length === 0}>
-                  Add
-                </button>
+                {notReadable && (
+                  <p className="exo-settings-warning" role="alert">
+                    exo.json cannot be read, so it cannot be edited here.
+                  </p>
+                )}
+                {rawChangedExternally && (
+                  <p className="exo-settings-warning" role="alert">
+                    exo.json changed on disk. Your draft is kept; reload to see the current file.
+                  </p>
+                )}
+                <IssueList issues={rawIssues} />
+                <div className="exo-plugin-raw-actions">
+                  <button
+                    type="button"
+                    onClick={() => void saveRaw()}
+                    disabled={!writable || config.busy || !rawDirty || notReadable}
+                  >
+                    Save
+                  </button>
+                  <button type="button" onClick={() => void reloadRaw()} disabled={config.busy}>
+                    Reload
+                  </button>
+                  <button type="button" onClick={() => setRawOpen(false)}>
+                    Close
+                  </button>
+                </div>
               </div>
-              <p className="exo-settings-hint">
-                Adding records the URL and starts loading the manifest. The plugin still needs your
-                consent before a frame is mounted.
-              </p>
-            </form>
-          )}
+            )}
+          </>
+        )}
 
-          <IssueList issues={issues} />
-
-          <div className="exo-plugin-raw-toggle">
-            <button type="button" onClick={openRaw} disabled={config.status === 'loading'}>
-              Open exo.json
-            </button>
-          </div>
-
-          <p className="exo-settings-hint">
-            Saving rewrites exo.json as canonical 2-space JSON. Comments, formatting and key order
-            are not preserved; comments are not valid JSON.
+        {status && (
+          <p className="exo-settings-hint" role="status">
+            {status}
           </p>
+        )}
 
-          {rawOpen && (
-            <div className="exo-plugin-raw">
-              <label htmlFor="exo-plugin-raw-text">exo.json content</label>
-              <textarea
-                id="exo-plugin-raw-text"
-                aria-label="exo.json content"
-                value={rawText}
-                readOnly={!writable || notReadable || config.busy}
-                onChange={(event) => {
-                  setRawText(event.target.value)
-                  setRawDirty(event.target.value !== rawSavedText.current)
-                  setRawIssues([])
-                  setRawChangedExternally(false)
-                }}
-              />
-              {notReadable && (
-                <p className="exo-settings-warning" role="alert">
-                  exo.json cannot be read, so it cannot be edited here.
-                </p>
-              )}
-              {rawChangedExternally && (
-                <p className="exo-settings-warning" role="alert">
-                  exo.json changed on disk. Your draft is kept; reload to see the current file.
-                </p>
-              )}
-              <IssueList issues={rawIssues} />
-              <div className="exo-plugin-raw-actions">
-                <button
-                  type="button"
-                  onClick={() => void saveRaw()}
-                  disabled={!writable || config.busy || !rawDirty || notReadable}
-                >
-                  Save
-                </button>
-                <button type="button" onClick={() => void reloadRaw()} disabled={config.busy}>
-                  Reload
-                </button>
-                <button type="button" onClick={() => setRawOpen(false)}>
-                  Close
-                </button>
-              </div>
-            </div>
-          )}
-        </>
+        {workspace.phase === 'ready' && <PluginLog entries={host.log} />}
+      </section>
+      {pendingPluginAction && (
+        <ClosePromptDialog
+          paths={pendingPluginAction.paths}
+          error={pendingPluginAction.error}
+          onSave={() => void savePendingPluginAction()}
+          onDiscard={discardPendingPluginAction}
+          onCancel={() => setPendingPluginAction(null)}
+        />
       )}
-
-      {status && (
-        <p className="exo-settings-hint" role="status">
-          {status}
-        </p>
-      )}
-
-      {workspace.phase === 'ready' && <PluginLog entries={host.log} />}
-    </section>
+    </>
   )
 }
 

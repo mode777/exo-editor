@@ -174,8 +174,8 @@ settings view fails with `conflict` rather than overwriting an external edit.
 | `icon` | string | no | Relative to the manifest. `https` absolute also allowed. Rendered only after validation; failures are ignored. |
 | `engines.exo` | string | yes | SemVer range. The shell refuses a plugin whose range excludes its version. |
 | `runtime.entry` | string | yes | Relative HTML path to the controller document, loaded as a hidden registration iframe. No query, fragment or `..` segment. Must share the manifest's origin. Its directory is the plugin root: every other page the plugin loads must be a sibling or descendant of it. |
-| `permissions` | array | yes | Subset of `workspace:read`, `workspace:write`, `events:subscribe`. No duplicates. `workspace:write` implies `workspace:read`. |
-| `contributes.fileEditors` | array | no | Maximum 20. Each entry: `glob` (required), `entry` (required, relative HTML URL for the per-document iframe, inside the plugin root), `label` (required, 1-40 chars), `priority` (integer -100..100, default 0). Every editor entry uses the entry-resolution rules in section 4. |
+| `permissions` | array | yes | Subset of `workspace:read`, `workspace:write`, `events:subscribe`. No duplicates. `workspace:write` implies `workspace:read`. A `contributes.fileEditors` entry requires `workspace:read` or `workspace:write`; registrations from a plugin without either are rejected with `permission-denied`. |
+| `contributes.fileEditors` | array | no | Maximum 20. Each entry: `glob` (required), `entry` (required, relative HTML URL for the per-document iframe, inside the plugin root), `label` (required, 1-40 chars), `priority` (integer -100..100, default 0). Every editor entry uses the entry-resolution rules in section 4 and requires `workspace:read` or `workspace:write`. |
 | `contributes.configuration` | object | no | Reserved for the plugin settings layer (D11); the v1 validator rejects the field. Layer 7 adds its schema and validation in a new change; until then a manifest that declares it is invalid, not partially accepted. |
 
 Unknown manifest fields are rejected at every level, like unknown `exo.json`

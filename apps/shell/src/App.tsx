@@ -6,6 +6,8 @@ import {
   type WorkbenchTab,
 } from 'vscode-workbench'
 import { DocumentArea } from './document/DocumentArea'
+import { OpenWithDialog } from './document/OpenWithDialog'
+import { ClosePromptDialog } from './components/ClosePromptDialog'
 import { requestExplorerCommand } from './explorer/bus'
 import { ConnectRemoteDialog } from './workspace/ConnectRemoteDialog'
 import { onRemoteConnect, requestRemoteConnect } from './workspace/connect-bus'
@@ -22,6 +24,7 @@ import { workbenchMenus } from './workbench/menus'
 import { createQuickOpenProvider } from './workbench/quick-open'
 import { ExoStatusBar } from './workbench/status-bar'
 import { activeDocumentPath, configurePresetStore, installCloseGuard } from './workbench/tabs'
+import type { EditorCandidate } from './plugins/registry'
 import { workbenchViews } from './workbench/views'
 import { workspaceErrorMessage, type WorkspacePath } from './workspace/contract'
 import {
@@ -71,6 +74,11 @@ function Shell({ runtime }: { runtime: WorkspaceRuntime }) {
   const [connectOpen, setConnectOpen] = useState(false)
   const [pendingClose, setPendingClose] = useState<PendingClose | null>(null)
   const [closeError, setCloseError] = useState<string | null>(null)
+  const [openWith, setOpenWith] = useState<{
+    path: WorkspacePath
+    candidates: EditorCandidate[]
+    currentIdentity?: string
+  } | null>(null)
 
   const openSettings = useCallback(() => {
     setSettingsSection('general')
@@ -153,6 +161,28 @@ function Shell({ runtime }: { runtime: WorkspaceRuntime }) {
     [runtime],
   )
 
+  const requestOpenWith = useCallback(() => {
+    const path = activeDocumentPath()
+    if (!path) return
+    const candidates = runtime.documents.candidatesFor(path)
+    if (candidates.length === 0) return
+    setOpenWith({
+      path,
+      candidates,
+      currentIdentity: runtime.documents.get(path)?.editor?.identity,
+    })
+  }, [runtime])
+
+  const chooseEditor = useCallback(
+    (candidate: EditorCandidate) => {
+      if (!openWith) return
+      const path = openWith.path
+      setOpenWith(null)
+      void runtime.documents.chooseEditor(path, candidate)
+    },
+    [openWith, runtime],
+  )
+
   const openFolder = useCallback(() => {
     guardDirty(() => void runtime.openFolder())
   }, [guardDirty, runtime])
@@ -177,6 +207,7 @@ function Shell({ runtime }: { runtime: WorkspaceRuntime }) {
       disconnect: disconnectWorkspace,
       restoreAccess: () => void runtime.requestPermission(),
       saveActive: () => void runtime.saveActiveDocument(),
+      openWith: requestOpenWith,
       newFile: () => requestExplorerCommand('new-file'),
       newFolder: () => requestExplorerCommand('new-folder'),
       rename: () => requestExplorerCommand('rename'),
@@ -195,11 +226,13 @@ function Shell({ runtime }: { runtime: WorkspaceRuntime }) {
 
   const getContext = useCallback((): CommandContext => {
     const current = runtime.getSnapshot()
+    const activePath = activeDocumentPath()
     return {
       hasWorkspace: current.phase === 'ready',
       writable: current.writable,
       hasSelection: Boolean(current.selection),
-      hasActiveDocument: Boolean(activeDocumentPath()),
+      hasActiveDocument: Boolean(activePath),
+      hasEditorChoice: activePath ? runtime.documents.candidatesFor(activePath).length > 1 : false,
       remote: Boolean(current.remote),
     }
   }, [runtime])
@@ -265,6 +298,15 @@ function Shell({ runtime }: { runtime: WorkspaceRuntime }) {
         onDisconnect={disconnectWorkspace}
       />
       <ConnectRemoteDialog open={connectOpen} onClose={() => setConnectOpen(false)} />
+      {openWith && (
+        <OpenWithDialog
+          path={openWith.path}
+          candidates={openWith.candidates}
+          currentIdentity={openWith.currentIdentity}
+          onChoose={chooseEditor}
+          onCancel={() => setOpenWith(null)}
+        />
+      )}
       {snapshot.remote?.rejected && (
         <div className="exo-reconnect-banner" role="alert">
           <span>The connection to {snapshot.remote.name} was rejected.</span>
@@ -297,51 +339,6 @@ function Shell({ runtime }: { runtime: WorkspaceRuntime }) {
         </span>
       )}
     </>
-  )
-}
-
-function ClosePromptDialog({
-  paths,
-  error,
-  onSave,
-  onDiscard,
-  onCancel,
-}: {
-  paths: WorkspacePath[]
-  error: string | null
-  onSave: () => void
-  onDiscard: () => void
-  onCancel: () => void
-}) {
-  const dirtyPaths = paths.filter((path) => Boolean(path))
-  return (
-    <div className="exo-dialog-backdrop">
-      <div className="exo-dialog" role="dialog" aria-modal="true" aria-label="Unsaved changes">
-        <h2>Unsaved changes</h2>
-        <p>
-          {dirtyPaths.length === 1
-            ? `${dirtyPaths[0]} has unsaved changes.`
-            : `${dirtyPaths.length} documents have unsaved changes.`}
-        </p>
-        <ul className="exo-close-list">
-          {dirtyPaths.map((path) => (
-            <li key={path}>{path}</li>
-          ))}
-        </ul>
-        {error && <p className="exo-dialog-error">{error}</p>}
-        <div className="exo-dialog-actions">
-          <button type="button" onClick={onSave}>
-            Save and close
-          </button>
-          <button type="button" onClick={onDiscard}>
-            Discard
-          </button>
-          <button type="button" onClick={onCancel}>
-            Cancel
-          </button>
-        </div>
-      </div>
-    </div>
   )
 }
 
