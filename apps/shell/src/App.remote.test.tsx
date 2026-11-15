@@ -8,24 +8,30 @@ import { MemoryWorkspaceProvider } from './workspace/providers/memory'
 import { MemoryHandleStore } from './workspace/providers/folder/handle-store'
 import { MemoryActiveWorkspaceStore } from './workspace/providers/active-store'
 import { MemoryConnectionStore } from './workspace/providers/stratofold/connection-store'
-import { FAKE_TOKEN, FakeStratofoldServer } from './workspace/providers/stratofold/fake-server'
+import {
+  FAKE_TOKEN,
+  FAKE_VDIR,
+  FakeStratofoldServer,
+} from './workspace/providers/stratofold/fake-server'
 import { configurePresetStore, clearWorkspaceTabs } from './workbench/tabs'
 import { requestRemoteConnect } from './workspace/connect-bus'
 
 interface Mounted {
   runtime: WorkspaceRuntime
   server: FakeStratofoldServer
+  connectionStore: MemoryConnectionStore
   container: HTMLElement
   root: Root
 }
 
 async function mount(server = new FakeStratofoldServer({ initialFiles: { 'a.txt': 'one' } })) {
+  const connectionStore = new MemoryConnectionStore()
   const runtime = new WorkspaceRuntime({
     providerFactory: () => new MemoryWorkspaceProvider({ initialFiles: { '/a.txt': 'one' } }),
     supportsFolder: () => true,
     handleStore: new MemoryHandleStore(),
     activeStore: new MemoryActiveWorkspaceStore(),
-    connectionStore: new MemoryConnectionStore(),
+    connectionStore,
     connectSeams: { fetch: server.fetch, createXhr: server.createXhr },
     eventTarget: new EventTarget(),
     now: () => 1,
@@ -34,7 +40,7 @@ async function mount(server = new FakeStratofoldServer({ initialFiles: { 'a.txt'
   document.body.appendChild(container)
   const root = createRoot(container)
   await act(async () => root.render(<App runtime={runtime} />))
-  return { runtime, server, container, root }
+  return { runtime, server, connectionStore, container, root }
 }
 
 function click(element: Element | null) {
@@ -74,6 +80,18 @@ async function connectThroughDialog(mounted: Mounted, token = FAKE_TOKEN, rememb
     click(button(mounted.container, 'Connect'))
   })
   await vi.waitFor(() => expect(mounted.container.querySelector('#exo-connect-server')).toBeNull())
+}
+
+function connectionStringFor(parts: { server: string; vdir?: string; token?: string }): string {
+  return `sfconn_v1_${Buffer.from(
+    JSON.stringify({
+      v: 1,
+      url: parts.server,
+      vdir: parts.vdir ?? FAKE_VDIR,
+      token: parts.token ?? FAKE_TOKEN,
+    }),
+    'utf8',
+  ).toString('base64url')}`
 }
 
 describe('remote workspace ui', () => {
@@ -205,6 +223,177 @@ describe('remote workspace ui', () => {
       expect(mounted.container.querySelector('.exo-reconnect-banner')).toBeNull()
       expect(mounted.server.requests.length).toBe(requestsAfterRejection)
       expect(useWorkbenchStore.getState().tabs).toEqual([])
+    } finally {
+      await act(async () => mounted.root.unmount())
+      mounted.container.remove()
+      await mounted.runtime.dispose()
+    }
+  })
+})
+
+describe('remote workspace connection strings', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    configurePresetStore()
+    clearWorkspaceTabs()
+  })
+
+  afterEach(() => {
+    document.body.innerHTML = ''
+    vi.unstubAllGlobals()
+  })
+
+  async function openDialog(mounted: Mounted) {
+    await vi.waitFor(() => expect(button(mounted.container, 'Connect Remote…')).not.toBeNull())
+    click(button(mounted.container, 'Connect Remote…'))
+    await vi.waitFor(() =>
+      expect(mounted.container.querySelector('#exo-connect-connection-string')).not.toBeNull(),
+    )
+  }
+
+  it('fills the form from a pasted connection string, clears it, and connects', async () => {
+    const mounted = await mount()
+    try {
+      await openDialog(mounted)
+      const value = connectionStringFor({ server: mounted.server.baseUrl })
+      const input = mounted.container.querySelector<HTMLInputElement>(
+        '#exo-connect-connection-string',
+      )
+      await act(async () => setValue(input, value))
+
+      expect(input?.value).toBe('')
+      expect(mounted.container.querySelector<HTMLInputElement>('#exo-connect-server')?.value).toBe(
+        mounted.server.baseUrl,
+      )
+      expect(mounted.container.querySelector<HTMLInputElement>('#exo-connect-token')?.value).toBe(
+        FAKE_TOKEN,
+      )
+
+      await act(async () => {
+        click(button(mounted.container, 'Connect'))
+      })
+      await vi.waitFor(() =>
+        expect(mounted.container.querySelector('#exo-connect-server')).toBeNull(),
+      )
+      await vi.waitFor(() => expect(mounted.container.textContent).toContain('a.txt'))
+
+      expect(mounted.runtime.getSnapshot()).toMatchObject({
+        phase: 'ready',
+        remote: { name: 'demo', role: 'editor', server: mounted.server.baseUrl },
+      })
+      expect(mounted.container.innerHTML).not.toContain('sfconn_v1_')
+      expect(mounted.container.innerHTML).not.toContain(FAKE_TOKEN)
+      expect(mounted.server.requests.every((request) => !request.url.includes('sfconn_v1_'))).toBe(
+        true,
+      )
+    } finally {
+      await act(async () => mounted.root.unmount())
+      mounted.container.remove()
+      await mounted.runtime.dispose()
+    }
+  })
+
+  it('rejects a malformed connection string locally without a request', async () => {
+    const mounted = await mount()
+    try {
+      await openDialog(mounted)
+      const before = mounted.server.requests.length
+      const input = mounted.container.querySelector<HTMLInputElement>(
+        '#exo-connect-connection-string',
+      )
+      await act(async () => setValue(input, 'sfconn_v1_%%%'))
+      await act(async () => {
+        click(button(mounted.container, 'Connect'))
+      })
+
+      await vi.waitFor(() =>
+        expect(mounted.container.textContent).toContain('connection string is not valid'),
+      )
+      expect(mounted.server.requests.length).toBe(before)
+      expect(mounted.runtime.getSnapshot().phase).not.toBe('ready')
+      expect(input?.value).toBe('sfconn_v1_%%%')
+    } finally {
+      await act(async () => mounted.root.unmount())
+      mounted.container.remove()
+      await mounted.runtime.dispose()
+    }
+  })
+
+  it('stores only the decomposed fields when a connection string is remembered', async () => {
+    const mounted = await mount()
+    try {
+      await openDialog(mounted)
+      const value = connectionStringFor({ server: mounted.server.baseUrl })
+      await act(async () =>
+        setValue(
+          mounted.container.querySelector<HTMLInputElement>('#exo-connect-connection-string'),
+          value,
+        ),
+      )
+      await act(async () => {
+        const checkbox = mounted.container.querySelector<HTMLInputElement>('#exo-connect-remember')
+        if (checkbox) click(checkbox)
+      })
+      await act(async () => {
+        click(button(mounted.container, 'Connect'))
+      })
+      await vi.waitFor(() =>
+        expect(mounted.container.querySelector('#exo-connect-server')).toBeNull(),
+      )
+      await vi.waitFor(() => expect(mounted.container.textContent).toContain('a.txt'))
+
+      const record = await mounted.connectionStore.get()
+      expect(record?.connection).toEqual({
+        server: mounted.server.baseUrl,
+        vdir: FAKE_VDIR,
+        name: 'demo',
+        role: 'editor',
+        token: FAKE_TOKEN,
+      })
+      const serialized = JSON.stringify(record)
+      expect(serialized).not.toContain('sfconn_v1_')
+      expect(serialized).not.toContain(value)
+    } finally {
+      await act(async () => mounted.root.unmount())
+      mounted.container.remove()
+      await mounted.runtime.dispose()
+    }
+  })
+
+  it('uses a corrected server origin with the string directory and token', async () => {
+    const mounted = await mount()
+    try {
+      await openDialog(mounted)
+      const value = connectionStringFor({ server: 'https://stale.test' })
+      await act(async () =>
+        setValue(
+          mounted.container.querySelector<HTMLInputElement>('#exo-connect-connection-string'),
+          value,
+        ),
+      )
+      expect(mounted.container.querySelector<HTMLInputElement>('#exo-connect-server')?.value).toBe(
+        'https://stale.test',
+      )
+
+      await act(async () =>
+        setValue(
+          mounted.container.querySelector<HTMLInputElement>('#exo-connect-server'),
+          mounted.server.baseUrl,
+        ),
+      )
+      await act(async () => {
+        click(button(mounted.container, 'Connect'))
+      })
+
+      await vi.waitFor(() =>
+        expect(mounted.container.querySelector('#exo-connect-server')).toBeNull(),
+      )
+      expect(mounted.runtime.getSnapshot().remote).toMatchObject({
+        server: mounted.server.baseUrl,
+        name: 'demo',
+        role: 'editor',
+      })
+      expect(mounted.server.requests[0].url.startsWith(mounted.server.baseUrl)).toBe(true)
     } finally {
       await act(async () => mounted.root.unmount())
       mounted.container.remove()

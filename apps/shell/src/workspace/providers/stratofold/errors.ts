@@ -83,7 +83,7 @@ function messageFor(code: WorkspaceErrorCode): string {
 
 /**
  * Races a client call that has no `AbortSignal` of its own against the caller's
- * signal. The remote operation is not cancelled - Stratofold 0.11.0 has no
+ * signal. The remote operation is not cancelled - Stratofold 0.12.0 has no
  * signal on `list`, `mkdir`, `move` or `remove` - so the promise rejects
  * immediately and the late result is dropped.
  */

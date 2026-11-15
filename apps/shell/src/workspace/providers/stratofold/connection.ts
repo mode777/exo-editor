@@ -10,6 +10,7 @@
  */
 import {
   ConfigurationError,
+  parseConnectionString,
   StratofoldClient,
   StratofoldError,
   type FetchLike,
@@ -21,7 +22,12 @@ export const DISCOVERY_VDIR = '-'
 export type StratofoldRole = 'editor' | 'viewer' | 'public'
 
 export type ConnectErrorCode =
-  'invalid-server' | 'unauthorized' | 'not-found' | 'mismatch' | 'network'
+  | 'invalid-server'
+  | 'invalid-connection-string'
+  | 'unauthorized'
+  | 'not-found'
+  | 'mismatch'
+  | 'network'
 
 export class StratofoldConnectError extends Error {
   readonly code: ConnectErrorCode
@@ -60,6 +66,38 @@ export interface ConnectSeams {
 export interface ConnectedWorkspace {
   connection: StratofoldConnection
   client: StratofoldClient
+}
+
+export interface ConnectionStringOptions {
+  /** Replace a stale origin embedded in the string; vdir and token still come from it. */
+  server?: string
+}
+
+/**
+ * Resolves an `sfconn_v1_` connection string locally into the connect request
+ * the rest of the shell already understands. Parsing makes no request, and the
+ * raw value (which carries the token) is never returned or included in an error.
+ */
+export function connectRequestFromConnectionString(
+  value: string,
+  options: ConnectionStringOptions = {},
+): ConnectRequest {
+  try {
+    const parts = parseConnectionString(value)
+    const override = options.server?.trim() ?? ''
+    return {
+      server: override === '' ? parts.baseUrl : override,
+      token: parts.token,
+      vdir: parts.vdir,
+    }
+  } catch (error) {
+    if (!(error instanceof ConfigurationError)) throw error
+    throw new StratofoldConnectError(
+      'invalid-connection-string',
+      'The connection string is not valid. Expected an sfconn_v1_ value carrying a server, directory and token.',
+      error,
+    )
+  }
 }
 
 export function clientFor(

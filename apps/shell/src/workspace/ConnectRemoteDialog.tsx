@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { connectRequestFromConnectionString, type ConnectRequest } from './providers/stratofold/connection'
 import { useWorkspaceRuntime, useWorkspaceSnapshot } from './context'
 
 interface ConnectRemoteDialogProps {
@@ -16,6 +17,8 @@ export function ConnectRemoteDialog({ open, onClose }: ConnectRemoteDialogProps)
   const [server, setServer] = useState('')
   const [token, setToken] = useState('')
   const [vdir, setVdir] = useState('')
+  const [connectionString, setConnectionString] = useState('')
+  const [connectionStringError, setConnectionStringError] = useState<string | null>(null)
   const [remember, setRemember] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -26,6 +29,8 @@ export function ConnectRemoteDialog({ open, onClose }: ConnectRemoteDialogProps)
     setServer(snapshot.remote?.server ?? '')
     setToken('')
     setVdir(snapshot.remote?.vdir ?? '')
+    setConnectionString('')
+    setConnectionStringError(null)
     setRemember(snapshot.remote?.remembered ?? false)
     setError(null)
     setBusy(false)
@@ -43,21 +48,53 @@ export function ConnectRemoteDialog({ open, onClose }: ConnectRemoteDialogProps)
 
   if (!open) return null
 
-  const canSubmit = server.trim() !== '' && (token.trim() !== '' || vdir.trim() !== '')
+  const canSubmit =
+    connectionString.trim() !== '' ||
+    (server.trim() !== '' && (token.trim() !== '' || vdir.trim() !== ''))
+
+  const applyConnectionString = (value: string): boolean => {
+    const trimmed = value.trim()
+    if (trimmed === '') return false
+    try {
+      const parsed = connectRequestFromConnectionString(trimmed)
+      setServer(parsed.server)
+      setVdir(parsed.vdir ?? '')
+      setToken(parsed.token ?? '')
+      setConnectionString('')
+      setConnectionStringError(null)
+      return true
+    } catch {
+      return false
+    }
+  }
 
   const submit = async () => {
     if (!canSubmit || busy) return
     setBusy(true)
     setError(null)
-    const connected = await runtime.connectRemote(
-      {
-        server: server.trim(),
-        token: token.trim() === '' ? undefined : token.trim(),
-        // A token determines the directory; only public mode uses this field.
-        vdir: token.trim() === '' && vdir.trim() !== '' ? vdir.trim() : undefined,
-      },
-      { remember },
-    )
+    setConnectionStringError(null)
+
+    let request: ConnectRequest = {
+      server: server.trim(),
+      token: token.trim() === '' ? undefined : token.trim(),
+      vdir: vdir.trim() === '' ? undefined : vdir.trim(),
+    }
+    if (connectionString.trim() !== '') {
+      try {
+        request = connectRequestFromConnectionString(connectionString.trim(), {
+          server: server.trim() === '' ? undefined : server.trim(),
+        })
+        setConnectionString('')
+      } catch (caught) {
+        setBusy(false)
+        setConnectionStringError(
+          caught instanceof Error ? caught.message : 'The connection string is not valid.',
+        )
+        return
+      }
+    }
+
+    const connected = await runtime.connectRemote(request, { remember })
     setBusy(false)
     if (!connected) {
       setError(
@@ -67,6 +104,8 @@ export function ConnectRemoteDialog({ open, onClose }: ConnectRemoteDialogProps)
       setToken('')
       return
     }
+    setConnectionString('')
+    setToken('')
     onClose()
   }
 
@@ -82,6 +121,27 @@ export function ConnectRemoteDialog({ open, onClose }: ConnectRemoteDialogProps)
         <p className="exo-dialog-hint">
           The browser talks to the server directly. The token is sent only in a request header and
           is never placed in a URL or shown to a plugin.
+        </p>
+        <label className="exo-dialog-field">
+          <span>Connection string</span>
+          <input
+            id="exo-connect-connection-string"
+            type="password"
+            value={connectionString}
+            placeholder="sfconn_v1_…"
+            autoComplete="off"
+            spellCheck={false}
+            onChange={(event) => {
+              const value = event.target.value
+              setConnectionString(value)
+              setConnectionStringError(null)
+              applyConnectionString(value)
+            }}
+          />
+        </label>
+        <p className="exo-dialog-hint">
+          Paste a connection string to fill the server, directory and token. It is read locally and
+          discarded.
         </p>
         <label className="exo-dialog-field">
           <span>Server URL</span>
@@ -130,9 +190,9 @@ export function ConnectRemoteDialog({ open, onClose }: ConnectRemoteDialogProps)
           Remembering stores the token in this browser so the workspace can reopen after a reload.
           Forget it by disconnecting.
         </p>
-        {(error ?? snapshot.remoteError?.message) && (
+        {(connectionStringError ?? error ?? snapshot.remoteError?.message) && (
           <p className="exo-dialog-error" role="alert">
-            {error ?? snapshot.remoteError?.message}
+            {connectionStringError ?? error ?? snapshot.remoteError?.message}
           </p>
         )}
         <div className="exo-dialog-actions">

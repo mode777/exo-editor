@@ -2,10 +2,12 @@
 
 Status: implemented by the OpenSpec change `add-stratofold-provider` and verified
 against the deployed shell on 2026-11-15 (Chromium and Firefox; viewer read-only
-and a live token revocation). The adapter and the connect flow are in
+and a live token revocation). The client was upgraded to 0.12.0 by
+`adopt-stratofold-0-12`, which adds connection strings and zero-byte uploads. The
+adapter and the connect flow are in
 `apps/shell/src/workspace/providers/stratofold/`.
 
-Upstream: `@stratofold/client` 0.11.0, published on the public npm registry and
+Upstream: `@stratofold/client` 0.12.0, published on the public npm registry and
 verified from the tarball on 2026-11-15 (`latest`, zero runtime dependencies,
 ISC, ESM with types). It is pinned exactly, because the package is `0.x`.
 
@@ -42,10 +44,10 @@ implements `WorkspaceProvider`/`WorkspaceHandle`. Paths are Exo-normalized: `/` 
 the vdir root, every other path loses its leading slash before it reaches the
 client. No provider method was added for this backend.
 
-| Exo surface | Stratofold 0.11.0 | Adapter notes |
+| Exo surface | Stratofold 0.12.0 | Adapter notes |
 | --- | --- | --- |
 | `capabilities()` | `tokenInfo()` role, or no token for a public vdir | `writable` only for an `editor` token; `watchable: false`; `persistent` follows the credential-storage choice; `caseSensitive: false` (conservative, see section 4) |
-| `open()` | No request: the connect flow already validated the connection | The connect form takes a server URL and a token (or a public directory id) and validates before the provider exists, so `capabilities()` can be synchronous and a failed connection never mounts. |
+| `open()` | No request: the connect flow already validated the connection | The connect form takes a server URL and a token, an `sfconn_v1_` connection string, or a public directory id, and validates before the provider exists, so `capabilities()` can be synchronous and a failed connection never mounts. |
 | `restore(id)` | Stored connection + `tokenInfo()` (public: `list`) | The active-workspace marker selects the provider kind. A remembered connection is revalidated before it mounts; a rejected credential mounts nothing and surfaces the reconnect state. |
 | `list(path, {depth, signal})` | `list(path)` returns `{name,size,dir,modtime,version}` | One level only; `depth: 'recursive'` is adapter recursion. Directories map to `size: 0`. `modtime` is RFC3339; Exo wants epoch milliseconds. |
 | `stat(path, {signal})` | `stat(path, {signal})` returns `{path,name,kind,size,mtime,version}` | Direct mapping; root is `""`; no parent listing needed. |
@@ -70,7 +72,25 @@ Error mapping:
 | other 5xx `server` | `io` |
 | abort with an aborted signal | `aborted` |
 
-## 3. What 0.11.0 provides
+## 3. What 0.12.0 provides
+
+0.12.0 keeps the 0.11.0 file API and adds:
+
+- **Connection strings.** A minted app token can be paired with an
+  `sfconn_v1_…` value that bundles the server origin, vdir id and plaintext
+  token. `parseConnectionString(value)` validates it locally and throws
+  `ConfigurationError` for a wrong prefix/version, bad base64url or JSON, or a
+  missing/invalid field; `StratofoldClient.fromConnectionString(value,
+  overrides?)` builds a client from it. The value is opaque, not a URL, and is a
+  bearer secret just like the token. Exo parses it in the connect form and never
+  stores or sends the raw value.
+- **Zero-byte uploads.** An empty body is a completed write: the server
+  publishes an empty file at the target, returns `200` with `{"path", "size": 0}`,
+  rotates the version and leaves no temp file. Replacing a non-empty file with
+  an empty body truncates it. This is a server-side fix; the client API is
+  unchanged. A 0.11.0 server still returns `503` for the same request.
+
+The file API inherited from 0.11.0:
 
 - **`stat(path)`** at `POST /api/sf/vdirs/{vdirId}/stat` with
   `{kind, size, mtime, version}` and a working root path. This removes the
@@ -90,21 +110,27 @@ Error mapping:
 Verified against the published `dist/*.d.ts` and `client.js`:
 
 - The constructor requires a non-empty `vdir`; `tokenInfo()` is the only method
-  that does not use it.
+  that does not use it. A connection string always contains a vdir, so the
+  sentinel probe is only needed for URL-plus-token discovery.
 - `UploadBody` is `Blob | File | ArrayBuffer`, so the adapter passes an
-  `ArrayBuffer` slice of the Exo buffer.
+  `ArrayBuffer` slice of the Exo buffer, including a zero-length one.
 - `ifVersion` must be an unquoted strong version or `"*"`.
 - Uploads use `XMLHttpRequest` behind an injectable `createXhr`, which is the
   test seam; JSON calls use `fetch`.
 - `list`, `mkdir`, `move` and `remove` accept no `AbortSignal`.
+- `parseConnectionString` and `fromConnectionString` are exported from the
+  package root and add no runtime dependency.
 
 See Stratofold's
 [ADR 0015](https://github.com/mode777/stratofold/blob/main/docs/decisions/0015-content-version-and-conditional-writes.md)
-and the `filesystem-api`, `client-library` and `file-server` specs.
+and
+[ADR 0016](https://github.com/mode777/stratofold/blob/main/docs/decisions/0016-app-connection-strings.md),
+plus the `filesystem-api`, `client-library`, `vdir-access-tokens` and
+`file-server` specs.
 
 ## 4. Remaining gaps and adapter decisions
 
-| Area | 0.11.0 behavior | Adapter workaround | Residual risk |
+| Area | 0.12.0 behavior | Adapter workaround | Residual risk |
 | --- | --- | --- | --- |
 | `remove` | Always recursive; missing path is success | Pre-`stat`; pre-`list` for `recursive: false` | A file added after the listing is still deleted by `rm`; current UI always passes `recursive: true` |
 | `move` | Always replaces a file destination; a missing source with an existing destination succeeds | Pre-`stat` source and destination | TOCTOU between stat and rename; a retry after an unacknowledged move can look like `not-found` because the source is gone |
@@ -118,7 +144,6 @@ and the `filesystem-api`, `client-library` and `file-server` specs.
 | Symlinks | `ls` uses `Lstat`; `stat`/`read` follow | Accept for v1; do not claim symlink parity | A symlinked directory can appear as a file; versions can differ between `ls` and `stat` |
 | External edits | Detected by size and whole-second mtime | None; document it | An external same-size edit in the same second is invisible (Stratofold's documented residual) |
 | HTTP cache | `/files` responses carry no explicit cache policy, so a browser may reuse a stale body after a save (observed in Firefox 132) | `read` sends `Cache-Control: no-cache` | A proxy that ignores the request directive could still serve stale bytes |
-| Empty files | A zero-byte upload returns `503 "Remote host unavailable."`, verified against the test instance on 2026-11-15 | None; the shell's New File surfaces the failure | A new empty file cannot be created in a remote workspace; seed the file elsewhere or write content first |
 | Credential revocation | Immediate, server-side | None | Revoking a token outside the shell is only visible on the next operation, which then enters the reconnect state |
 
 ## 5. Credentials, security and browser behavior
@@ -126,20 +151,29 @@ and the `filesystem-api`, `client-library` and `file-server` specs.
 - **Token shape.** A vdir-scoped `sf_v1_` bearer token with role `viewer` or
   `editor`, optional expiry, and immediate revocation. A public vdir needs no
   token and is read-only in Exo.
+- **Connection strings.** Stratofold's token mint returns an optional
+  `sfconn_v1_…` value that bundles the origin, vdir id and token. It is opaque,
+  is not a URL, and is as sensitive as the token. The connect form parses it
+  locally, prefills the server and directory, holds the token only in the form,
+  and clears the raw value once it parses. The raw string is never sent, stored,
+  logged or exposed to a plugin; the editable server field is the override for
+  a stale embedded origin.
 - **Discovery.** `tokenInfo()` returns the vdir id/name, role, expiry, last use
-  and a non-secret hint. Because the constructor requires a `vdir`, the connect
-  form asks for a server URL and a token only: validation builds a throwaway
-  client with the sentinel `vdir` `"-"`, calls `tokenInfo()` once
-  (`/api/sf/tokens/me`, the only request the sentinel client makes), then
-  rebuilds the client from `info.vdir.id`. A test asserts the sentinel never
-  appears in a directory URL. Public discovery is impossible without a token, so
-  the form asks for the directory id and validates it with `list("")`.
+  and a non-secret hint. For a URL-plus-token connection, the constructor
+  requires a `vdir`, so validation builds a throwaway client with the sentinel
+  `vdir` `"-"`, calls `tokenInfo()` once (`/api/sf/tokens/me`, the only request
+  the sentinel client makes), then rebuilds the client from `info.vdir.id`. A
+  connection string already carries the vdir and skips the sentinel. A test
+  asserts the sentinel never appears in a directory URL. Public discovery is
+  impossible without a token, so the form asks for the directory id and
+  validates it with `list("")`.
 - **Storage.** Session-only by default. The connect form's opt-in writes
   `{ server, vdir, name, role, token }` to the `exo-remote` IndexedDB database;
-  "disconnect and forget" deletes it. Never bundle a token, put it in a URL, log
-  it, or send it to a plugin frame. Revoking it in Stratofold surfaces as an
-  explicit reconnect state: the adapter stops issuing requests and only a
-  reconnect or disconnect clears it.
+  "disconnect and forget" deletes it. A connection supplied as a connection
+  string is reduced to those fields, and the raw string is never written. Never
+  bundle a token, put it in a URL, log it, or send it to a plugin frame. Revoking
+  it in Stratofold surfaces as an explicit reconnect state: the adapter stops
+  issuing requests and only a reconnect or disconnect clears it.
 - **Reserved paths.** The session enforces `/exo.json` and `/.exo/**` for plugin
   requests. Stratofold itself has no knowledge of Exo, so anyone holding the
   vdir token can read those paths through another client. This is the same trust
@@ -154,16 +188,19 @@ and the `filesystem-api`, `client-library` and `file-server` specs.
 
 ## 6. Distribution
 
-**Resolved - `@stratofold/client` 0.11.0 is published.**
+**Resolved - `@stratofold/client` 0.12.0 is published.**
 
-- The registry has `0.11.0` as `latest`, with `0.0.0-bootstrap.0` and
-  `0.0.0-stage` as the only other versions. `npm view @stratofold/client@0.11.0`
-  and a tarball inspection agree with the repository's `client/package.json`:
-  zero runtime dependencies, ISC, ESM with types, `sideEffects: false`.
-- Exo depends on the exact version `0.11.0` and a clean `npm ci` from the lockfile
-  installs it. The old options - vendoring a tarball, or a git subdirectory
-  dependency - are no longer needed and are not used.
-- The release workflow still publishes by tag; a future `0.11.x`/`0.12` needs a
+- The registry has `0.12.0` as `latest`, with `0.11.0`, `0.0.0-bootstrap.0` and
+  `0.0.0-stage` as the other versions. `npm view @stratofold/client@0.12.0` and a
+  tarball inspection agree with the repository's `client/package.json`: zero
+  runtime dependencies, ISC, ESM with types, `sideEffects: false`.
+- Exo depends on the exact version `0.12.0` and a clean `npm ci` from the
+  lockfile installs it. The old options - vendoring a tarball, or a git
+  subdirectory dependency - are no longer needed and are not used.
+- `0.12.0` is additive over `0.11.0` (connection-string parsing plus the
+  server-side zero-byte fix); no call site changed shape. Empty-file creation
+  still needs a `0.12.0` server even with the `0.12.0` client.
+- The release workflow still publishes by tag; a future `0.12.x`/`0.13` needs a
   deliberate version bump here, not an automatic upgrade.
 
 ## 7. Verification plan
@@ -174,6 +211,11 @@ and the `filesystem-api`, `client-library` and `file-server` specs.
   (`providers/stratofold/fake-server.ts`), and the edge tests cover:
   - same-size, same-second save: the version rotates, and a stale `ifVersion`
     gets `conflict` without publishing;
+  - zero-byte create, read and replace: size is 0, the version rotates, and a
+    stale empty write gets `conflict` without truncating the file;
+  - connection strings: valid values resolve to server/vdir/token, a corrected
+    server override is applied, malformed values fail locally with no request,
+    and no error, request URL or stored record contains the raw string;
   - rename onto an existing file without `overwrite`: `already-exists`, both
     files intact;
   - non-recursive remove of a non-empty directory: fails without deleting;
@@ -207,17 +249,16 @@ and the `filesystem-api`, `client-library` and `file-server` specs.
   - Not verified: Safari (no driver on the verification host) and public-vdir
     mode (the test vdir is not public).
 - **Packaging.** A clean `npm ci` from the registry, the CI `verify` job, the
-  bundle budget and the CSP checks. Measured: the deployed bundle grew from
-  130,600 to 135,376 gzip bytes (+4,776 - the client plus the adapter, connect
-  dialog and settings), so the `js` limit moved from 136,000 to 142,000 with
-  6,624 bytes of headroom.
+  bundle budget and the CSP checks. Measured after 0.12.0 and the
+  connection-string dialog: `js` 143,622 gzip bytes against a 145,000 limit
+  (1,378 bytes of headroom) and `css` 12,851 against 14,000, so no budget change
+  was needed.
 
 ## 8. Upstream asks
 
 | Priority | Ask | Why |
 | --- | --- | --- |
 | P1 | `vdir` optional for discovery, or a vdir-independent `whoami` | Removes the sentinel-vdir workaround and the coupling to constructor validation |
-| P1 | Accept a zero-byte upload (create an empty file) | The shell's New File cannot create a file in a remote workspace today |
 | P1 | `rm { recursive: false }` plus `{ removed: boolean }` | Non-recursive delete and `not-found` without a pre-list race |
 | P1 | `mv { overwrite: false }` returning 409/412 | No-clobber rename; the current default silently replaces the destination |
 | P1 | `AbortSignal` on `list`, `mkdir`, `move`, `remove` | Contract-conformant teardown and workspace switches |
@@ -234,6 +275,12 @@ and the `filesystem-api`, `client-library` and `file-server` specs.
 - **Credential storage.** Session-only is the default. The connect form's
   "remember this connection" opt-in writes the record to IndexedDB and states
   that the token stays in this browser; disconnect deletes it.
+- **Connection string entry.** Accepted as a connect-form input. It is parsed
+  locally into server, vdir and token, the raw value is discarded, and the
+  editable server field remains the override for a stale embedded origin. A
+  remembered connection stores only the decomposed fields.
+- **Zero-byte files.** Supported through the normal upload path with the 0.12.0
+  client and server; there is no adapter workaround and no separate create API.
 - **Multiple workspaces.** One at a time. A new connection replaces the active
   workspace through the normal switch path; the store keeps only the last
   remembered connection.

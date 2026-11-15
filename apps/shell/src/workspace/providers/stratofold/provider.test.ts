@@ -201,6 +201,56 @@ describe('stratofold provider writes and mutations', () => {
     expect(server.readText('a.txt')).toBe('bbbb')
   })
 
+  it('creates and reads a zero-byte file', async () => {
+    const server = seededServer()
+    const { provider } = providerFor(server)
+    const handle = await provider.open()
+
+    const created = await handle.write('/empty.txt', new Uint8Array(), { create: true })
+    expect(created).toMatchObject({ path: '/empty.txt', kind: 'file', size: 0 })
+    expect(server.readText('empty.txt')).toBe('')
+
+    const bytes = await handle.read('/empty.txt')
+    expect(bytes.byteLength).toBe(0)
+
+    const listing = await handle.list('/')
+    expect(listing).toContainEqual(expect.objectContaining({ path: '/empty.txt', size: 0 }))
+  })
+
+  it('replaces non-empty content with empty content and rotates the version', async () => {
+    const server = seededServer()
+    server.seedFile('a.txt', 'content')
+    const { provider } = providerFor(server)
+    const handle = await provider.open()
+    const loaded = await handle.stat('/a.txt')
+
+    const written = await handle.write('/a.txt', new Uint8Array(), {
+      ifVersion: loaded.version,
+    })
+    expect(written.size).toBe(0)
+    expect(written.version).not.toBe(loaded.version)
+    expect(server.readText('a.txt')).toBe('')
+    expect((await handle.read('/a.txt')).byteLength).toBe(0)
+  })
+
+  it('rejects an empty write with a stale version without truncating the file', async () => {
+    const server = seededServer()
+    server.seedFile('a.txt', 'keep me')
+    const { provider } = providerFor(server)
+    const handle = await provider.open()
+    const loaded = await handle.stat('/a.txt')
+
+    const updated = await handle.write('/a.txt', new TextEncoder().encode('new content'), {
+      ifVersion: loaded.version,
+    })
+    expect(updated.version).not.toBe(loaded.version)
+
+    await expect(
+      handle.write('/a.txt', new Uint8Array(), { ifVersion: loaded.version }),
+    ).rejects.toMatchObject({ code: 'conflict' })
+    expect(server.readText('a.txt')).toBe('new content')
+  })
+
   it('creates missing parents only when create is set', async () => {
     const server = seededServer()
     const { provider } = providerFor(server)

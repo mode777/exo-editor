@@ -1,8 +1,27 @@
 import { describe, expect, it } from 'vitest'
-import { connectStratofold, DISCOVERY_VDIR, StratofoldConnectError } from './connection'
+import {
+  connectRequestFromConnectionString,
+  connectStratofold,
+  DISCOVERY_VDIR,
+  StratofoldConnectError,
+} from './connection'
 import { FAKE_TOKEN, FakeStratofoldServer, FAKE_VDIR } from './fake-server'
 
 const VIEWER_TOKEN = 'sf_v1_viewer_token'
+
+function encodeConnectionString(payload: Record<string, unknown>): string {
+  return `sfconn_v1_${Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url')}`
+}
+
+function validConnectionString(overrides: Record<string, unknown> = {}): string {
+  return encodeConnectionString({
+    v: 1,
+    url: 'https://files.test',
+    vdir: FAKE_VDIR,
+    token: FAKE_TOKEN,
+    ...overrides,
+  })
+}
 
 function serverWithToken() {
   return new FakeStratofoldServer({
@@ -123,6 +142,92 @@ describe('stratofold connection', () => {
       expect(error).toBeInstanceOf(StratofoldConnectError)
       expect((error as StratofoldConnectError).code).toBe('invalid-server')
     }
-    expect(server.requests).toEqual([])
+  })
+})
+
+describe('stratofold connection strings', () => {
+  it('resolves a valid string locally and connects with its embedded facts', async () => {
+    const server = serverWithToken()
+    const value = validConnectionString({ url: server.baseUrl })
+
+    const request = connectRequestFromConnectionString(value)
+    expect(request).toEqual({
+      server: server.baseUrl,
+      vdir: FAKE_VDIR,
+      token: FAKE_TOKEN,
+    })
+
+    const { connection } = await connectStratofold(request, {
+      fetch: server.fetch,
+      createXhr: server.createXhr,
+    })
+    expect(connection).toEqual({
+      server: server.baseUrl,
+      vdir: FAKE_VDIR,
+      name: 'demo',
+      role: 'editor',
+      token: FAKE_TOKEN,
+    })
+    expect(server.requests).toHaveLength(1)
+    expect(server.requests[0].headers.authorization).toBe(`Bearer ${FAKE_TOKEN}`)
+    expect(server.requests[0].url).not.toContain('sfconn_v1_')
+    expect(server.requests[0].url).not.toContain(FAKE_TOKEN)
+  })
+
+  it('applies a corrected server origin while keeping the embedded directory and token', () => {
+    const value = validConnectionString({ url: 'https://stale.test/' })
+    const request = connectRequestFromConnectionString(value, {
+      server: 'https://corrected.test',
+    })
+
+    expect(request).toEqual({
+      server: 'https://corrected.test',
+      vdir: FAKE_VDIR,
+      token: FAKE_TOKEN,
+    })
+    expect(connectRequestFromConnectionString(value).server).toBe('https://stale.test')
+  })
+
+  it('rejects malformed values locally without echoing the input', () => {
+    const values = [
+      'not-a-connection-string',
+      'sfconn_v2_' + 'abc',
+      'sfconn_v1_%%%',
+      `sfconn_v1_${Buffer.from('not json', 'utf8').toString('base64url')}`,
+      encodeConnectionString({
+        v: 2,
+        url: 'https://files.test',
+        vdir: FAKE_VDIR,
+        token: FAKE_TOKEN,
+      }),
+      encodeConnectionString({ v: 1, url: 'https://files.test', vdir: FAKE_VDIR }),
+      encodeConnectionString({
+        v: 1,
+        url: 'https://files.test/path',
+        vdir: FAKE_VDIR,
+        token: FAKE_TOKEN,
+      }),
+      encodeConnectionString({
+        v: 1,
+        url: 'https://user:pass@files.test',
+        vdir: FAKE_VDIR,
+        token: FAKE_TOKEN,
+      }),
+    ]
+
+    for (const value of values) {
+      let caught: unknown
+      try {
+        connectRequestFromConnectionString(value)
+      } catch (error) {
+        caught = error
+      }
+      expect(caught).toBeInstanceOf(StratofoldConnectError)
+      const error = caught as StratofoldConnectError
+      expect(error.code).toBe('invalid-connection-string')
+      expect(error.message).not.toContain(value)
+      expect(String(error.cause)).not.toContain(value)
+      expect(error.message).toContain('sfconn_v1_')
+    }
   })
 })
