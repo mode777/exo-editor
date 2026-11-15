@@ -142,6 +142,12 @@
         if (data.payload && data.payload.kind === 'renamed' && state.file) {
           state.file = Object.assign({}, state.file, { path: data.payload.path })
         }
+        if (data.payload && data.payload.kind !== 'deleted') {
+          // Simulate a local edit so a later save exercises the conflict path.
+          state.buffer = `${state.buffer || ''}\n[fixture local edit]`
+          state.dirty = true
+          post('plugin/dirty', { dirty: true })
+        }
         render()
         break
       case 'shell/dispose':
