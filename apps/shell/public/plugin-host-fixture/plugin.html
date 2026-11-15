@@ -29,7 +29,11 @@
       document.title = `Exo fixture ${mode} ${storage}`
 
       window.addEventListener('message', (event) => {
-        if (!host || event.origin !== host) return
+        if (!host) return
+        if (event.source !== parent) return
+        // A same-origin sandboxed frame reports "null"; a cross-origin frame
+        // reports the shell origin it was told to post to.
+        if (event.origin !== host && event.origin !== 'null') return
         const data = event.data
         if (!data || data.exo !== 1 || data.type !== 'shell/init') return
         if (mode !== 'register') return
