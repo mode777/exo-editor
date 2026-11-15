@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { connectRequestFromConnectionString, type ConnectRequest } from './providers/stratofold/connection'
+import {
+  connectRequestFromConnectionString,
+  type ConnectRequest,
+} from './providers/stratofold/connection'
 import { useWorkspaceRuntime, useWorkspaceSnapshot } from './context'
 
 interface ConnectRemoteDialogProps {
