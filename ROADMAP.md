@@ -1,7 +1,9 @@
 # Exo Editor - Roadmap
 
 Status: layers 0-4 are complete and archived. Layer 5 (`plugin-file-editors`) is
-next. The parallel Stratofold provider track (P1) is archived as
+implemented and verified against the deployed shell; its change is awaiting
+archive, after which layer 6 (`plugin-events`) starts. The parallel Stratofold
+provider track (P1) is archived as
 `2026-11-15-add-stratofold-provider` and does not gate the numbered layers. Each
 layer is one OpenSpec change. A layer is done when its change is archived and its exit criteria
 are demonstrated against the deployed shell - never from a local dev server or
@@ -298,6 +300,9 @@ settings.
 
 ## Layer 5 - `plugin-file-editors`
 
+**Status:** implemented; deployed verification passed on 2026-11-15 with Chrome
+for Testing 131.0.6778.264. Archive pending.
+
 **Goal:** a third-party editor can open, edit and save a workspace file without
 the shell understanding the format.
 
@@ -325,6 +330,25 @@ the shell understanding the format.
 - Closing the tab removes the frame; no further messages are accepted.
 - Switching workspaces mid-save cancels the write and leaves the old file
   untouched.
+
+**Deployed verification (2026-11-15):**
+
+- Opening `second.txt` mounted exactly one hidden `editor.html` frame with
+  `sandbox="allow-scripts"`; the document area held no textarea. The handler's
+  observation after `shell/init` listed metadata with `reads: []`; after it
+  requested the file the observation listed one read with the file version.
+- The fixture reported dirty, the tab enabled Save, and Ctrl+S wrote
+  `second file\n[fixture save 1]` to the workspace.
+- An external write showed the external-change notice; the fixture then reported
+  a local edit and a save surfaced the conflict notice while the disk kept
+  `second file\n[fixture save 1]\nexternal edit` with no fixture marker added.
+- Closing the dirty tab prompted, Discard removed the tab, and no iframe
+  remained. Disabling the plugin then opened `third.txt` in the shell text
+  surface with no handler frame.
+- A `workspace:read`-only manifest opened the editor with no Save action and an
+  explicit `Read-only editor` notice. A restored read-only workspace (permission
+  query denied read-write) opened the editor with no Save action and an explicit
+  `Read-only workspace` notice.
 
 ---
 

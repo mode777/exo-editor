@@ -46,12 +46,12 @@
 
 - [x] 6.1 Run the full local gate (`npm ci`, `lint`, `format:check`, `typecheck`, `test`, `build`, bundle budget, dist CSP, dist elements) and confirm every command passes
 - [x] 6.2 Measure the bundle delta, verify `npm run budget` passes and record the measured number with any deliberate limit change
-- [ ] 6.3 Against `https://mode777.github.io/exo-editor/`, open a `.txt` file with a plugin editor registered and confirm one handler frame mounts and no content is requested until the handler asks; record the observation
-- [ ] 6.4 Against the deployed shell, edit through the plugin, confirm the tab dot, close prompt, save round trip and exact saved bytes, and record the observed content
-- [ ] 6.5 Against the deployed shell, change the open file on disk and confirm the handler is notified, the tab shows the external-change notice and a save surfaces `conflict` without overwriting; record the steps and result
-- [ ] 6.6 Against the deployed shell, close the tab and confirm the frame is gone and no further messages are accepted; disable the plugin and confirm the file falls back to the shell text renderer
-- [ ] 6.7 Against the deployed shell, confirm a read-only viewer workspace opens plugin editors without Save, and a plugin without `workspace:write` behaves the same; record both
-- [ ] 6.8 Update `ROADMAP.md` layer 5 status and exit criteria with the deployed evidence, and confirm `openspec validate --all` passes
+- [x] 6.3 Against `https://mode777.github.io/exo-editor/`, open a `.txt` file with a plugin editor registered and confirm one handler frame mounts and no content is requested until the handler asks; record the observation
+- [x] 6.4 Against the deployed shell, edit through the plugin, confirm the tab dot, close prompt, save round trip and exact saved bytes, and record the observed content
+- [x] 6.5 Against the deployed shell, change the open file on disk and confirm the handler is notified, the tab shows the external-change notice and a save surfaces `conflict` without overwriting; record the steps and result
+- [x] 6.6 Against the deployed shell, close the tab and confirm the frame is gone and no further messages are accepted; disable the plugin and confirm the file falls back to the shell text renderer
+- [x] 6.7 Against the deployed shell, confirm a read-only viewer workspace opens plugin editors without Save, and a plugin without `workspace:write` behaves the same; record both
+- [x] 6.8 Update `ROADMAP.md` layer 5 status and exit criteria with the deployed evidence, and confirm `openspec validate --all` passes
 
 ## Workflow follow-up
 
