@@ -41,6 +41,7 @@
   }
 
   function onInit(payload) {
+    console.log('EXO_EDITOR init', payload && payload.file && payload.file.path)
     if (state.phase !== 'starting') return
     state.phase = 'active'
     state.file = payload.file
@@ -52,6 +53,11 @@
   }
 
   function onContent(payload) {
+    console.log(
+      'EXO_EDITOR content',
+      payload && payload.path,
+      typeof payload.text === 'string' ? payload.text.length : 'binary',
+    )
     state.reads.push({
       path: payload.path,
       version: payload.version,
@@ -68,6 +74,7 @@
     if (state.dirty) return
     state.dirty = true
     render()
+    console.log('EXO_EDITOR dirty')
     post('plugin/dirty', { dirty: true })
   }
 
@@ -115,6 +122,7 @@
     if (event.origin !== host && event.origin !== 'null') return
     const data = event.data
     if (!data || data.exo !== 1) return
+    console.log('EXO_EDITOR message', data.type)
     switch (data.type) {
       case 'shell/init':
         onInit(data.payload || {})
