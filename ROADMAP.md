@@ -5,7 +5,7 @@ next. The parallel Stratofold provider track (P1) is archived as
 `2026-11-15-add-stratofold-provider` and does not gate the numbered layers. Its
 0.12.0 follow-on, P2 `adopt-stratofold-0-12`, is implemented, verified against
 the deployed shell and archived. P3 `add-remote-recents` is implemented and
-awaiting its deployed checks. Each layer is one OpenSpec change. A layer is done
+verified against the deployed shell; archive pending. Each layer is one OpenSpec change. A layer is done
 when its change is archived and its exit criteria are demonstrated against the
 deployed shell - never from a local dev server or local build.
 
@@ -59,7 +59,7 @@ composition.
 | --- | --- | --- | --- | --- |
 | P1 | `add-stratofold-provider` | Stratofold vdir as a workspace: connect/restore, browse, read/write/save, viewer/public read-only | 0, 2, 3 | archived 2026-11-15; verified on the deployed shell with Chromium and Firefox |
 | P2 | `adopt-stratofold-0-12` | Client 0.12.0: connection-string connect and zero-byte remote files | P1 | archived 2026-11-15; verified on the deployed shell |
-| P3 | `add-remote-recents` | Automatic connection persistence and a capped recent-workspaces list with reopen/remove | P1, P2 | implemented; local gate passed, deployed verification pending |
+| P3 | `add-remote-recents` | Automatic connection persistence and a capped recent-workspaces list with reopen/remove | P1, P2 | implemented; verified 2026-11-15 on the deployed shell; archive pending |
 
 P1 is not part of the numbered v1 critical path. It started after layer 3 and
 lands alongside layers 4-10 without gating one. It integrated through
@@ -152,11 +152,13 @@ migrated into the list.
 - Met: the local `verify` gate passes (lint, format, typecheck, 541 tests,
   build, CSP and custom elements); the measured bundle is 146,708 gzip bytes
   against the 148,000 js limit and 12,946 against the 14,000 css limit.
-- Pending: against the deployed shell, two workspaces appear newest-first, each
-  reopens from the list, removal deletes one token, disconnect keeps an entry,
-  reload restores the active entry, and a revoked token surfaces the reconnect
+- Met (2026-11-15): against the deployed shell with a deterministic HTTPS
+  Stratofold protocol server, two workspaces appeared newest-first, each
+  reopened from the list, removal deleted one token, disconnect kept an entry,
+  reload restored the active entry, and a revoked token surfaced the reconnect
   state without mounting or deleting it.
-- Pending: no token appears in the DOM, a request URL or `localStorage`.
+- Met: no token appeared in the DOM, a request URL or `localStorage`; the list
+  and snapshot carried metadata only.
 
 ---
 

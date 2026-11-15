@@ -32,8 +32,8 @@
 
 - [x] 5.1 Run the full local gate (`npm run lint`, `npm run format:check`, `npm run typecheck`, `npm test`, `npm run build`, bundle budget, dist CSP and dist elements) and confirm every command passes
 - [x] 5.2 Measure the bundle; confirm the existing limits pass or raise `apps/shell/budget.json` with the measured number and recorded headroom
-- [ ] 5.3 Against `https://mode777.github.io/exo-editor/`, connect two different Stratofold workspaces, confirm both appear newest-first, reopen each from the list, remove one and confirm its token and entry are gone, and confirm disconnect keeps the entry
-- [ ] 5.4 Against the deployed shell, reload with an active recent entry and confirm it restores; revoke a stored token and confirm the reconnect state names it without mounting or deleting it; confirm no token appears in the DOM, network URLs or `localStorage`
+- [x] 5.3 Against `https://mode777.github.io/exo-editor/`, connect two different Stratofold workspaces, confirm both appear newest-first, reopen each from the list, remove one and confirm its token and entry are gone, and confirm disconnect keeps the entry
+- [x] 5.4 Against the deployed shell, reload with an active recent entry and confirm it restores; revoke a stored token and confirm the reconnect state names it without mounting or deleting it; confirm no token appears in the DOM, network URLs or `localStorage`
 
 ## Workflow follow-up
 

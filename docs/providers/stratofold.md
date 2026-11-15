@@ -266,11 +266,18 @@ plus the `filesystem-api`, `client-library`, `vdir-access-tokens` and
     field, using the string's directory and token.
   - Under the P2 default, a session-only connection was not restored after
     reload. P3 replaces that default with automatic persistence.
-- **Recent workspaces (implemented; deployed verification recorded below when
-  complete).** The store keeps keyed records newest first and caps them at ten,
-  a successful connection is stored without an opt-in, disconnect keeps the
-  entry, removal deletes its token, and the connect dialog lists, opens and
-  removes entries without rendering a token.
+- **Deployed verification - recent workspaces (passed 2026-11-15).** Against
+  `https://mode777.github.io/exo-editor/` in chrome-headless-shell 131, with a
+  deterministic HTTPS Stratofold protocol server serving two editor vdirs (the
+  production instance had no test token available):
+  - Connecting both vdirs produced a newest-first list of two entries; each
+    reopened from the list and mounted.
+  - Disconnect released the workspace but kept both entries. Removing one
+    deleted its record and token, leaving the other entry.
+  - Reload restored the active entry. Revoking its token produced the reconnect
+    banner naming the workspace, mounted nothing and kept the entry listed.
+  - The tokens appeared in no DOM text, request URL or `localStorage`; the list
+    and snapshot rendered metadata only. 33 API requests and zero page errors.
   - New File created `empty-check.txt` at size 0 and it opened empty; saving
     `remote content\n` wrote exactly those bytes and rotated the version, and
     saving empty content truncated the file with another version rotation.
