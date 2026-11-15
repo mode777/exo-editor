@@ -104,6 +104,17 @@
       requestFile('read-2')
       return
     }
+    if (fixtureMode === 'events') {
+      // The events fixture stays clean on open and only simulates a local edit
+      // after an external change, so save and return-to-clean are observable.
+      if (state.external) markDirty()
+      return
+    }
+    if (state.dirty) return
+    markDirty()
+  }
+
+  function markDirty() {
     if (state.dirty) return
     state.dirty = true
     render()
@@ -179,6 +190,10 @@
           state.buffer = `${state.buffer || ''}\n[fixture local edit]`
           state.dirty = true
           post('plugin/dirty', { dirty: true })
+          if (fixtureMode === 'events') {
+            // Re-read so the following save uses the new base version.
+            requestFile(`read-external-${state.reads.length + 1}`)
+          }
         }
         render()
         break

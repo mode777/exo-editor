@@ -61,7 +61,9 @@ The `events` mode subscribes to `theme/changed`, `workspace/file-changed`,
 `workspace/closed` and `config/changed` after `shell/init`. `#observation`
 records `init` (theme and workspace name), `subscriptions` (the `shell/subscribed`
 replies with their sequence numbers) and `events` (the `shell/event` payloads).
-The other modes do not subscribe, so they receive no topic events.
+It stays clean on open; an external change re-reads the file, applies a local edit
+and reports dirty so a following save is observable. The other modes do not
+subscribe, so they receive no topic events.
 
 ## Manual checks against the deployed shell
 
@@ -83,9 +85,11 @@ The other modes do not subscribe, so they receive no topic events.
    `subscriptions` with `seq: 0` for all four topics and `init.theme` matches the
    current theme. Toggling the theme appends one `theme/changed` event; a `.txt`
    opened with the default editor records none.
-9. Save the open document twice quickly: the frame gets `shell/save-result`
-   before one coalesced `workspace/file-changed`, and an external write is
-   recorded as another `workspace/file-changed` with the new version.
+9. Write the open file externally while the events editor is mounted: the frame
+   records the targeted `shell/file-changed`, re-reads the file, and appends one
+   `workspace/file-changed` with the new version. Save after that and confirm one
+   more `workspace/file-changed` after `shell/save-result`; switching away without
+   saving should not prompt.
 10. Switch or close the workspace: the events frame records `workspace/closed`
     with `switch` or `close` before `shell/dispose`, and `#observation` stops
     changing afterwards.
