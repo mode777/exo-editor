@@ -1,8 +1,7 @@
 # Exo Editor - Roadmap
 
-Status: layers 0-5 are complete and archived. Layer 6 (`plugin-events`) is
-implemented and verified against the deployed shell; its change is awaiting
-archive, after which layer 7 (`plugin-settings`) starts. The parallel Stratofold provider track (P1) is archived as
+Status: layers 0-6 are complete and archived. Layer 7 (`plugin-settings`) is
+next. The parallel Stratofold provider track (P1) is archived as
 `2026-11-15-add-stratofold-provider` and does not gate the numbered layers. Its
 0.12.0 follow-on, P2 `adopt-stratofold-0-12`, is implemented and verified against
 the deployed shell; archive pending. Each layer is one OpenSpec change. A layer
@@ -383,8 +382,8 @@ artifacts.
 
 ## Layer 6 - `plugin-events`
 
-**Status:** complete - implemented and verified against the deployed shell on
-2026-11-15; archive pending.
+**Status:** complete - change archived on 2026-11-15 after deployed verification;
+`openspec validate --all` passes.
 
 **Goal:** plugins learn about shell state changes without polling or coupling.
 
