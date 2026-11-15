@@ -1,9 +1,9 @@
 # Exo Editor - Roadmap
 
 Status: layers 0-4 are complete and archived. Layer 5 (`plugin-file-editors`) is
-next. The parallel Stratofold provider track (P1) is implemented by the change
-`add-stratofold-provider` and does not gate the numbered layers. Each layer is one
-OpenSpec change. A layer is done when its change is archived and its exit criteria
+next. The parallel Stratofold provider track (P1) is archived as
+`2026-11-15-add-stratofold-provider` and does not gate the numbered layers. Each
+layer is one OpenSpec change. A layer is done when its change is archived and its exit criteria
 are demonstrated against the deployed shell - never from a local dev server or
 local build.
 
@@ -55,7 +55,7 @@ composition.
 
 | # | Change | Outcome | Depends on | Status |
 | --- | --- | --- | --- | --- |
-| P1 | `add-stratofold-provider` | Stratofold vdir as a workspace: connect/restore, browse, read/write/save, viewer/public read-only | 0, 2, 3 | implemented; verified on the deployed shell with Chromium and Firefox |
+| P1 | `add-stratofold-provider` | Stratofold vdir as a workspace: connect/restore, browse, read/write/save, viewer/public read-only | 0, 2, 3 | archived 2026-11-15; verified on the deployed shell with Chromium and Firefox |
 
 P1 is not part of the numbered v1 critical path. It started after layer 3 and
 lands alongside layers 4-10 without gating one. It integrated through

@@ -138,9 +138,7 @@ capability as unsupported rather than weaken the contract.
 
 ### Requirement: Persisted workspace restore
 
-A persistent provider SHALL store its workspace identity in IndexedDB, SHALL
-query permission on restore, and SHALL keep the restored workspace read-only
-until the user grants write permission in a user gesture.
+A persistent provider that relies on browser-granted permissions SHALL store its workspace identity in IndexedDB, SHALL query permission on restore, and SHALL keep the restored workspace read-only until the user grants write permission in a user gesture. A remote provider SHALL restore only a connection the user explicitly asked to remember.
 
 #### Scenario: Silent restore with permission
 
@@ -177,14 +175,12 @@ plugin.
 
 ### Requirement: Unsupported browsers are explicit
 
-When no provider can open a folder-backed workspace, the shell SHALL present an
-explicit unsupported state and SHALL NOT degrade into a mock or partially
-functional explorer.
+When no provider can open a folder-backed workspace, the shell SHALL present an explicit unsupported state for folder workspaces, SHALL offer the remote-connect path when a remote provider is available, and SHALL NOT degrade into a mock or partially functional explorer.
 
 #### Scenario: Firefox opens the shell
 
 - **WHEN** a browser without the File System Access API loads the shell
-- **THEN** the open-workspace action explains the limitation and the explorer shows no fabricated files
+- **THEN** the open-folder action explains the limitation, the remote-connect action is offered, and the explorer shows no fabricated files
 
 ### Requirement: Caller-scoped session access
 
@@ -252,3 +248,24 @@ The session SHALL expose a permission-request operation that delegates to the pr
 
 - **WHEN** the provider has no permission-request operation
 - **THEN** the session rejects with `unsupported` instead of pretending the grant succeeded
+
+### Requirement: Provider selection and workspace identity
+
+The shell SHALL support more than one provider kind at runtime, SHALL open
+exactly one workspace at a time, and SHALL identify the active workspace by its
+provider kind plus its workspace identity.
+
+#### Scenario: Local and remote are alternatives
+
+- **WHEN** a local folder workspace is open and the user connects a remote workspace
+- **THEN** the folder session is disposed and the remote workspace replaces it, with no tabs or plugin state carried across
+
+#### Scenario: Restore uses the provider kind that stored the workspace
+
+- **WHEN** the shell restarts with a stored workspace record
+- **THEN** it restores that workspace with the matching provider kind, and a provider that cannot restore reports no workspace rather than mounting another provider's record
+
+#### Scenario: Folder support does not gate remote workspaces
+
+- **WHEN** the browser cannot open a local folder but a remote connection is available and valid
+- **THEN** the remote workspace opens normally and only the folder-backed path is reported as unsupported
