@@ -4,8 +4,8 @@ Status: layers 0-6 are complete and archived. Layer 7 (`plugin-settings`) is
 next. The parallel Stratofold provider track (P1) is archived as
 `2026-11-15-add-stratofold-provider` and does not gate the numbered layers. Its
 0.12.0 follow-on, P2 `adopt-stratofold-0-12`, is implemented, verified against
-the deployed shell and archived. P3 `add-remote-recents` is implemented and
-verified against the deployed shell; archive pending. Each layer is one OpenSpec change. A layer is done
+the deployed shell and archived. P3 `add-remote-recents` is implemented,
+verified against the deployed shell and archived. Each layer is one OpenSpec change. A layer is done
 when its change is archived and its exit criteria are demonstrated against the
 deployed shell - never from a local dev server or local build.
 
@@ -59,7 +59,7 @@ composition.
 | --- | --- | --- | --- | --- |
 | P1 | `add-stratofold-provider` | Stratofold vdir as a workspace: connect/restore, browse, read/write/save, viewer/public read-only | 0, 2, 3 | archived 2026-11-15; verified on the deployed shell with Chromium and Firefox |
 | P2 | `adopt-stratofold-0-12` | Client 0.12.0: connection-string connect and zero-byte remote files | P1 | archived 2026-11-15; verified on the deployed shell |
-| P3 | `add-remote-recents` | Automatic connection persistence and a capped recent-workspaces list with reopen/remove | P1, P2 | implemented; verified 2026-11-15 on the deployed shell; archive pending |
+| P3 | `add-remote-recents` | Automatic connection persistence and a capped recent-workspaces list with reopen/remove | P1, P2 | archived 2026-11-15; verified on the deployed shell |
 
 P1 is not part of the numbered v1 critical path. It started after layer 3 and
 lands alongside layers 4-10 without gating one. It integrated through
