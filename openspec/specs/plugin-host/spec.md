@@ -214,10 +214,7 @@ workspace can mutate current state.
 
 ### Requirement: No file access in the registration layer
 
-The plugin host SHALL NOT request workspace content, create a plugin-facing
-workspace facade or send file metadata in this layer, and a registration frame
-that sends a handler-phase message SHALL be treated as a protocol violation with
-no workspace read.
+The plugin host SHALL NOT request workspace content, create a plugin-facing workspace facade or send file metadata to a registration frame, and a registration frame that sends a handler-phase message SHALL be treated as a protocol violation with no workspace read. A handler frame SHALL be the only plugin path to file metadata or content.
 
 #### Scenario: Handler message in registration mode
 
@@ -231,5 +228,10 @@ no workspace read.
 
 #### Scenario: No plugin facade is built
 
-- **WHEN** a plugin is loaded in this layer
+- **WHEN** a plugin is loaded in the registration phase
 - **THEN** the host never calls the session's plugin facade and no `FileSystemHandle`, `File` or `Blob` reaches the frame
+
+#### Scenario: Handler sessions are the only content path
+
+- **WHEN** an active plugin opens a document
+- **THEN** its metadata and content reach the plugin only through that document's handler session, never through the registration frame

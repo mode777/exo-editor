@@ -1,9 +1,7 @@
 # Exo Editor - Roadmap
 
-Status: layers 0-4 are complete and archived. Layer 5 (`plugin-file-editors`) is
-implemented and verified against the deployed shell; its change is awaiting
-archive, after which layer 6 (`plugin-events`) starts. The parallel Stratofold
-provider track (P1) is archived as
+Status: layers 0-5 are complete and archived. Layer 6 (`plugin-events`) is next.
+The parallel Stratofold provider track (P1) is archived as
 `2026-11-15-add-stratofold-provider` and does not gate the numbered layers. Its
 0.12.0 follow-on, P2 `adopt-stratofold-0-12`, is implemented and verified against
 the deployed shell; archive pending. Each layer is one OpenSpec change. A layer
@@ -326,8 +324,8 @@ settings.
 
 ## Layer 5 - `plugin-file-editors`
 
-**Status:** implemented; deployed verification passed on 2026-11-15 with Chrome
-for Testing 131.0.6778.264. Archive pending.
+**Status:** complete - change archived on 2026-11-15 after deployed verification
+with Chrome for Testing 131.0.6778.264; `openspec validate --all` passes.
 
 **Goal:** a third-party editor can open, edit and save a workspace file without
 the shell understanding the format.
