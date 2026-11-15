@@ -2,11 +2,14 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import {
   usePluginConfig,
   usePluginHost,
+  usePluginSettings,
   useWorkspaceRuntime,
   useWorkspaceSnapshot,
 } from '../workspace/context'
 import type { PluginHostRecord, PluginLogEntry } from '../plugins/host'
 import type { WorkspacePath } from '../workspace/contract'
+import type { ManifestConfiguration, ManifestSetting, SettingValue } from '../plugins/manifest'
+import type { PluginSettingsView } from '../plugins/settings'
 import { ClosePromptDialog } from '../components/ClosePromptDialog'
 import {
   emptyExoConfig,
@@ -155,11 +158,175 @@ export function RuntimeRow({
   )
 }
 
+function settingControlId(identity: string, key: string): string {
+  const encode = (value: string) => value.replace(/[^a-zA-Z0-9_-]/g, '-')
+  return `exo-plugin-setting-${encode(identity)}-${encode(key)}`
+}
+
+function invalidSettingMessage(setting: ManifestSetting): string {
+  if (setting.type === 'number') return 'Enter a finite number.'
+  if (setting.enum) return 'Choose one of the listed values.'
+  return 'Use at most 4096 characters.'
+}
+
+function SettingInput({
+  identity,
+  name,
+  setting,
+  value,
+}: {
+  identity: string
+  name: string
+  setting: ManifestSetting
+  value: SettingValue
+}) {
+  const runtime = useWorkspaceRuntime()
+  const controlId = settingControlId(identity, name)
+  const initialDraft = typeof value === 'string' || typeof value === 'number' ? String(value) : ''
+  const [draft, setDraft] = useState(initialDraft)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (typeof value === 'string' || typeof value === 'number') setDraft(String(value))
+  }, [value])
+
+  const commit = (next: SettingValue) => {
+    const result = runtime.pluginSettings.set(identity, name, next)
+    if (!result.ok) {
+      setError(invalidSettingMessage(setting))
+      return
+    }
+    setError(null)
+    if (typeof next === 'string' || typeof next === 'number') setDraft(String(next))
+  }
+
+  const commitDraft = () => {
+    if (setting.type === 'number') {
+      const trimmed = draft.trim()
+      const parsed = Number(trimmed)
+      if (trimmed.length === 0 || !Number.isFinite(parsed)) {
+        setError('Enter a finite number.')
+        return
+      }
+      commit(parsed)
+      return
+    }
+    if (setting.type === 'string') commit(draft)
+  }
+
+  let control
+  if (setting.type === 'boolean') {
+    control = (
+      <input
+        id={controlId}
+        type="checkbox"
+        checked={value === true}
+        onChange={(event) => commit(event.target.checked)}
+      />
+    )
+  } else if (setting.enum) {
+    const selected = setting.enum.findIndex((option) => option === value)
+    control = (
+      <select
+        id={controlId}
+        value={selected >= 0 ? String(selected) : '0'}
+        onChange={(event) => {
+          const option = setting.enum?.[Number(event.target.value)]
+          if (option !== undefined) commit(option)
+        }}
+      >
+        {setting.enum.map((option, index) => (
+          <option key={`${String(option)}:${index}`} value={index}>
+            {String(option)}
+          </option>
+        ))}
+      </select>
+    )
+  } else {
+    control = (
+      <input
+        id={controlId}
+        type={setting.type === 'number' ? 'number' : 'text'}
+        step={setting.type === 'number' ? 'any' : undefined}
+        maxLength={setting.type === 'string' ? 4096 : undefined}
+        value={draft}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? `${controlId}-error` : undefined}
+        onChange={(event) => {
+          setDraft(event.target.value)
+          setError(null)
+        }}
+        onBlur={commitDraft}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault()
+            commitDraft()
+          }
+        }}
+      />
+    )
+  }
+
+  return (
+    <div className="exo-plugin-setting">
+      <label htmlFor={controlId}>{name}</label>
+      {setting.description && <p className="exo-settings-hint">{setting.description}</p>}
+      {control}
+      {error && (
+        <p id={`${controlId}-error`} className="exo-plugin-setting-error" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
+  )
+}
+
+function PluginSettingFields({
+  identity,
+  configuration,
+  view,
+  canReceiveEvents,
+}: {
+  identity: string
+  configuration: ManifestConfiguration
+  view: PluginSettingsView | undefined
+  canReceiveEvents: boolean
+}) {
+  const entries = Object.entries(configuration.properties)
+  if (entries.length === 0) return null
+  return (
+    <fieldset className="exo-plugin-settings">
+      <legend>Settings</legend>
+      {view?.issues.map((issue) => (
+        <p key={issue.key} className="exo-settings-warning" role="alert">
+          The stored value for <code>{issue.key}</code> is invalid; using its default.
+        </p>
+      ))}
+      {entries.map(([name, setting]) => (
+        <SettingInput
+          key={name}
+          identity={identity}
+          name={name}
+          setting={setting}
+          value={view?.values[name] ?? setting.default}
+        />
+      ))}
+      {!canReceiveEvents && (
+        <p className="exo-settings-hint">
+          This plugin does not subscribe to configuration changes. New values apply the next time an
+          editor opens.
+        </p>
+      )}
+    </fieldset>
+  )
+}
+
 export function PluginSettings() {
   const runtime = useWorkspaceRuntime()
   const workspace = useWorkspaceSnapshot()
   const config = usePluginConfig()
   const host = usePluginHost()
+  const settings = usePluginSettings()
   const store = runtime.pluginConfig
 
   const writable = workspace.phase === 'ready' && workspace.writable
@@ -336,6 +503,14 @@ export function PluginSettings() {
               </p>
             )}
 
+            {settings.storage !== 'ok' && (
+              <p className="exo-settings-warning" role="status">
+                {settings.storage === 'read-failed'
+                  ? 'Stored plugin settings could not be read. Defaults are in use.'
+                  : 'Plugin settings could not be saved. Changes apply for this session only.'}
+              </p>
+            )}
+
             {config.status === 'idle' || config.status === 'loading' ? (
               <p className="exo-settings-hint" role="status">
                 Loading exo.json…
@@ -352,39 +527,54 @@ export function PluginSettings() {
 
             {config.status === 'valid' && (
               <ul className="exo-plugin-list" aria-label="Declared plugins">
-                {config.entries.map((entry) => (
-                  <li className="exo-plugin-entry" key={`${entry.index}:${entry.manifest}`}>
-                    <code className="exo-plugin-manifest">{entry.manifest}</code>
-                    <div className="exo-plugin-actions">
-                      <label className="exo-settings-option">
-                        <input
-                          type="checkbox"
-                          checked={entry.enabled}
+                {config.entries.map((entry) => {
+                  const record = host.records.find(
+                    (candidate) => candidate.manifestUrl === entry.manifest,
+                  )
+                  return (
+                    <li className="exo-plugin-entry" key={`${entry.index}:${entry.manifest}`}>
+                      <code className="exo-plugin-manifest">{entry.manifest}</code>
+                      <div className="exo-plugin-actions">
+                        <label className="exo-settings-option">
+                          <input
+                            type="checkbox"
+                            checked={entry.enabled}
+                            disabled={!canMutate}
+                            onChange={() => void toggle(entry)}
+                          />
+                          Enabled
+                        </label>
+                        <button
+                          type="button"
+                          className="exo-plugin-remove"
                           disabled={!canMutate}
-                          onChange={() => void toggle(entry)}
+                          onClick={() => void remove(entry)}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                      <RuntimeRow
+                        record={record}
+                        onReview={(identity) => runtime.pluginHost.requestConsent(identity)}
+                        onRevoke={(identity) =>
+                          guardPluginAction(identity, () =>
+                            runtime.pluginHost.revokeConsent(identity),
+                          )
+                        }
+                      />
+                      {record?.identity && record.manifest?.configuration && (
+                        <PluginSettingFields
+                          identity={record.identity}
+                          configuration={record.manifest.configuration}
+                          view={settings.plugins[record.identity]}
+                          canReceiveEvents={record.manifest.permissions.includes(
+                            'events:subscribe',
+                          )}
                         />
-                        Enabled
-                      </label>
-                      <button
-                        type="button"
-                        className="exo-plugin-remove"
-                        disabled={!canMutate}
-                        onClick={() => void remove(entry)}
-                      >
-                        Remove
-                      </button>
-                    </div>
-                    <RuntimeRow
-                      record={host.records.find((record) => record.manifestUrl === entry.manifest)}
-                      onReview={(identity) => runtime.pluginHost.requestConsent(identity)}
-                      onRevoke={(identity) =>
-                        guardPluginAction(identity, () =>
-                          runtime.pluginHost.revokeConsent(identity),
-                        )
-                      }
-                    />
-                  </li>
-                ))}
+                      )}
+                    </li>
+                  )
+                })}
               </ul>
             )}
 

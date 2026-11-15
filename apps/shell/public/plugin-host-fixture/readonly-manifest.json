@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "com.example.exo.fixture",
   "name": "Exo Host Fixture",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "A stub plugin used to verify the Exo plugin host and file editors.",
   "publisher": {
     "name": "Exo"
@@ -15,6 +15,26 @@
   },
   "permissions": ["workspace:read"],
   "contributes": {
+    "configuration": {
+      "properties": {
+        "fixture.greeting": {
+          "type": "string",
+          "default": "hello from fixture",
+          "description": "Text the fixture reports in its observation."
+        },
+        "fixture.repeat": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether the fixture should keep its repeated-read mode enabled."
+        },
+        "fixture.size": {
+          "type": "number",
+          "enum": [1, 2, 3],
+          "default": 1,
+          "description": "A numeric enum used by the settings checks."
+        }
+      }
+    },
     "fileEditors": [
       {
         "glob": "**/*.events.txt",

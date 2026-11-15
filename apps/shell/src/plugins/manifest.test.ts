@@ -6,10 +6,15 @@ import {
   MANIFEST_HTTPS_URL_PATTERN,
   MANIFEST_ID_PATTERN,
   MANIFEST_MAX_EDITORS,
+  MANIFEST_MAX_ENUM_VALUES,
   MANIFEST_MAX_GLOB_LENGTH,
   MANIFEST_MAX_LABEL,
   MANIFEST_MAX_NAME,
   MANIFEST_MAX_PAGE,
+  MANIFEST_MAX_SETTING_DESCRIPTION,
+  MANIFEST_MAX_SETTING_KEY,
+  MANIFEST_MAX_SETTING_STRING,
+  MANIFEST_MAX_SETTINGS,
   MANIFEST_PRIORITY_MAX,
   MANIFEST_PRIORITY_MIN,
   MANIFEST_RELATIVE_ASSET_PATTERN,
@@ -17,6 +22,8 @@ import {
   MANIFEST_REQUIRED_FIELDS,
   MANIFEST_SCHEMA_VERSION,
   MANIFEST_SEMVER_PATTERN,
+  MANIFEST_SETTING_KEY_PATTERN,
+  MANIFEST_SETTING_TYPES,
   PLUGIN_PERMISSIONS,
   loadManifest,
   resolvePluginEntry,
@@ -59,6 +66,10 @@ function manifest(overrides: Record<string, unknown> = {}): Record<string, unkno
 
 function validate(overrides: Record<string, unknown> = {}, url = MANIFEST_URL) {
   return validateManifest(manifest(overrides), url, SHELL_VERSION)
+}
+
+function withConfiguration(properties: Record<string, unknown>) {
+  return { contributes: { configuration: { properties } } }
 }
 
 function errorOf(result: ManifestLoadResult): ManifestIssue {
@@ -247,12 +258,189 @@ describe('manifest validation', () => {
     expect(validate({ permissions: [] }).ok).toBe(true)
   })
 
-  it('rejects the reserved configuration contribution', () => {
-    const result = validate({ contributes: { configuration: {} } })
-    expect(errorOf(result)).toMatchObject({
-      code: 'invalid-manifest',
-      field: '/contributes/configuration',
+  it('accepts a configuration contribution with all supported setting types', () => {
+    const result = validate(
+      withConfiguration({
+        'editor.fontSize': { type: 'number', default: 13, description: 'Font size in pixels.' },
+        'editor.theme': {
+          type: 'string',
+          enum: ['auto', 'dark', 'light'],
+          default: 'auto',
+          scope: 'workspace',
+        },
+        'editor.minimap': { type: 'boolean', default: false },
+      }),
+    )
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.manifest.configuration).toEqual({
+      properties: {
+        'editor.fontSize': {
+          type: 'number',
+          default: 13,
+          description: 'Font size in pixels.',
+          scope: 'workspace',
+        },
+        'editor.theme': {
+          type: 'string',
+          enum: ['auto', 'dark', 'light'],
+          default: 'auto',
+          scope: 'workspace',
+        },
+        'editor.minimap': { type: 'boolean', default: false, scope: 'workspace' },
+      },
     })
+  })
+
+  it('accepts an empty property map and an absent configuration', () => {
+    expect(validate(withConfiguration({})).ok).toBe(true)
+    expect(validate({ contributes: { fileEditors: [] } }).ok).toBe(true)
+  })
+
+  it('rejects invalid configuration shapes and setting keys', () => {
+    expect(
+      errorOf(validate({ contributes: { configuration: { properties: {}, extra: true } } })).field,
+    ).toBe('/contributes/configuration/extra')
+    expect(errorOf(validate({ contributes: { configuration: {} } })).field).toBe(
+      '/contributes/configuration/properties',
+    )
+    expect(errorOf(validate({ contributes: { configuration: { properties: [] } } })).field).toBe(
+      '/contributes/configuration/properties',
+    )
+    expect(
+      errorOf(
+        validate(
+          withConfiguration({
+            'editor.fontSize': { type: 'number', default: 13, extra: true },
+          }),
+        ),
+      ).field,
+    ).toBe('/contributes/configuration/properties/editor.fontSize/extra')
+    expect(
+      errorOf(validate(withConfiguration({ Bad: { type: 'string', default: 'x' } }))).field,
+    ).toBe('/contributes/configuration/properties/Bad')
+    expect(
+      errorOf(validate(withConfiguration({ 'a..b': { type: 'string', default: 'x' } }))).field,
+    ).toBe('/contributes/configuration/properties/a..b')
+    expect(
+      errorOf(
+        validate(
+          withConfiguration({
+            ['a'.repeat(MANIFEST_MAX_SETTING_KEY + 1)]: { type: 'string', default: 'x' },
+          }),
+        ),
+      ).field,
+    ).toBe(`/contributes/configuration/properties/${'a'.repeat(MANIFEST_MAX_SETTING_KEY + 1)}`)
+  })
+
+  it('rejects more settings than the limit', () => {
+    const properties = Object.fromEntries(
+      Array.from({ length: MANIFEST_MAX_SETTINGS + 1 }, (_, index) => [
+        `setting${index}`,
+        { type: 'string', default: 'x' },
+      ]),
+    )
+    expect(errorOf(validate(withConfiguration(properties))).field).toBe(
+      '/contributes/configuration/properties',
+    )
+  })
+
+  it('rejects missing, mismatched and invalid setting values', () => {
+    expect(errorOf(validate(withConfiguration({ setting: { default: 'x' } }))).field).toBe(
+      '/contributes/configuration/properties/setting/type',
+    )
+    expect(
+      errorOf(validate(withConfiguration({ setting: { type: 'object', default: {} } }))).field,
+    ).toBe('/contributes/configuration/properties/setting/type')
+    expect(errorOf(validate(withConfiguration({ setting: { type: 'string' } }))).field).toBe(
+      '/contributes/configuration/properties/setting/default',
+    )
+    expect(
+      errorOf(validate(withConfiguration({ setting: { type: 'number', default: '1' } }))).field,
+    ).toBe('/contributes/configuration/properties/setting/default')
+    expect(
+      errorOf(
+        validate(
+          withConfiguration({ setting: { type: 'number', default: Number.POSITIVE_INFINITY } }),
+        ),
+      ).field,
+    ).toBe('/contributes/configuration/properties/setting/default')
+    expect(
+      errorOf(
+        validate(
+          withConfiguration({
+            setting: { type: 'string', default: 'x'.repeat(MANIFEST_MAX_SETTING_STRING + 1) },
+          }),
+        ),
+      ).field,
+    ).toBe('/contributes/configuration/properties/setting/default')
+  })
+
+  it('rejects invalid enums, scopes and descriptions', () => {
+    expect(
+      errorOf(
+        validate(
+          withConfiguration({ setting: { type: 'boolean', default: true, enum: [true, false] } }),
+        ),
+      ).field,
+    ).toBe('/contributes/configuration/properties/setting/enum')
+    expect(
+      errorOf(validate(withConfiguration({ setting: { type: 'string', default: 'a', enum: [] } })))
+        .field,
+    ).toBe('/contributes/configuration/properties/setting/enum')
+    expect(
+      errorOf(
+        validate(
+          withConfiguration({
+            setting: { type: 'string', default: 'a', enum: Array(51).fill('a') },
+          }),
+        ),
+      ).field,
+    ).toBe('/contributes/configuration/properties/setting/enum')
+    expect(
+      errorOf(
+        validate(
+          withConfiguration({ setting: { type: 'string', default: 'a', enum: ['a', 'a'] } }),
+        ),
+      ).field,
+    ).toBe('/contributes/configuration/properties/setting/enum')
+    expect(
+      errorOf(
+        validate(withConfiguration({ setting: { type: 'string', default: 'a', enum: ['a', 1] } })),
+      ).field,
+    ).toBe('/contributes/configuration/properties/setting/enum')
+    expect(
+      errorOf(
+        validate(
+          withConfiguration({ setting: { type: 'string', default: 'b', enum: ['a', 'c'] } }),
+        ),
+      ).field,
+    ).toBe('/contributes/configuration/properties/setting/enum')
+    expect(
+      errorOf(
+        validate(
+          withConfiguration({ setting: { type: 'string', default: 'a', scope: 'machine' } }),
+        ),
+      ).field,
+    ).toBe('/contributes/configuration/properties/setting/scope')
+    expect(
+      errorOf(
+        validate(withConfiguration({ setting: { type: 'string', default: 'a', description: '' } })),
+      ).field,
+    ).toBe('/contributes/configuration/properties/setting/description')
+    expect(
+      errorOf(
+        validate(
+          withConfiguration({
+            setting: {
+              type: 'string',
+              default: 'a',
+              description: 'x'.repeat(MANIFEST_MAX_SETTING_DESCRIPTION + 1),
+            },
+          }),
+        ),
+      ).field,
+    ).toBe('/contributes/configuration/properties/setting/description')
   })
 
   it('rejects duplicate globs and invalid editor entries', () => {
@@ -562,8 +750,34 @@ interface SchemaDefs {
     additionalProperties: boolean
     properties: {
       fileEditors: { maxItems: number; items: { $ref: string } }
-      configuration: boolean
+      configuration: { $ref: string }
     }
+  }
+  configuration: {
+    additionalProperties: boolean
+    required: string[]
+    properties: {
+      properties: {
+        maxProperties: number
+        propertyNames: { $ref: string }
+        additionalProperties: { $ref: string }
+      }
+    }
+  }
+  settingKey: { maxLength: number; pattern: string }
+  setting: {
+    additionalProperties: boolean
+    required: string[]
+    properties: {
+      type: { enum: string[] }
+      default: { $ref: string }
+      enum: { minItems: number; maxItems: number; uniqueItems: boolean; items: { $ref: string } }
+      description: { minLength: number; maxLength: number }
+      scope: { const: string }
+    }
+  }
+  settingValue: {
+    oneOf: Array<{ type: string; maxLength?: number }>
   }
   fileEditor: {
     required: string[]
@@ -603,8 +817,36 @@ describe('manifest schema parity', () => {
     expect(defs.exoManifest.properties.permissions.uniqueItems).toBe(true)
     expect(defs.exoManifest.properties.permissions.items.enum).toEqual([...PLUGIN_PERMISSIONS])
     expect(defs.contributes.additionalProperties).toBe(false)
-    expect(defs.contributes.properties.configuration).toBe(false)
+    expect(defs.contributes.properties.configuration.$ref).toBe('#/$defs/configuration')
     expect(defs.contributes.properties.fileEditors.maxItems).toBe(MANIFEST_MAX_EDITORS)
+    expect(defs.configuration.additionalProperties).toBe(false)
+    expect(defs.configuration.required).toEqual(['properties'])
+    expect(defs.configuration.properties.properties.maxProperties).toBe(MANIFEST_MAX_SETTINGS)
+    expect(defs.configuration.properties.properties.propertyNames.$ref).toBe('#/$defs/settingKey')
+    expect(defs.configuration.properties.properties.additionalProperties.$ref).toBe(
+      '#/$defs/setting',
+    )
+    expect(defs.settingKey.maxLength).toBe(MANIFEST_MAX_SETTING_KEY)
+    expect(defs.settingKey.pattern).toBe(MANIFEST_SETTING_KEY_PATTERN)
+    expect(defs.setting.additionalProperties).toBe(false)
+    expect(defs.setting.required).toEqual(['type', 'default'])
+    expect(defs.setting.properties.type.enum).toEqual([...MANIFEST_SETTING_TYPES])
+    expect(defs.setting.properties.default.$ref).toBe('#/$defs/settingValue')
+    expect(defs.setting.properties.enum.minItems).toBe(1)
+    expect(defs.setting.properties.enum.maxItems).toBe(MANIFEST_MAX_ENUM_VALUES)
+    expect(defs.setting.properties.enum.uniqueItems).toBe(true)
+    expect(defs.setting.properties.enum.items.$ref).toBe('#/$defs/settingValue')
+    expect(defs.setting.properties.description.minLength).toBe(1)
+    expect(defs.setting.properties.description.maxLength).toBe(MANIFEST_MAX_SETTING_DESCRIPTION)
+    expect(defs.setting.properties.scope.const).toBe('workspace')
+    expect(defs.settingValue.oneOf.map((entry) => entry.type)).toEqual([
+      'boolean',
+      'string',
+      'number',
+    ])
+    expect(defs.settingValue.oneOf.find((entry) => entry.type === 'string')?.maxLength).toBe(
+      MANIFEST_MAX_SETTING_STRING,
+    )
     expect(defs.fileEditor.required).toEqual(['glob', 'entry', 'label'])
     expect(defs.fileEditor.properties.label.maxLength).toBe(MANIFEST_MAX_LABEL)
     expect(defs.fileEditor.properties.glob.$ref).toBe('#/$defs/glob')

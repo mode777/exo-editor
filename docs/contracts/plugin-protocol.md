@@ -118,6 +118,11 @@ interface ShellInit {
   theme: 'dark' | 'light' | 'high-contrast'
   permissions: PluginPermission[]
   locale: string
+  /**
+   * Resolved workspace-scoped settings for this plugin. Always present; `{}`
+   * when the plugin declares no configuration. Never contains file content.
+   */
+  settings: Record<string, boolean | string | number>
   /** Present only when mode is 'editor'. Never contains file content. */
   file?: FileMetadata
   /** Present only when mode is 'editor'. */
@@ -137,7 +142,11 @@ interface ShellInit {
 
 Handler init is not acknowledged and there is no heartbeat in v1; the first
 request is the earliest liveness signal, and an unresponsive handler surfaces as
-a failed save rather than a disconnect.
+a failed save rather than a disconnect. Settings are resolved by the shell before
+the frame mounts: a stored value that matches the declaration wins, otherwise the
+declared default is sent. `config/changed` is the only live update channel and
+requires `events:subscribe`; a new handler always receives the current values in
+`shell/init`.
 
 ### 3.3 Phase rules
 
@@ -215,6 +224,9 @@ RegistrationRejection  = 'not-declared' | 'permission-denied' | 'invalid-glob' |
 - If the plugin declared no `contributes.fileEditors`, it may complete
   immediately; the shell records it as a configuration-only or event-only plugin
   for later layers.
+- Both registration and editor `shell/init` messages carry the plugin's resolved
+  workspace-scoped `settings` map. It is `{}` when the plugin declares no
+  configuration and contains primitives only.
 - A manifest that declares `fileEditors` but registers none is allowed (the user
   may have disabled all of them) and produces no editor.
 

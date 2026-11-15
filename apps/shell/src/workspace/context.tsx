@@ -3,6 +3,7 @@ import type { WorkspacePath } from './contract'
 import type { DocumentState } from './documents'
 import type { PluginConfigSnapshot } from '../plugins/store'
 import type { PluginHostSnapshot } from '../plugins/host'
+import type { PluginSettingsSnapshot } from '../plugins/settings'
 import type { WorkspaceRuntime, WorkspaceSnapshot } from './runtime'
 
 const WorkspaceRuntimeContext = createContext<WorkspaceRuntime | null>(null)
@@ -60,5 +61,11 @@ export function usePluginConfig(): PluginConfigSnapshot {
 export function usePluginHost(): PluginHostSnapshot {
   const runtime = useWorkspaceRuntime()
   const store = runtime.pluginHost
+  return useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
+}
+
+export function usePluginSettings(): PluginSettingsSnapshot {
+  const runtime = useWorkspaceRuntime()
+  const store = runtime.pluginSettings
   return useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
 }

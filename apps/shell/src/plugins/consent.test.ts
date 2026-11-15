@@ -153,6 +153,27 @@ describe('consent fingerprint', () => {
     expect(cosmetic).toBe(base)
   })
 
+  it('ignores contributed configuration', async () => {
+    const base = await computeFingerprint(manifest(), digest)
+    const configured = await computeFingerprint(
+      manifest({
+        configuration: {
+          properties: {
+            'editor.fontSize': { type: 'number', default: 13, scope: 'workspace' },
+            'editor.theme': {
+              type: 'string',
+              default: 'auto',
+              enum: ['auto', 'dark'],
+              scope: 'workspace',
+            },
+          },
+        },
+      }),
+      digest,
+    )
+    expect(configured).toBe(base)
+  })
+
   it('changes on every capability field', async () => {
     const base = await computeFingerprint(manifest(), digest)
     const variants = [

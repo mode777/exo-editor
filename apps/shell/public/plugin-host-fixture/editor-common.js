@@ -14,6 +14,7 @@
     phase: 'starting',
     file: null,
     init: null,
+    settings: {},
     subscriptions: [],
     events: [],
     reads: [],
@@ -51,10 +52,12 @@
     state.permissions = payload.permissions
     state.capabilities = payload.capabilities
     state.limits = payload.limits
+    state.settings = payload.settings || {}
     state.init = {
       theme: payload.theme,
       workspace: payload.workspace,
       permissions: payload.permissions,
+      settings: payload.settings,
     }
     if (fixtureMode === 'events') subscribeAll()
     render()
@@ -81,6 +84,14 @@
 
   function onEvent(payload) {
     state.events.push(payload)
+    if (
+      payload &&
+      payload.topic === 'config/changed' &&
+      payload.payload &&
+      payload.payload.values
+    ) {
+      state.settings = payload.payload.values
+    }
     console.log('EXO_EDITOR event', payload && payload.topic, payload && payload.seq)
     render()
   }

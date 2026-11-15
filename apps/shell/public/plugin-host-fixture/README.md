@@ -25,7 +25,8 @@ This serves `http://localhost:5174/` with `Access-Control-Allow-Origin: *` and
 The deployed same-origin copy lives at
 `https://mode777.github.io/exo-editor/plugin-host-fixture/exo-manifest.json`.
 `readonly-manifest.json` declares the same editors with only `workspace:read`, so
-a save must not be offered.
+a save must not be offered. It also declares the same contributed settings
+without `events:subscribe`, which makes the no-live-update hint observable.
 
 ## Controller observations
 
@@ -59,11 +60,27 @@ document title so a hidden frame remains inspectable in devtools.
 
 The `events` mode subscribes to `theme/changed`, `workspace/file-changed`,
 `workspace/closed` and `config/changed` after `shell/init`. `#observation`
-records `init` (theme and workspace name), `subscriptions` (the `shell/subscribed`
-replies with their sequence numbers) and `events` (the `shell/event` payloads).
-It stays clean on open; an external change re-reads the file, applies a local edit
-and reports dirty so a following save is observable. The other modes do not
-subscribe, so they receive no topic events.
+records `init` (theme, workspace name and the resolved `settings`),
+`subscriptions` (the `shell/subscribed` replies with their sequence numbers) and
+`events` (the `shell/event` payloads). A `config/changed` event also replaces the
+recorded `settings` with the event's full value map. It stays clean on open; an
+external change re-reads the file, applies a local edit and reports dirty so a
+following save is observable. The other modes do not subscribe, so they receive
+no topic events.
+
+## Contributed settings
+
+The fixture manifest declares three workspace-scoped settings:
+
+| Setting            | Type    | Default              | Purpose                         |
+| ------------------ | ------- | -------------------- | ------------------------------- |
+| `fixture.greeting` | string  | `hello from fixture` | Free text reported in the frame |
+| `fixture.repeat`   | boolean | `false`              | Boolean toggle for the checks   |
+| `fixture.size`     | number  | `1` (enum `1,2,3`)   | Numeric enum for the select     |
+
+They are shell-owned: changing one writes IndexedDB, never `exo.json` or a
+workspace file. `shell/init` carries the resolved values; `config/changed`
+carries the full new map to subscribed frames of this plugin only.
 
 ## Manual checks against the deployed shell
 
@@ -95,6 +112,27 @@ subscribe, so they receive no topic events.
     changing afterwards.
 11. Enable `readonly-manifest.json` instead: its events editor opens and every
     subscription is answered with `permission-denied` in `errors`.
+12. Open Settings > Plugins with the deployed manifest: the fixture entry shows
+    the string, boolean and enum controls with the manifest defaults and
+    descriptions.
+13. Open `events.events.txt`, change `fixture.greeting` in Settings > Plugins,
+    and confirm the frame records exactly one `config/changed` with
+    `{ pluginId, values }` for the full map. Open a new `.txt` document and
+    confirm its `shell/init.settings` already carries the new value.
+14. Reload the page with the same workspace: Settings and `shell/init` show the
+    changed value. Switch to a second workspace: the defaults are shown and the
+    first workspace's value is not delivered. Switch back: the value returns.
+15. Seed an invalid stored value: in DevTools > Application > IndexedDB >
+    `exo-plugin-settings` > `settings`, edit the record for the workspace and set
+    `values[<identity>]['fixture.size'] = 9`, then reload. The settings surface
+    warns for `fixture.size`, the fixture receives the default `1`, and the
+    workspace stays usable.
+16. Confirm a setting change does not modify `exo.json`, create a workspace file
+    or open a document tab.
+17. Enable `readonly-manifest.json`: the settings block still renders and stays
+    editable, and the "does not subscribe to configuration changes" hint appears
+    because that manifest lacks `events:subscribe`. The events editor's
+    subscriptions remain `permission-denied`.
 
 Changes are only observed for open documents plus the shell's own writes; both
 providers are non-watchable, so an unopened file is not reported.

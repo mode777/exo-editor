@@ -10,6 +10,7 @@ import {
 } from './registration'
 import { EditorRegistry, type EditorCandidate } from './registry'
 import type { PluginConfigStore } from './store'
+import type { PluginSettingsStore } from './settings'
 import { SHELL_VERSION } from '../version'
 
 export type PluginHostPhase =
@@ -65,6 +66,8 @@ export interface PluginHostSnapshot {
 export interface PluginHostAttachOptions {
   session: WorkspaceSession
   config: PluginConfigStore
+  /** Shell-owned workspace settings; declarations are registered on load. */
+  settings?: PluginSettingsStore
 }
 
 export interface HandlerLifecycle {
@@ -126,12 +129,30 @@ function errorMessage(issue: {
   return issue.code
 }
 
+function cloneManifest(manifest: PluginManifest): PluginManifest {
+  return {
+    ...manifest,
+    fileEditors: manifest.fileEditors.map((editor) => ({ ...editor })),
+    configuration: manifest.configuration
+      ? {
+          properties: Object.fromEntries(
+            Object.entries(manifest.configuration.properties).map(([key, setting]) => [
+              key,
+              {
+                ...setting,
+                ...(setting.enum ? { enum: [...setting.enum] } : {}),
+              },
+            ]),
+          ),
+        }
+      : undefined,
+  }
+}
+
 function cloneRecord(record: PluginHostRecord): PluginHostRecord {
   return {
     ...record,
-    manifest: record.manifest
-      ? { ...record.manifest, fileEditors: [...record.manifest.fileEditors] }
-      : undefined,
+    manifest: record.manifest ? cloneManifest(record.manifest) : undefined,
     registrations: [...record.registrations],
     error: record.error ? { ...record.error } : undefined,
   }
@@ -173,6 +194,7 @@ export class PluginHost {
   private snapshot: PluginHostSnapshot = INITIAL_SNAPSHOT
   private session: WorkspaceSession | null = null
   private config: PluginConfigStore | null = null
+  private settings: PluginSettingsStore | null = null
   private unsubscribe: (() => void) | null = null
   private generation = 0
   private work: Promise<void> = Promise.resolve()
@@ -221,6 +243,7 @@ export class PluginHost {
     this.generation += 1
     this.session = options.session
     this.config = options.config
+    this.settings = options.settings ?? null
     this.unsubscribe = options.config.subscribe(this.handleConfig)
     this.publish({ phase: 'ready' })
     this.enqueue(() => this.reconcile())
@@ -233,6 +256,7 @@ export class PluginHost {
     this.stopAll()
     this.session = null
     this.config = null
+    this.settings = null
     this.records.clear()
     this.logEntries = []
     this.consentRequest = null
@@ -582,6 +606,7 @@ export class PluginHost {
         continue
       }
       claimed.set(identity, record)
+      this.settings?.declare(identity, manifest.configuration)
 
       let fingerprint: string
       try {
@@ -653,6 +678,7 @@ export class PluginHost {
         workspaceName: this.session?.descriptor.name ?? '',
         theme: this.theme(),
         locale: this.locale,
+        settings: this.settings?.values(identity) ?? {},
         createSessionId: this.createSessionId,
         setTimeoutImpl: this.setTimeoutImpl,
         clearTimeoutImpl: this.clearTimeoutImpl,
@@ -750,6 +776,7 @@ export class PluginHost {
 
   private stopRecord(record: PluginHostRecord): void {
     this.stopRegistration(record)
+    if (record.identity) this.settings?.declare(record.identity, undefined)
     const controller = this.controllers.get(record)
     if (controller) {
       controller.abort()

@@ -10,6 +10,7 @@ import type { FrameHandle, FrameTransport, PluginMessage } from './frame'
 import { hasEventsSubscribe, hasWorkspaceRead, hasWorkspaceWrite } from './manifest'
 import type { EventBus, EventSubscriber } from './events'
 import type { EditorCandidate } from './registry'
+import type { SettingValues } from './settings'
 import {
   DISPOSE_TIMEOUT_MS,
   MAX_IN_FLIGHT_REQUESTS,
@@ -86,6 +87,8 @@ export interface HandlerSessionOptions {
   canWrite: boolean
   maxFileSize: number
   maxRequestBytes: number
+  /** Resolved workspace-scoped settings for this plugin; defaults when absent. */
+  settings?: SettingValues
   createSessionId?: () => string
   setTimeoutImpl?: typeof setTimeout
   clearTimeoutImpl?: typeof clearTimeout
@@ -241,6 +244,7 @@ export class HandlerSession {
     this.violations = new ViolationBudget(() => this.fail('protocol-violation', 'editor'))
     this.subscription = options.events.createSubscriber({
       label: options.candidate.pluginId,
+      identity: options.candidate.identity,
       deliver: (event) => {
         postEnvelope(this.frame, this.boundary.targetOrigin, 'shell/event', event)
       },
@@ -582,6 +586,7 @@ export class HandlerSession {
       theme: this.options.theme,
       permissions: candidate.permissions,
       locale: this.options.locale,
+      settings: this.options.settings ?? {},
       file: { ...this.file },
       capabilities: {
         read: hasWorkspaceRead(candidate.permissions),

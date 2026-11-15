@@ -17,11 +17,12 @@ import {
   type ShellEvent,
 } from './events'
 
-function collector(label = 'test') {
+function collector(label = 'test', identity?: string) {
   const events: ShellEvent[] = []
   const errors: Array<{ topic: string; code: string }> = []
   const sink: EventSink = {
     label,
+    identity,
     deliver: (event) => events.push(event),
     onError: (topic, code) => errors.push({ topic, code }),
   }
@@ -96,6 +97,38 @@ describe('subscriptions', () => {
     bus.publish('theme/changed', { theme: 'high-contrast' })
     flush()
     expect(events.map((event) => event.seq)).toEqual([3])
+  })
+
+  it('delivers a targeted event only to the named identity and still sequences it', () => {
+    const { bus, flush } = harness()
+    const first = collector('first', 'https://a.example.com::com.example.a')
+    const second = collector('second', 'https://b.example.com::com.example.b')
+    const firstSubscriber = bus.createSubscriber(first.sink)
+    const secondSubscriber = bus.createSubscriber(second.sink)
+    firstSubscriber.subscribe('config/changed')
+    secondSubscriber.subscribe('config/changed')
+
+    bus.publish(
+      'config/changed',
+      { pluginId: 'com.example.a', values: { greeting: 'hi' } },
+      { target: 'https://a.example.com::com.example.a' },
+    )
+    flush()
+
+    expect(first.events).toHaveLength(1)
+    expect(second.events).toHaveLength(0)
+    expect(bus.sequence('config/changed')).toBe(1)
+
+    bus.publish(
+      'config/changed',
+      { pluginId: 'com.example.missing', values: {} },
+      { target: 'https://missing.example.com::com.example.missing' },
+    )
+    flush()
+
+    expect(first.events).toHaveLength(1)
+    expect(second.events).toHaveLength(0)
+    expect(bus.sequence('config/changed')).toBe(2)
   })
 
   it('unsubscribes one topic without affecting another subscriber', () => {

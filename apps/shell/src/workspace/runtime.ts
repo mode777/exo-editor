@@ -19,6 +19,7 @@ import { isReservedPath, normalizePath } from './paths'
 import { PluginConfigStore } from '../plugins/store'
 import { PluginHost } from '../plugins/host'
 import { HandlerPool } from '../plugins/handlers'
+import { PluginSettingsStore, type PluginSettingsStorage } from '../plugins/settings'
 import { FileChangeCoalescer, SelfWriteEcho, type ThemeName } from '../plugins/events'
 import { FolderWorkspaceProvider } from './providers/folder/provider'
 import { IndexedDbHandleStore, type HandleStore } from './providers/folder/handle-store'
@@ -88,6 +89,8 @@ export interface WorkspaceRuntimeOptions {
   handleStore?: HandleStore
   activeStore?: ActiveWorkspaceStore
   connectionStore?: ConnectionStore
+  /** Storage seam for workspace-scoped plugin settings. */
+  pluginSettingsStorage?: PluginSettingsStorage
   /** Test seam for the Stratofold connect flow. */
   connectSeams?: ConnectSeams
   eventTarget?: EventTarget
@@ -112,6 +115,7 @@ export class WorkspaceRuntime {
   readonly pluginConfig: PluginConfigStore
   readonly pluginHost: PluginHost
   readonly handlers: HandlerPool
+  readonly pluginSettings: PluginSettingsStore
 
   private readonly fileChanges: FileChangeCoalescer
   private readonly echoes: SelfWriteEcho
@@ -152,6 +156,10 @@ export class WorkspaceRuntime {
       new HandlerPool({
         onHandlerClosed: (path) => this.documents.handleHandlerClosed(path),
       })
+    this.pluginSettings = new PluginSettingsStore({
+      storage: options.pluginSettingsStorage,
+      onChange: (identity, values) => this.handlers.updateSettings(identity, values),
+    })
     this.pluginHost.setHandlerLifecycle(this.handlers)
     this.fileChanges = new FileChangeCoalescer({
       publish: (payload) => {
@@ -227,6 +235,7 @@ export class WorkspaceRuntime {
       return
     }
     await this.activate(handle, provider)
+    if (this.session?.descriptor.id !== handle.descriptor.id) return
     this.remote = null
     this.remoteError = null
     this.patch({ remote: undefined, remoteError: undefined })
@@ -255,6 +264,7 @@ export class WorkspaceRuntime {
     }
 
     await this.activate(connected.handle, connected.provider)
+    if (this.session?.descriptor.id !== connected.handle.descriptor.id) return false
     this.remote = summaryOf(connected.connection, connected.stored)
     this.patch({ remote: this.remote })
     await this.persistActive('stratofold', connected.handle.descriptor.id)
@@ -410,6 +420,7 @@ export class WorkspaceRuntime {
     this.reservedDocumentHandler = null
     this.pluginHost.dispose()
     this.handlers.disposeTransport()
+    this.pluginSettings.detach()
     this.pluginConfig.detach()
     await this.deactivate('close')
     this.documents.clear()
@@ -495,6 +506,7 @@ export class WorkspaceRuntime {
       })
       if (!restored) return false
       await this.activate(restored.handle, restored.provider)
+      if (this.session?.descriptor.id !== restored.handle.descriptor.id) return false
       this.remote = summaryOf(restored.connection, restored.stored)
       this.patch({ remote: this.remote, remoteError: undefined })
       return true
@@ -530,6 +542,7 @@ export class WorkspaceRuntime {
     await this.deactivate()
 
     this.generationCount += 1
+    const generation = this.generationCount
     const session = this.createSession(handle)
     this.session = session
     this.provider = provider
@@ -551,12 +564,19 @@ export class WorkspaceRuntime {
       selection: null,
       explorerRevision: this.current.explorerRevision + 1,
     })
+    await this.pluginSettings.attach(handle.descriptor.id)
+    if (generation !== this.generationCount || this.session !== session) return
     void this.pluginConfig.attach(session)
-    this.pluginHost.attach({ session, config: this.pluginConfig })
+    this.pluginHost.attach({
+      session,
+      config: this.pluginConfig,
+      settings: this.pluginSettings,
+    })
     this.handlers.attach({
       session,
       host: this.pluginHost,
       workspaceName: handle.descriptor.name,
+      settings: this.pluginSettings,
     })
   }
 
@@ -583,6 +603,7 @@ export class WorkspaceRuntime {
     this.fileChanges.reset()
     this.echoes.reset()
     this.pluginHost.detach()
+    this.pluginSettings.detach()
     this.pluginConfig.detach()
     this.externalRegistration?.dispose()
     this.externalRegistration = null

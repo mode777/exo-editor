@@ -28,6 +28,9 @@ shell/event         { topic: string, seq: number, payload: unknown }
 - `plugin/subscribe` is idempotent. Re-subscribing returns the current `seq`.
 - `PluginPermission` `events:subscribe` is required; without it the shell replies
   `permission-denied`.
+- `config/changed` is targeted: only the subscribed handler frames of the plugin
+  named in the payload receive it. A frame of another plugin receives neither the
+  event nor the values, even if it subscribes to the topic.
 - Unknown topics are rejected with `unsupported-topic`; the shell does not
   wildcard-match topics.
 - Subscriptions belong to a frame. They are not persisted and do not survive
@@ -66,15 +69,17 @@ interface ShellEvent<T> {
 | `theme/changed` | `{ theme: 'dark' \| 'light' \| 'high-contrast' }` | The user changes the shell theme |
 | `workspace/file-changed` | `{ path, kind: 'created' \| 'changed' \| 'deleted' \| 'renamed', version? }` | A file in the workspace changes, including saves from other tabs |
 | `workspace/closed` | `{ reason: 'switch' \| 'close' }` | The workspace is being released; the last event a frame receives |
-| `config/changed` | `{ pluginId, values: Record<string, unknown> }` | A plugin's contributed settings change |
+| `config/changed` | `{ pluginId, values: Record<string, unknown> }` | A plugin's contributed settings change; only that plugin's subscribed handler frames receive it |
 
 Topic names are `<namespace>/<event>`, lowercase, `[a-z0-9-]` segments, maximum
 64 characters. New topics are added by changing this contract and the OpenSpec
 spec; a plugin must ignore topics it does not know.
 
-`config/changed` is part of the v1 catalog but has no producer until the plugin
-settings layer ships. Subscribing to it before then is valid and silent; current
-values are still delivered in `shell/init` once settings exist.
+`config/changed` carries the full new value map for the named plugin, not a
+delta. It requires `events:subscribe`, and the shell delivers it only to that
+plugin's live handler frames. A plugin without the permission, or with no open
+handler, gets the current values from `shell/init` the next time a frame mounts.
+Settings are shell-owned; no other plugin can read them through this topic.
 
 ### `workspace/closed` ordering
 
@@ -112,8 +117,8 @@ provider capability, not an event-bus feature.
 ## 5. Initial state
 
 The shell does not replay a history. `shell/init` carries the current `theme`,
-`workspace.name` and the plugin's settings values, so a frame can render without
-subscribing. `config/changed` is then incremental.
+`workspace.name` and the plugin's current settings values, so a frame can render
+without subscribing. `config/changed` is then incremental.
 
 ## 6. Limits and failure
 

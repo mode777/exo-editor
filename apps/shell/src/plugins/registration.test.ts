@@ -121,7 +121,7 @@ describe('registration session', () => {
   })
 
   it('sends init only after a valid ready, with no file block', () => {
-    const context = start()
+    const context = start({ settings: { 'editor.greeting': 'hi' } })
     ready(context)
     const init = postedType(context.frame, 'shell/init')
     expect(init?.payload).toMatchObject({
@@ -134,11 +134,18 @@ describe('registration session', () => {
       theme: 'dark',
       permissions: ['workspace:read'],
       locale: 'en',
+      settings: { 'editor.greeting': 'hi' },
     })
     expect(init?.payload).not.toHaveProperty('file')
     expect(init?.payload).not.toHaveProperty('capabilities')
     expect(init?.payload).not.toHaveProperty('limits')
     expect(context.frame.posted[0].targetOrigin).toBe('https://plugins.example.com')
+  })
+
+  it('sends an empty settings map when no settings are declared', () => {
+    const context = start()
+    ready(context)
+    expect(postedType(context.frame, 'shell/init')?.payload).toMatchObject({ settings: {} })
   })
 
   it('uses the stricter sandbox and wildcard target for an opaque same-origin frame', () => {

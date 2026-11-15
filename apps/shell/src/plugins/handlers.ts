@@ -17,6 +17,7 @@ import {
 } from './handler'
 import { hasWorkspaceRead } from './manifest'
 import { EventBus, type EventTopic, type ThemeName } from './events'
+import type { PluginSettingsStore, SettingValues } from './settings'
 import { MAX_HANDLER_FRAMES } from './protocol'
 import type { EditorCandidate } from './registry'
 
@@ -38,6 +39,7 @@ export interface HandlerPoolAttachOptions {
   session: WorkspaceSession
   host: HandlerPoolHost
   workspaceName: string
+  settings?: PluginSettingsStore
 }
 
 export interface HandlerOpenInput {
@@ -202,6 +204,7 @@ export class HandlerPool {
       canWrite: capabilities.writable,
       maxFileSize: capabilities.maxFileSize ?? DEFAULT_MAX_REQUEST_BYTES,
       maxRequestBytes: this.maxRequestBytes,
+      settings: attached.settings?.values(input.candidate.identity) ?? {},
       createSessionId: this.createSessionId,
       setTimeoutImpl: this.setTimeoutImpl,
       clearTimeoutImpl: this.clearTimeoutImpl,
@@ -287,6 +290,22 @@ export class HandlerPool {
 
   publishWorkspaceClosed(reason: 'switch' | 'close'): void {
     this.events.publishImmediate('workspace/closed', { reason })
+  }
+
+  /**
+   * Deliver a plugin's new settings only to its own subscribed handler frames.
+   * No live frame means there is nothing to notify; the next init carries the
+   * values.
+   */
+  updateSettings(identity: string, values: SettingValues): void {
+    let pluginId: string | undefined
+    for (const record of this.records.values()) {
+      if (record.identity !== identity) continue
+      pluginId = record.candidate.pluginId
+      break
+    }
+    if (!pluginId) return
+    this.events.publish('config/changed', { pluginId, values }, { target: identity })
   }
 
   save(path: WorkspacePath): Promise<HandlerSaveRequest> {

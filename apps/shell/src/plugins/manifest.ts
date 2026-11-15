@@ -19,8 +19,14 @@ export const MANIFEST_MAX_LABEL = 40
 export const MANIFEST_MAX_PAGE = 512
 export const MANIFEST_PRIORITY_MIN = -100
 export const MANIFEST_PRIORITY_MAX = 100
+export const MANIFEST_MAX_SETTINGS = 50
+export const MANIFEST_MAX_ENUM_VALUES = 50
+export const MANIFEST_MAX_SETTING_KEY = 64
+export const MANIFEST_MAX_SETTING_DESCRIPTION = 500
+export const MANIFEST_MAX_SETTING_STRING = 4096
 
 export const MANIFEST_ID_PATTERN = '^[a-z0-9][a-z0-9.-]{2,63}$'
+export const MANIFEST_SETTING_KEY_PATTERN = '^[a-z][a-zA-Z0-9]*(?:[.-][a-zA-Z0-9]+)*$'
 export const MANIFEST_SEMVER_PATTERN =
   '^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-((?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\\+([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?$'
 export const MANIFEST_RELATIVE_PAGE_PATTERN =
@@ -30,8 +36,11 @@ export const MANIFEST_RELATIVE_ASSET_PATTERN =
 export const MANIFEST_HTTPS_URL_PATTERN = '^https://[^\\s@#]+$'
 
 export const PLUGIN_PERMISSIONS = ['workspace:read', 'workspace:write', 'events:subscribe'] as const
+export const MANIFEST_SETTING_TYPES = ['boolean', 'string', 'number'] as const
 
 export type PluginPermission = (typeof PLUGIN_PERMISSIONS)[number]
+export type ManifestSettingType = (typeof MANIFEST_SETTING_TYPES)[number]
+export type SettingValue = boolean | string | number
 
 /** `workspace:write` implies read, so either permission grants reads. */
 export function hasWorkspaceRead(permissions: PluginPermission[]): boolean {
@@ -91,6 +100,18 @@ export interface ManifestFileEditor {
   priority: number
 }
 
+export interface ManifestSetting {
+  type: ManifestSettingType
+  default: SettingValue
+  enum?: SettingValue[]
+  description?: string
+  scope: 'workspace'
+}
+
+export interface ManifestConfiguration {
+  properties: Record<string, ManifestSetting>
+}
+
 export interface PluginManifest {
   schemaVersion: typeof MANIFEST_SCHEMA_VERSION
   manifestUrl: string
@@ -109,6 +130,7 @@ export interface PluginManifest {
   engines: { exo: string }
   permissions: PluginPermission[]
   fileEditors: ManifestFileEditor[]
+  configuration?: ManifestConfiguration
 }
 
 export type ManifestValidationResult =
@@ -126,6 +148,7 @@ const SEMVER = new RegExp(MANIFEST_SEMVER_PATTERN)
 const RELATIVE_PAGE = new RegExp(MANIFEST_RELATIVE_PAGE_PATTERN)
 const RELATIVE_ASSET = new RegExp(MANIFEST_RELATIVE_ASSET_PATTERN)
 const HTTPS_URL = new RegExp(MANIFEST_HTTPS_URL_PATTERN)
+const SETTING_KEY = new RegExp(MANIFEST_SETTING_KEY_PATTERN)
 const ENCODED_DOT = /%2e/i
 
 function issue(
@@ -381,6 +404,103 @@ function parseFileEditors(
   return editors
 }
 
+/** Validate one setting against its declared type and value limits. */
+function validSettingValue(value: unknown, type: ManifestSettingType): value is SettingValue {
+  if (type === 'boolean') return typeof value === 'boolean'
+  if (type === 'string') {
+    return typeof value === 'string' && value.length <= MANIFEST_MAX_SETTING_STRING
+  }
+  return typeof value === 'number' && Number.isFinite(value)
+}
+
+function parseSetting(value: unknown, base: string): ManifestSetting | ManifestIssue {
+  if (!isPlainObject(value)) return issue('invalid-manifest', { field: base })
+  const unknown = unknownKeys(value, ['type', 'default', 'enum', 'description', 'scope'], base)
+  if (unknown) return unknown
+  if (
+    !hasOwn(value, 'type') ||
+    typeof value.type !== 'string' ||
+    !(MANIFEST_SETTING_TYPES as readonly string[]).includes(value.type)
+  ) {
+    return issue('invalid-manifest', { field: `${base}/type` })
+  }
+  const type = value.type as ManifestSettingType
+  if (!hasOwn(value, 'default') || !validSettingValue(value.default, type)) {
+    return issue('invalid-manifest', { field: `${base}/default` })
+  }
+  const defaultValue = value.default
+
+  let enumValues: SettingValue[] | undefined
+  if (hasOwn(value, 'enum')) {
+    if (
+      type === 'boolean' ||
+      !Array.isArray(value.enum) ||
+      value.enum.length === 0 ||
+      value.enum.length > MANIFEST_MAX_ENUM_VALUES
+    ) {
+      return issue('invalid-manifest', { field: `${base}/enum` })
+    }
+    const seen = new Set<SettingValue>()
+    for (const item of value.enum) {
+      if (!validSettingValue(item, type) || seen.has(item)) {
+        return issue('invalid-manifest', { field: `${base}/enum` })
+      }
+      seen.add(item)
+    }
+    if (!seen.has(defaultValue)) {
+      return issue('invalid-manifest', {
+        field: `${base}/enum`,
+        message: 'The default must be one of the enum values.',
+      })
+    }
+    enumValues = [...seen]
+  }
+
+  if (
+    hasOwn(value, 'description') &&
+    !isStringInRange(value.description, 1, MANIFEST_MAX_SETTING_DESCRIPTION)
+  ) {
+    return issue('invalid-manifest', { field: `${base}/description` })
+  }
+
+  if (hasOwn(value, 'scope') && value.scope !== 'workspace') {
+    return issue('invalid-manifest', { field: `${base}/scope` })
+  }
+
+  return {
+    type,
+    default: defaultValue,
+    ...(enumValues ? { enum: enumValues } : {}),
+    ...(typeof value.description === 'string' ? { description: value.description } : {}),
+    scope: 'workspace',
+  }
+}
+
+function parseConfiguration(value: unknown): ManifestConfiguration | ManifestIssue {
+  const base = '/contributes/configuration'
+  if (!isPlainObject(value)) return issue('invalid-manifest', { field: base })
+  const unknown = unknownKeys(value, ['properties'], base)
+  if (unknown) return unknown
+  if (!hasOwn(value, 'properties') || !isPlainObject(value.properties)) {
+    return issue('invalid-manifest', { field: `${base}/properties` })
+  }
+  const keys = Object.keys(value.properties)
+  if (keys.length > MANIFEST_MAX_SETTINGS) {
+    return issue('invalid-manifest', { field: `${base}/properties` })
+  }
+  const properties: Record<string, ManifestSetting> = {}
+  for (const key of keys) {
+    const field = pointer('contributes', 'configuration', 'properties', key)
+    if (key.length > MANIFEST_MAX_SETTING_KEY || !SETTING_KEY.test(key)) {
+      return issue('invalid-manifest', { field })
+    }
+    const setting = parseSetting(value.properties[key], field)
+    if ('code' in setting) return setting
+    properties[key] = setting
+  }
+  return { properties }
+}
+
 /** Validate an already-parsed manifest against a final response URL. */
 export function validateManifest(
   value: unknown,
@@ -476,13 +596,15 @@ export function validateManifest(
   if (!Array.isArray(permissions)) return { ok: false, error: permissions }
 
   let fileEditors: ManifestFileEditor[] = []
+  let configuration: ManifestConfiguration | undefined
   if (hasOwn(value, 'contributes')) {
     if (!isPlainObject(value.contributes)) return invalid('/contributes')
-    const contributesUnknown = unknownKeys(value.contributes, ['fileEditors'], '/contributes')
+    const contributesUnknown = unknownKeys(
+      value.contributes,
+      ['fileEditors', 'configuration'],
+      '/contributes',
+    )
     if (contributesUnknown) return { ok: false, error: contributesUnknown }
-    if (hasOwn(value.contributes, 'configuration')) {
-      return invalid('/contributes/configuration')
-    }
     if (hasOwn(value.contributes, 'fileEditors')) {
       const parsed = parseFileEditors(
         value.contributes.fileEditors,
@@ -492,6 +614,11 @@ export function validateManifest(
       )
       if (!Array.isArray(parsed)) return { ok: false, error: parsed }
       fileEditors = parsed
+    }
+    if (hasOwn(value.contributes, 'configuration')) {
+      const parsed = parseConfiguration(value.contributes.configuration)
+      if ('code' in parsed) return { ok: false, error: parsed }
+      configuration = parsed
     }
   }
 
@@ -517,6 +644,7 @@ export function validateManifest(
       engines: { exo: value.engines.exo },
       permissions,
       fileEditors,
+      ...(configuration ? { configuration } : {}),
     },
   }
 }

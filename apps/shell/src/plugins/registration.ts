@@ -6,6 +6,7 @@ import {
   type PluginManifest,
 } from './manifest'
 import type { FrameHandle, FrameSandbox, FrameTransport, PluginMessage } from './frame'
+import type { SettingValues } from './settings'
 import {
   ACK_CLOSE_DELAY_MS,
   PROTOCOL_VERSION,
@@ -77,6 +78,8 @@ export interface RegistrationSessionOptions {
   workspaceName: string
   theme: 'dark' | 'light' | 'high-contrast'
   locale: string
+  /** Resolved workspace-scoped settings for this plugin; defaults when absent. */
+  settings?: SettingValues
   createSessionId?: () => string
   setTimeoutImpl?: typeof setTimeout
   clearTimeoutImpl?: typeof clearTimeout
@@ -313,6 +316,7 @@ export class RegistrationSession {
       theme: this.options.theme,
       permissions: this.options.manifest.permissions,
       locale: this.options.locale,
+      settings: this.options.settings ?? {},
     })
     this.registrationTimer = this.setTimeoutImpl(() => {
       this.fail('timeout', 'register')

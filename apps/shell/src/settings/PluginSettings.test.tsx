@@ -16,10 +16,13 @@ import { EXO_CONFIG_PATH } from '../plugins/config'
 import { ConsentStore, type ConsentStorage, type Digest } from '../plugins/consent'
 import { FakeFrameTransport } from '../plugins/frame-test-support'
 import { PluginHost } from '../plugins/host'
+import { MemoryPluginSettingsStorage, type PluginSettingsStorage } from '../plugins/settings'
 
 const decoder = new TextDecoder()
 const FIXED_FINGERPRINT = `v1:${'0'.repeat(64)}`
 const fixedDigest: Digest = async () => new Uint8Array(32).buffer
+const TEST_IDENTITY = 'https://plugins.example.com::com.example.test'
+const WORKSPACE_ID = 'memory:memory-workspace'
 
 class MemoryStorage implements ConsentStorage {
   readonly values = new Map<string, string>()
@@ -34,7 +37,7 @@ class MemoryStorage implements ConsentStorage {
   }
 }
 
-function testManifest(): Record<string, unknown> {
+function testManifest(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     schemaVersion: 1,
     id: 'com.example.test',
@@ -47,18 +50,19 @@ function testManifest(): Record<string, unknown> {
     contributes: {
       fileEditors: [{ glob: '**/*.txt', entry: 'editor.html', label: 'Text', priority: 0 }],
     },
+    ...overrides,
   }
 }
 
-function manifestResponse(url: string): Response {
-  const response = new Response(JSON.stringify(testManifest()), {
+function manifestResponse(url: string, overrides: Record<string, unknown> = {}): Response {
+  const response = new Response(JSON.stringify(testManifest(overrides)), {
     headers: { 'content-type': 'application/json' },
   })
   Object.defineProperty(response, 'url', { value: url })
   return response
 }
 
-function testHost() {
+function testHost(manifestOverrides: Record<string, unknown> = {}) {
   const storage = new MemoryStorage()
   const consentStore = new ConsentStore({ storage })
   for (const origin of ['https://plugins.example.com', 'https://a.example', 'https://b.example']) {
@@ -71,7 +75,9 @@ function testHost() {
       grantedAt: '2026-11-14T00:00:00.000Z',
     })
   }
-  const fetchImpl = vi.fn(async (url: RequestInfo | URL) => manifestResponse(String(url)))
+  const fetchImpl = vi.fn(async (url: RequestInfo | URL) =>
+    manifestResponse(String(url), manifestOverrides),
+  )
   const host = new PluginHost({
     transport: new FakeFrameTransport(),
     fetchImpl: fetchImpl as unknown as typeof fetch,
@@ -140,14 +146,20 @@ class FakePluginPool implements DocumentEditorHost {
 
 async function mount(
   files: Record<string, string | Uint8Array>,
-  options: { writable?: boolean; open?: boolean; editors?: FakePluginPool } = {},
+  options: {
+    writable?: boolean
+    open?: boolean
+    editors?: FakePluginPool
+    manifest?: Record<string, unknown>
+    settingsStorage?: PluginSettingsStorage
+  } = {},
 ) {
   const provider = new MemoryWorkspaceProvider({
     now: () => 1,
     initialFiles: files,
     writable: options.writable ?? true,
   })
-  const host = testHost()
+  const host = testHost(options.manifest)
   const runtime = new WorkspaceRuntime({
     providerFactory: () => provider,
     supportsFolder: () => true,
@@ -156,6 +168,7 @@ async function mount(
     now: () => 1,
     pluginHost: host.host,
     handlerPool: options.editors as unknown as HandlerPool | undefined,
+    pluginSettingsStorage: options.settingsStorage,
   })
   await runtime.start()
   if (options.open !== false) await runtime.openFolder()
@@ -230,6 +243,281 @@ describe('plugin settings surface', () => {
   afterEach(() => {
     document.body.innerHTML = ''
     vi.unstubAllGlobals()
+  })
+
+  it('renders contributed settings and commits string, boolean and enum changes', async () => {
+    const settingsStorage = new MemoryPluginSettingsStorage()
+    const workspace = await mount(
+      {
+        '/exo.json': configJson(['https://plugins.example.com/exo-manifest.json']),
+        '/a.txt': 'one',
+      },
+      {
+        settingsStorage,
+        manifest: {
+          permissions: ['workspace:read', 'events:subscribe'],
+          contributes: {
+            configuration: {
+              properties: {
+                'editor.greeting': {
+                  type: 'string',
+                  default: 'hello',
+                  description: 'Greeting text.',
+                },
+                'editor.repeat': {
+                  type: 'boolean',
+                  default: false,
+                  description: 'Repeat it.',
+                },
+                'editor.size': {
+                  type: 'number',
+                  enum: [1, 2, 3],
+                  default: 1,
+                  description: 'Size.',
+                },
+                'editor.width': {
+                  type: 'number',
+                  default: 80,
+                  description: 'Width.',
+                },
+              },
+            },
+          },
+        },
+      },
+    )
+    try {
+      await openPluginSettings(workspace)
+      await vi.waitFor(() =>
+        expect(workspace.container.querySelector('.exo-plugin-settings')).not.toBeNull(),
+      )
+      const fieldset = workspace.container.querySelector('.exo-plugin-settings') as HTMLElement
+      expect(fieldset.textContent).toContain('Greeting text.')
+      expect(fieldset.textContent).toContain('Repeat it.')
+      expect(fieldset.textContent).toContain('Size.')
+      expect(fieldset.querySelector('input[type="text"]')).not.toBeNull()
+      expect(fieldset.querySelector('input[type="checkbox"]')).not.toBeNull()
+      expect(fieldset.querySelector('select')).not.toBeNull()
+      expect(fieldset.querySelector('input[type="number"]')).not.toBeNull()
+
+      const text = fieldset.querySelector('input[type="text"]') as HTMLInputElement
+      await act(async () => setNativeValue(text, 'hi'))
+      await act(async () => {
+        text.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+      })
+      const checkbox = fieldset.querySelector('input[type="checkbox"]') as HTMLInputElement
+      await act(async () => click(checkbox))
+      const select = fieldset.querySelector('select') as HTMLSelectElement
+      await act(async () => {
+        select.value = '2'
+        select.dispatchEvent(new Event('change', { bubbles: true }))
+      })
+      const width = fieldset.querySelector('input[type="number"]') as HTMLInputElement
+      await act(async () => setNativeValue(width, 'abc'))
+      await act(async () => {
+        width.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+      })
+      expect(fieldset.textContent).toContain('Enter a finite number.')
+      expect(workspace.runtime.pluginSettings.values(TEST_IDENTITY)['editor.width']).toBe(80)
+      await act(async () => setNativeValue(width, '90'))
+      await act(async () => {
+        width.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+      })
+
+      expect(workspace.runtime.pluginSettings.values(TEST_IDENTITY)).toEqual({
+        'editor.greeting': 'hi',
+        'editor.repeat': true,
+        'editor.size': 3,
+        'editor.width': 90,
+      })
+      await vi.waitFor(() =>
+        expect(settingsStorage.records.get(WORKSPACE_ID)).toEqual({
+          [TEST_IDENTITY]: {
+            'editor.greeting': 'hi',
+            'editor.repeat': true,
+            'editor.size': 3,
+            'editor.width': 90,
+          },
+        }),
+      )
+    } finally {
+      await unmount(workspace)
+    }
+  })
+
+  it('rejects an over-long string and still allows settings in a read-only workspace', async () => {
+    const workspace = await mount(
+      {
+        '/exo.json': configJson(['https://plugins.example.com/exo-manifest.json']),
+        '/a.txt': 'one',
+      },
+      {
+        writable: false,
+        settingsStorage: new MemoryPluginSettingsStorage(),
+        manifest: {
+          contributes: {
+            configuration: {
+              properties: {
+                'editor.greeting': { type: 'string', default: 'hello', description: 'Greeting.' },
+              },
+            },
+          },
+        },
+      },
+    )
+    try {
+      await openPluginSettings(workspace)
+      await vi.waitFor(() =>
+        expect(workspace.container.querySelector('.exo-plugin-settings')).not.toBeNull(),
+      )
+      expect(workspace.container.textContent).toContain(
+        'This plugin does not subscribe to configuration changes',
+      )
+      const text = workspace.container.querySelector(
+        '.exo-plugin-settings input[type="text"]',
+      ) as HTMLInputElement
+      expect(text.disabled).toBe(false)
+
+      await act(async () => setNativeValue(text, 'x'.repeat(4097)))
+      await act(async () => {
+        text.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+      })
+      expect(workspace.container.textContent).toContain('Use at most 4096 characters.')
+      expect(workspace.runtime.pluginSettings.values(TEST_IDENTITY)).toEqual({
+        'editor.greeting': 'hello',
+      })
+    } finally {
+      await unmount(workspace)
+    }
+  })
+
+  it('shows invalid stored values and storage read failures', async () => {
+    const invalidStorage = new MemoryPluginSettingsStorage()
+    invalidStorage.records.set(WORKSPACE_ID, {
+      [TEST_IDENTITY]: { 'editor.greeting': 42 },
+    })
+    const workspace = await mount(
+      {
+        '/exo.json': configJson(['https://plugins.example.com/exo-manifest.json']),
+        '/a.txt': 'one',
+      },
+      {
+        settingsStorage: invalidStorage,
+        manifest: {
+          contributes: {
+            configuration: {
+              properties: {
+                'editor.greeting': { type: 'string', default: 'hello' },
+              },
+            },
+          },
+        },
+      },
+    )
+    try {
+      await openPluginSettings(workspace)
+      await vi.waitFor(() =>
+        expect(workspace.container.textContent).toContain(
+          'The stored value for editor.greeting is invalid',
+        ),
+      )
+      expect(workspace.runtime.pluginSettings.values(TEST_IDENTITY)).toEqual({
+        'editor.greeting': 'hello',
+      })
+    } finally {
+      await unmount(workspace)
+    }
+
+    const failedStorage = new MemoryPluginSettingsStorage()
+    failedStorage.failReads = true
+    const failed = await mount(
+      {
+        '/exo.json': configJson(['https://plugins.example.com/exo-manifest.json']),
+        '/a.txt': 'one',
+      },
+      {
+        settingsStorage: failedStorage,
+        manifest: {
+          contributes: {
+            configuration: {
+              properties: {
+                'editor.greeting': { type: 'string', default: 'hello' },
+              },
+            },
+          },
+        },
+      },
+    )
+    try {
+      await openPluginSettings(failed)
+      await vi.waitFor(() =>
+        expect(failed.container.textContent).toContain(
+          'Stored plugin settings could not be read. Defaults are in use.',
+        ),
+      )
+    } finally {
+      await unmount(failed)
+    }
+  })
+
+  it('shows a write warning without losing the session value', async () => {
+    const storage = new MemoryPluginSettingsStorage()
+    storage.failWrites = true
+    const workspace = await mount(
+      {
+        '/exo.json': configJson(['https://plugins.example.com/exo-manifest.json']),
+        '/a.txt': 'one',
+      },
+      {
+        settingsStorage: storage,
+        manifest: {
+          contributes: {
+            configuration: {
+              properties: {
+                'editor.repeat': { type: 'boolean', default: false },
+              },
+            },
+          },
+        },
+      },
+    )
+    try {
+      await openPluginSettings(workspace)
+      await vi.waitFor(() =>
+        expect(workspace.container.querySelector('.exo-plugin-settings')).not.toBeNull(),
+      )
+      const checkbox = workspace.container.querySelector(
+        '.exo-plugin-settings input[type="checkbox"]',
+      ) as HTMLInputElement
+      await act(async () => click(checkbox))
+      expect(workspace.runtime.pluginSettings.values(TEST_IDENTITY)).toEqual({
+        'editor.repeat': true,
+      })
+      await vi.waitFor(() =>
+        expect(workspace.container.textContent).toContain(
+          'Plugin settings could not be saved. Changes apply for this session only.',
+        ),
+      )
+    } finally {
+      await unmount(workspace)
+    }
+  })
+
+  it('renders no settings block when the manifest declares no configuration', async () => {
+    const workspace = await mount(
+      {
+        '/exo.json': configJson(['https://plugins.example.com/exo-manifest.json']),
+        '/a.txt': 'one',
+      },
+      { settingsStorage: new MemoryPluginSettingsStorage() },
+    )
+    try {
+      await openPluginSettings(workspace)
+      await vi.waitFor(() => expect(workspace.container.textContent).toContain('Test Plugin'))
+      expect(workspace.container.querySelector('.exo-plugin-settings')).toBeNull()
+    } finally {
+      await unmount(workspace)
+    }
   })
 
   it('creates exo.json and starts the host after adding an entry', async () => {

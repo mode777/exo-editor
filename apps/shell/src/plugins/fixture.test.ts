@@ -20,6 +20,11 @@ describe('deployed plugin fixture', () => {
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(result.manifest.fileEditors).toHaveLength(6)
+    expect(result.manifest.configuration?.properties).toMatchObject({
+      'fixture.greeting': { type: 'string', default: 'hello from fixture' },
+      'fixture.repeat': { type: 'boolean', default: false },
+      'fixture.size': { type: 'number', enum: [1, 2, 3], default: 1 },
+    })
     for (const editor of result.manifest.fileEditors) {
       const file = resolve(fixtureDir, editor.entry)
       expect(existsSync(file), editor.entry).toBe(true)

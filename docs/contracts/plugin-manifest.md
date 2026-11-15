@@ -176,11 +176,62 @@ settings view fails with `conflict` rather than overwriting an external edit.
 | `runtime.entry` | string | yes | Relative HTML path to the controller document, loaded as a hidden registration iframe. No query, fragment or `..` segment. Must share the manifest's origin. Its directory is the plugin root: every other page the plugin loads must be a sibling or descendant of it. |
 | `permissions` | array | yes | Subset of `workspace:read`, `workspace:write`, `events:subscribe`. No duplicates. `workspace:write` implies `workspace:read`. A `contributes.fileEditors` entry requires `workspace:read` or `workspace:write`; registrations from a plugin without either are rejected with `permission-denied`. |
 | `contributes.fileEditors` | array | no | Maximum 20. Each entry: `glob` (required), `entry` (required, relative HTML URL for the per-document iframe, inside the plugin root), `label` (required, 1-40 chars), `priority` (integer -100..100, default 0). Every editor entry uses the entry-resolution rules in section 4 and requires `workspace:read` or `workspace:write`. |
-| `contributes.configuration` | object | no | Reserved for the plugin settings layer (D11); the v1 validator rejects the field. Layer 7 adds its schema and validation in a new change; until then a manifest that declares it is invalid, not partially accepted. |
+| `contributes.configuration` | object | no | Optional workspace settings declaration. `configuration.properties` is an object of at most 50 named settings, each with `type` (`boolean`, `string` or `number`), a required matching `default`, an optional `enum`, an optional `description`, and an optional `scope` that must be `workspace`. See section 3.1. |
 
 Unknown manifest fields are rejected at every level, like unknown `exo.json`
 fields. A field added by a future schema version requires that version and a new
 validator; it is never ignored in v1.
+
+### 3.1 Contributed configuration
+
+```json
+{
+  "contributes": {
+    "configuration": {
+      "properties": {
+        "editor.fontSize": {
+          "type": "number",
+          "default": 13,
+          "description": "Font size in pixels."
+        },
+        "editor.theme": {
+          "type": "string",
+          "enum": ["auto", "dark", "light"],
+          "default": "auto",
+          "scope": "workspace"
+        }
+      }
+    }
+  }
+}
+```
+
+`configuration` is optional. `properties` is required and holds at most 50
+settings. Each key is 1-64 characters matching
+`^[a-z][a-zA-Z0-9]*(?:[.-][a-zA-Z0-9]+)*$`: a lowercase first character, then
+letters or digits, with single dots or dashes between segments. Unknown fields at
+the configuration or setting level make the manifest invalid.
+
+Each setting has:
+
+| Field | Required | Rules |
+| --- | --- | --- |
+| `type` | yes | `boolean`, `string` or `number`. |
+| `default` | yes | Must match `type`. A string is at most 4096 characters; a number must be finite. |
+| `enum` | no | 1-50 unique values of the same type, containing `default`. Not allowed for `boolean`. |
+| `description` | no | 1-500 characters. |
+| `scope` | no | Must be `workspace`; omission means `workspace`. |
+
+`properties: {}` is valid and declares no settings. A string default or enum value
+longer than 4096 characters and a non-finite number are invalid.
+
+Configuration declares values the user edits in shell-owned state. It is not a
+capability: it does not grant workspace, event or network access and it is
+**excluded from the consent fingerprint**. Values are stored by the shell keyed by
+workspace and plugin identity (D11); they are never written to `exo.json` or the
+workspace. The settings UI and delivery rules are in
+[`plugin-settings`](../../openspec/specs/plugin-settings/spec.md) and
+[`plugin-protocol.md`](./plugin-protocol.md).
 
 ### Glob rules
 
@@ -364,4 +415,4 @@ interface ConsentRecord {
 - Automatic or background plugin updates.
 - Marketplace discovery, ratings or install counts.
 - Multiple manifests per plugin, or a plugin that declares another plugin.
-- Contributions other than file editors and (later) configuration.
+- Contributions other than file editors and configuration.

@@ -71,6 +71,8 @@ export interface EventSink {
   onError?(topic: EventTopic, code: 'rate-limited'): void
   /** Stable label used when a failing subscriber is removed. */
   label?: string
+  /** Plugin identity used by targeted topics such as `config/changed`. */
+  identity?: string
 }
 
 export interface EventBusOptions {
@@ -177,7 +179,11 @@ export class EventBus {
     return this.sequences.get(topic) ?? 0
   }
 
-  publish(topic: EventTopic, payload: unknown, options: { burst?: boolean } = {}): boolean {
+  publish(
+    topic: EventTopic,
+    payload: unknown,
+    options: { burst?: boolean; target?: string } = {},
+  ): boolean {
     if (!isEventTopic(topic)) return false
     if (payloadTooLarge(payload, MAX_EVENT_BYTES)) {
       this.onDropped?.(topic, 'too-large')
@@ -195,6 +201,7 @@ export class EventBus {
     const event: ShellEvent = { topic, seq, payload }
     for (const subscriber of [...this.subscribers]) {
       if (!subscriber.active || !subscriber.topics.has(topic)) continue
+      if (options.target !== undefined && subscriber.sink.identity !== options.target) continue
       let queue = subscriber.queues.get(topic)
       if (!queue) {
         queue = []

@@ -11,13 +11,57 @@ import {
 } from './contract'
 import { clearWorkspaceTabs, configurePresetStore } from '../workbench/tabs'
 import { EXO_CONFIG_PATH } from '../plugins/config'
-import type { HandlerPool } from '../plugins/handlers'
+import { HandlerPool } from '../plugins/handlers'
 import type { HandlerSaveRequest } from '../plugins/handler'
 import type { EditorCandidate } from '../plugins/registry'
+import { MemoryPluginSettingsStorage } from '../plugins/settings'
+import type { PluginSettingsStorage, RawSettingsByPlugin } from '../plugins/settings'
+import { FakeFrameTransport } from '../plugins/frame-test-support'
+import type { ManifestConfiguration } from '../plugins/manifest'
 import type { DocumentEditorHost, PluginCallbacks } from './documents'
 
 function memoryProvider(files: Record<string, string> = {}) {
   return new MemoryWorkspaceProvider({ now: () => 1, initialFiles: files })
+}
+
+function handlerCandidate(): EditorCandidate {
+  return {
+    identity: 'https://plugins.example.com::com.example.code',
+    pluginOrder: 0,
+    pluginName: 'Code Plugin',
+    pluginId: 'com.example.code',
+    pluginVersion: '1.0.0',
+    origin: 'https://plugins.example.com',
+    permissions: ['workspace:read', 'workspace:write', 'events:subscribe'],
+    glob: '**/*.txt',
+    entry: 'editors/code.html',
+    entryUrl: 'https://plugins.example.com/monaco/editors/code.html',
+    label: 'Code',
+    priority: 10,
+    registrationOrder: 0,
+  }
+}
+
+function settingsConfiguration(): ManifestConfiguration {
+  return {
+    properties: {
+      'editor.greeting': { type: 'string', default: 'hello', scope: 'workspace' },
+    },
+  }
+}
+
+class DeferredSettingsStorage implements PluginSettingsStorage {
+  readonly reads = new Map<string, (value: RawSettingsByPlugin | null) => void>()
+
+  async get(workspaceId: string): Promise<RawSettingsByPlugin | null> {
+    return new Promise((resolve) => {
+      this.reads.set(workspaceId, resolve)
+    })
+  }
+
+  async put(): Promise<void> {
+    // The late-read test does not persist.
+  }
 }
 
 function runtimeWith(providers: WorkspaceProvider[], handleStore = new MemoryHandleStore()) {
@@ -31,6 +75,24 @@ function runtimeWith(providers: WorkspaceProvider[], handleStore = new MemoryHan
     handleStore,
     eventTarget: new EventTarget(),
     now: () => 1,
+  })
+}
+
+function runtimeWithSettings(
+  providers: WorkspaceProvider[],
+  pluginSettingsStorage: PluginSettingsStorage,
+) {
+  return new WorkspaceRuntime({
+    providerFactory: () => {
+      const next = providers.shift()
+      if (!next) throw new Error('No provider queued')
+      return next
+    },
+    supportsFolder: () => true,
+    handleStore: new MemoryHandleStore(),
+    eventTarget: new EventTarget(),
+    now: () => 1,
+    pluginSettingsStorage,
   })
 }
 
@@ -95,6 +157,151 @@ describe('workspace runtime', () => {
     expect(useWorkbenchStore.getState().tabs).toEqual([])
     expect(runtime.documents.paths()).toEqual([])
     expect(runtime.getSnapshot().descriptor?.name).toBe('memory-workspace')
+    await runtime.dispose()
+  })
+
+  it('delivers settings changes to subscribed handlers and initializes later handlers', async () => {
+    const provider = memoryProvider({ '/a.txt': 'a', '/b.txt': 'b' })
+    const transport = new FakeFrameTransport()
+    const pool = new HandlerPool({
+      transport,
+      shellOrigin: 'https://editor.example.com',
+      shellVersion: '0.1.0',
+      theme: () => 'dark',
+      locale: 'en',
+      createSessionId: () => 'session-1',
+    })
+    const runtime = new WorkspaceRuntime({
+      providerFactory: () => provider,
+      supportsFolder: () => true,
+      handleStore: new MemoryHandleStore(),
+      eventTarget: new EventTarget(),
+      now: () => 1,
+      pluginSettingsStorage: new MemoryPluginSettingsStorage(),
+      handlerPool: pool,
+    })
+    await runtime.start()
+    await runtime.openFolder()
+
+    const candidate = handlerCandidate()
+    runtime.pluginSettings.declare(candidate.identity, settingsConfiguration())
+    const session = runtime.getSession()
+    if (!session) throw new Error('No workspace session')
+    const callbacks = {
+      onActive: vi.fn(),
+      onDirty: vi.fn(),
+      onFailure: vi.fn(),
+      onVersion: vi.fn(),
+    }
+    const firstStat = await session.stat('/a.txt')
+    expect(pool.open({ path: '/a.txt', file: firstStat, candidate }, callbacks)).toEqual({
+      ok: true,
+    })
+    const first = transport.frames[0]
+    const ready = (frame: (typeof transport.frames)[number]) =>
+      frame.emit(
+        { exo: 1, type: 'plugin/ready', payload: { protocolVersion: '1', sessionId: 'session-1' } },
+        'https://plugins.example.com',
+      )
+    const events = (frame: (typeof transport.frames)[number]) =>
+      frame.posted
+        .map((posted) => posted.message as { type?: string; payload?: unknown })
+        .filter((message) => message.type === 'shell/event')
+        .map((message) => message.payload)
+
+    ready(first)
+    first.emit(
+      {
+        exo: 1,
+        type: 'plugin/subscribe',
+        id: 'sub-config',
+        payload: { topic: 'config/changed' },
+      },
+      'https://plugins.example.com',
+    )
+    expect(runtime.pluginSettings.set(candidate.identity, 'editor.greeting', 'hi')).toEqual({
+      ok: true,
+      changed: true,
+    })
+    await vi.waitFor(() => expect(events(first)).toHaveLength(1))
+    expect(events(first)[0]).toMatchObject({
+      topic: 'config/changed',
+      payload: { pluginId: 'com.example.code', values: { 'editor.greeting': 'hi' } },
+    })
+
+    const secondStat = await session.stat('/b.txt')
+    expect(pool.open({ path: '/b.txt', file: secondStat, candidate }, callbacks)).toEqual({
+      ok: true,
+    })
+    const second = transport.frames[1]
+    ready(second)
+    const init = second.posted
+      .map((posted) => posted.message as { type?: string; payload?: unknown })
+      .find((message) => message.type === 'shell/init')
+    expect(init?.payload).toMatchObject({ settings: { 'editor.greeting': 'hi' } })
+
+    await runtime.dispose()
+  })
+
+  it('persists settings for the same workspace and resets them on a switch', async () => {
+    const storage = new MemoryPluginSettingsStorage()
+    const identity = handlerCandidate().identity
+    const configuration = settingsConfiguration()
+    const first = new MemoryWorkspaceProvider({ name: 'first', now: () => 1 })
+    const second = new MemoryWorkspaceProvider({ name: 'second', now: () => 1 })
+    const runtime = runtimeWithSettings([first, second], storage)
+    await runtime.start()
+    await runtime.openFolder()
+    runtime.pluginSettings.declare(identity, configuration)
+    runtime.pluginSettings.set(identity, 'editor.greeting', 'first value')
+    await vi.waitFor(() =>
+      expect(storage.records.get('memory:first')).toEqual({
+        [identity]: { 'editor.greeting': 'first value' },
+      }),
+    )
+
+    await runtime.openFolder()
+    runtime.pluginSettings.declare(identity, configuration)
+    expect(runtime.pluginSettings.values(identity)).toEqual({ 'editor.greeting': 'hello' })
+    await runtime.dispose()
+
+    const reloadedProvider = new MemoryWorkspaceProvider({ name: 'first', now: () => 1 })
+    const reloaded = runtimeWithSettings([reloadedProvider], storage)
+    await reloaded.start()
+    await reloaded.openFolder()
+    reloaded.pluginSettings.declare(identity, configuration)
+    expect(reloaded.pluginSettings.values(identity)).toEqual({
+      'editor.greeting': 'first value',
+    })
+    await reloaded.dispose()
+  })
+
+  it('ignores a settings read that resolves after a workspace switch', async () => {
+    const storage = new DeferredSettingsStorage()
+    const first = new MemoryWorkspaceProvider({ name: 'first', now: () => 1 })
+    const second = new MemoryWorkspaceProvider({ name: 'second', now: () => 1 })
+    const runtime = runtimeWithSettings([first, second], storage)
+    await runtime.start()
+
+    const firstOpen = runtime.openFolder()
+    await vi.waitFor(() => expect(storage.reads.has('memory:first')).toBe(true))
+    const secondOpen = runtime.openFolder()
+    await vi.waitFor(() => expect(storage.reads.has('memory:second')).toBe(true))
+
+    storage.reads.get('memory:first')?.({
+      [handlerCandidate().identity]: { 'editor.greeting': 'first value' },
+    })
+    await firstOpen
+    storage.reads.get('memory:second')?.({
+      [handlerCandidate().identity]: { 'editor.greeting': 'second value' },
+    })
+    await secondOpen
+
+    expect(runtime.getSnapshot().descriptor?.name).toBe('second')
+    runtime.pluginSettings.declare(handlerCandidate().identity, settingsConfiguration())
+    expect(runtime.pluginSettings.values(handlerCandidate().identity)).toEqual({
+      'editor.greeting': 'second value',
+    })
     await runtime.dispose()
   })
 

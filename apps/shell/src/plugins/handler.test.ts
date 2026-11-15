@@ -162,7 +162,7 @@ describe('handler session', () => {
   })
 
   it('sends metadata-only init after ready', async () => {
-    const context = await start()
+    const context = await start({ settings: { 'editor.size': 2 } })
     ready(context)
     const init = postedType(context.frame, 'shell/init')
     expect(init?.payload).toMatchObject({
@@ -171,12 +171,19 @@ describe('handler session', () => {
       plugin: { id: 'com.example.code', version: '1.2.0' },
       file: { path: '/src/a.ts', name: 'a.ts', dir: '/src', version: context.stat.version },
       capabilities: { read: true, write: true, requestFiles: true },
+      settings: { 'editor.size': 2 },
     })
     const serialized = JSON.stringify(init?.payload)
     expect(serialized).not.toContain('export const a = 1')
     expect(init?.payload).not.toHaveProperty('bytes')
     expect(init?.payload).not.toHaveProperty('text')
     expect(context.frame.posted[0].targetOrigin).toBe(PLUGIN_ORIGIN)
+  })
+
+  it('sends an empty settings map when no settings are declared', async () => {
+    const context = await start()
+    ready(context)
+    expect(postedType(context.frame, 'shell/init')?.payload).toMatchObject({ settings: {} })
   })
 
   it('uses the stricter sandbox and wildcard target for a same-origin editor', async () => {

@@ -347,7 +347,7 @@ layer named in the last column.
 | D8 | `exo.json` is shell-only and strict JSON; the settings UI rewrites it as canonical 2-space JSON, does not preserve formatting or key order, and reports comments rather than stripping them | decided | layer 3 |
 | D9 | Cross-origin frames use `sandbox="allow-scripts allow-same-origin"`; same-origin frames use `allow-scripts` only; never top navigation, popups or modals | decided | layer 4 |
 | D10 | v1 supports Chromium only for folder-backed workspaces; other browsers get an explicit unsupported state | decided | layer 2 |
-| D11 | Plugin settings live in the shell's store keyed by workspace, not in `exo.json` | decided | layer 7 |
+| D11 | Plugin settings live in the shell's IndexedDB store keyed by workspace and plugin identity, not in `exo.json` | decided | layer 7 |
 | D12 | The SDK, plugin template and Monaco reference plugin stay in this repository through v1; a split is reconsidered after layer 9, not before layer 8 | decided | none |
 | D13 | Manifest and protocol are versioned independently; the shell accepts exactly one protocol major version per release | decided | layer 4 |
 | D14 | Page loading is confined to the directory tree of the controller entry (siblings and descendants); consent covers that root, not each page | decided | layer 4 |

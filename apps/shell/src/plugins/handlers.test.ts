@@ -78,7 +78,72 @@ async function open(harness: Harness, path: WorkspacePath) {
   )
 }
 
+async function openWith(harness: Harness, path: WorkspacePath, chosen: EditorCandidate) {
+  const stat = await harness.session.stat(path)
+  return harness.pool.open(
+    { path, file: stat, candidate: chosen },
+    {
+      onActive: () => undefined,
+      onDirty: () => undefined,
+      onFailure: () => undefined,
+      onVersion: () => undefined,
+    },
+  )
+}
+
+function readyFrame(
+  frame: ReturnType<FakeFrameTransport['open']>,
+  origin: string,
+  sessionId = 'session-1',
+) {
+  frame.emit({ exo: 1, type: 'plugin/ready', payload: { protocolVersion: '1', sessionId } }, origin)
+}
+
+function subscribe(frame: ReturnType<FakeFrameTransport['open']>, origin: string, topic: string) {
+  frame.emit({ exo: 1, type: 'plugin/subscribe', id: `sub-${topic}`, payload: { topic } }, origin)
+}
+
+function eventsFor(frame: ReturnType<FakeFrameTransport['open']>): unknown[] {
+  return frame.posted
+    .map((posted) => posted.message as { type?: string; payload?: unknown })
+    .filter((message) => message.type === 'shell/event')
+    .map((message) => message.payload)
+}
+
 describe('handler pool', () => {
+  it('delivers config changes only to the target plugin frame', async () => {
+    const context = await harness({ '/src/a.ts': 'a', '/src/b.ts': 'b' })
+    const first = candidate('https://a.example.com::com.example.a', {
+      pluginId: 'com.example.a',
+      origin: 'https://a.example.com',
+      permissions: ['workspace:read', 'events:subscribe'],
+      entryUrl: 'https://a.example.com/plugins/a/editors/code.html',
+    })
+    const second = candidate('https://b.example.com::com.example.b', {
+      pluginId: 'com.example.b',
+      origin: 'https://b.example.com',
+      permissions: ['workspace:read', 'events:subscribe'],
+      entryUrl: 'https://b.example.com/plugins/b/editors/code.html',
+    })
+    await openWith(context, '/src/a.ts', first)
+    await openWith(context, '/src/b.ts', second)
+    const firstFrame = context.transport.frames[0]
+    const secondFrame = context.transport.frames[1]
+    readyFrame(firstFrame, 'https://a.example.com')
+    readyFrame(secondFrame, 'https://b.example.com')
+    subscribe(firstFrame, 'https://a.example.com', 'config/changed')
+    subscribe(secondFrame, 'https://b.example.com', 'config/changed')
+
+    context.pool.updateSettings(first.identity, { greeting: 'hi' })
+
+    await vi.waitFor(() => expect(eventsFor(firstFrame)).toHaveLength(1))
+    expect(eventsFor(secondFrame)).toEqual([])
+    expect(eventsFor(firstFrame)[0]).toMatchObject({
+      topic: 'config/changed',
+      payload: { pluginId: 'com.example.a', values: { greeting: 'hi' } },
+    })
+  })
+
   it('refuses a 21st frame for one plugin', async () => {
     const files: Record<string, string> = {}
     for (let index = 0; index < MAX_HANDLER_FRAMES + 1; index += 1) {

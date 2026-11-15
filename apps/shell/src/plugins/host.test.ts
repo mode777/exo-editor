@@ -7,6 +7,7 @@ import { PluginHost } from './host'
 import { validateManifest, type PluginManifest } from './manifest'
 import type { PluginConfigEntry } from './config'
 import type { PluginConfigSnapshot, PluginConfigStore } from './store'
+import { MemoryPluginSettingsStorage, PluginSettingsStore } from './settings'
 
 const SHELL_ORIGIN = 'https://editor.example.com'
 const MANIFEST_URL = 'https://plugins.example.com/monaco/exo-manifest.json'
@@ -116,7 +117,7 @@ function fakeSession(name = 'demo'): WorkspaceSession {
 
 function createHost(
   fetchImpl: typeof fetch = vi.fn(async () => jsonResponse(manifestJson(), MANIFEST_URL)),
-  options: { consentStore?: ConsentStore } = {},
+  options: { consentStore?: ConsentStore; settings?: PluginSettingsStore } = {},
 ) {
   const transport = new FakeFrameTransport()
   const storage = new MemoryStorage()
@@ -132,7 +133,11 @@ function createHost(
     createSessionId: () => 'session-1',
   })
   const config = new FakeConfig()
-  host.attach({ session: fakeSession(), config: config as unknown as PluginConfigStore })
+  host.attach({
+    session: fakeSession(),
+    config: config as unknown as PluginConfigStore,
+    settings: options.settings,
+  })
   return { host, transport, consentStore, storage, config }
 }
 
@@ -199,6 +204,107 @@ describe('plugin host', () => {
     await vi.waitFor(() => expect(host.getSnapshot().records).toEqual([]))
     expect(fetchImpl).not.toHaveBeenCalled()
     host.dispose()
+  })
+
+  it('exposes a validated configuration on the loaded manifest record', async () => {
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse(
+        manifestJson({
+          contributes: {
+            configuration: {
+              properties: {
+                'editor.fontSize': {
+                  type: 'number',
+                  default: 13,
+                  description: 'Font size in pixels.',
+                },
+              },
+            },
+          },
+        }),
+        MANIFEST_URL,
+      ),
+    )
+    const { host, config } = createHost(fetchImpl)
+    config.setEntries(entries(MANIFEST_URL))
+    await waitForRecord(host, MANIFEST_URL, 'awaiting-consent')
+    const record = host.getSnapshot().records[0]
+    expect(record.manifest?.configuration).toEqual({
+      properties: {
+        'editor.fontSize': {
+          type: 'number',
+          default: 13,
+          description: 'Font size in pixels.',
+          scope: 'workspace',
+        },
+      },
+    })
+    host.dispose()
+  })
+
+  it('declares configuration and sends resolved values into registration init', async () => {
+    const settings = new PluginSettingsStore({ storage: new MemoryPluginSettingsStorage() })
+    await settings.attach('test')
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse(
+        manifestJson({
+          contributes: {
+            configuration: {
+              properties: {
+                'editor.greeting': { type: 'string', default: 'hello' },
+              },
+            },
+          },
+        }),
+        MANIFEST_URL,
+      ),
+    )
+    const { host, transport, config } = createHost(fetchImpl, { settings })
+    config.setEntries(entries(MANIFEST_URL))
+    await waitForRecord(host, MANIFEST_URL, 'awaiting-consent')
+    const identity = 'https://plugins.example.com::com.example.monaco'
+    expect(settings.values(identity)).toEqual({ 'editor.greeting': 'hello' })
+
+    settings.set(identity, 'editor.greeting', 'hi')
+    host.approveConsent(identity)
+    await vi.waitFor(() => expect(transport.frames).toHaveLength(1))
+    ready(transport.frames[0], 'https://plugins.example.com')
+    const init = transport.frames[0].posted
+      .map((posted) => posted.message as { type?: string; payload?: unknown })
+      .find((message) => message.type === 'shell/init')
+    expect(init?.payload).toMatchObject({ settings: { 'editor.greeting': 'hi' } })
+    host.dispose()
+  })
+
+  it('does not declare settings for an invalid or disabled entry', async () => {
+    const settings = new PluginSettingsStore({ storage: new MemoryPluginSettingsStorage() })
+    await settings.attach('test')
+    const failing = vi.fn(async () =>
+      jsonResponse(
+        manifestJson({
+          contributes: {
+            configuration: { properties: { setting: { type: 'string', default: 1 } } },
+          },
+        }),
+        MANIFEST_URL,
+      ),
+    )
+    const { host, config } = createHost(failing, { settings })
+    config.setEntries(entries(MANIFEST_URL))
+    await waitForRecord(host, MANIFEST_URL, 'failed')
+    expect(settings.values('https://plugins.example.com::com.example.monaco')).toEqual({})
+    host.dispose()
+
+    const disabledSettings = new PluginSettingsStore({
+      storage: new MemoryPluginSettingsStorage(),
+    })
+    await disabledSettings.attach('test')
+    const disabledFetch = vi.fn()
+    const disabled = createHost(disabledFetch, { settings: disabledSettings })
+    disabled.config.setEntries([{ index: 0, manifest: MANIFEST_URL, enabled: false }])
+    await waitForRecord(disabled.host, MANIFEST_URL, 'disabled')
+    expect(disabledSettings.values('https://plugins.example.com::com.example.monaco')).toEqual({})
+    disabled.host.dispose()
   })
 
   it('loads a manifest, requests consent and activates a registered editor', async () => {
