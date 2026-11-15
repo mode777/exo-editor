@@ -1,15 +1,13 @@
 # Exo Editor - Roadmap
 
-Status: layers 0-6 are complete and archived. Layer 7 (`plugin-settings`) is
-implemented and verified against the deployed shell; its archive is pending.
-Layer 8 (`plugin-sdk-template`) is next. The parallel Stratofold provider track
-(P1) is archived as `2026-11-15-add-stratofold-provider` and does not gate the
-numbered layers. Its 0.12.0 follow-on, P2 `adopt-stratofold-0-12`, is implemented,
-verified against the deployed shell and archived. P3 `add-remote-recents` is
-implemented, verified against the deployed shell and archived. Each layer is one
-OpenSpec change. A layer is done when its change is archived and its exit
-criteria are demonstrated against the deployed shell - never from a local dev
-server or local build.
+Status: layers 0-7 are complete and archived. Layer 8 (`plugin-sdk-template`) is
+next. The parallel Stratofold provider track (P1) is archived as
+`2026-11-15-add-stratofold-provider` and does not gate the numbered layers. Its
+0.12.0 follow-on, P2 `adopt-stratofold-0-12`, is implemented, verified against
+the deployed shell and archived. P3 `add-remote-recents` is implemented,
+verified against the deployed shell and archived. Each layer is one OpenSpec change. A layer is done
+when its change is archived and its exit criteria are demonstrated against the
+deployed shell - never from a local dev server or local build.
 
 ## Sequencing rationale
 
@@ -474,8 +472,8 @@ registration and handler code were the real artifacts.
 
 ## Layer 7 - `plugin-settings`
 
-**Status:** complete - implemented and verified against the deployed shell on
-2026-11-15; archive pending.
+**Status:** complete - change archived as `2026-11-15-plugin-settings` after
+deployed verification on 2026-11-15.
 
 **Goal:** a plugin can declare configuration and the shell renders it in the same
 settings surface as shell settings.

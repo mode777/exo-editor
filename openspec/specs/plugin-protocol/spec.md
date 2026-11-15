@@ -62,13 +62,28 @@ The shell SHALL mount plugin frames hidden with no top navigation, popups, modal
 downloads or fullscreen, and `referrerpolicy="no-referrer"`, SHALL apply
 `sandbox="allow-scripts allow-same-origin"` to cross-origin plugin origins and
 `sandbox="allow-scripts"` to plugin origins equal to the shell origin, SHALL pass
-the shell origin and session id in the URL fragment, and SHALL send `shell/init`
-only after receiving a valid `plugin/ready`.
+the shell origin and session id in the URL fragment, SHALL send `shell/init` only
+after receiving a valid `plugin/ready`, and SHALL include in `shell/init` the
+plugin's resolved workspace-scoped settings values for both registration and
+editor modes.
 
 #### Scenario: Ready starts the session
 
 - **WHEN** a plugin frame sends `plugin/ready` with a supported protocol version
-- **THEN** the shell replies with `shell/init` containing the mode, session id, plugin identity, shell version and origin, workspace name, theme, permissions and locale
+- **THEN** the shell replies with `shell/init` containing the mode, session id, plugin identity, shell version and origin, workspace name, theme, permissions, locale and the plugin's current settings values
+
+#### Scenario: Settings values are initialized
+
+- **WHEN** a plugin declares workspace settings and a handler or registration
+  frame sends `plugin/ready`
+- **THEN** `shell/init` carries the resolved values for that plugin, including
+  declared defaults for settings with no stored value
+
+#### Scenario: No settings means an empty map
+
+- **WHEN** a plugin declares no configuration
+- **THEN** `shell/init` carries an empty settings object rather than omitting the
+  field or inventing values
 
 #### Scenario: Same-origin plugin gets the stricter sandbox
 
