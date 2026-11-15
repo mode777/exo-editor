@@ -41,4 +41,15 @@ describe('deployed plugin fixture', () => {
     expect(byGlob.get('**/*.txt')?.entry).toBe('editor.html')
     expect(byGlob.get('**/*.sibling.txt')?.entry).toBe('sibling.html')
   })
+
+  it('registers every declared editor glob', () => {
+    const manifest = JSON.parse(readFileSync(resolve(fixtureDir, 'exo-manifest.json'), 'utf8')) as {
+      contributes: { fileEditors: Array<{ glob: string; entry: string }> }
+    }
+    const controller = readFileSync(resolve(fixtureDir, 'plugin.html'), 'utf8')
+    for (const editor of manifest.contributes.fileEditors) {
+      expect(controller).toContain(`glob: '${editor.glob}'`)
+      expect(controller).toContain(`entry: '${editor.entry}'`)
+    }
+  })
 })
