@@ -195,6 +195,13 @@ function Shell({ runtime }: { runtime: WorkspaceRuntime }) {
     guardDirty(() => void runtime.disconnect())
   }, [guardDirty, runtime])
 
+  const removeRemoteWorkspace = useCallback(
+    (id: string) => {
+      guardDirty(() => void runtime.removeRemoteConnection(id))
+    },
+    [guardDirty, runtime],
+  )
+
   useEffect(() => onRemoteConnect(openConnect), [openConnect])
 
   const handlers = useMemo<ExoCommandHandlers>(
@@ -296,6 +303,7 @@ function Shell({ runtime }: { runtime: WorkspaceRuntime }) {
         onOpenFolder={openFolder}
         onConnectRemote={openConnect}
         onDisconnect={disconnectWorkspace}
+        onRemoveRemote={removeRemoteWorkspace}
       />
       <ConnectRemoteDialog open={connectOpen} onClose={() => setConnectOpen(false)} />
       {openWith && (

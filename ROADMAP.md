@@ -3,10 +3,11 @@
 Status: layers 0-6 are complete and archived. Layer 7 (`plugin-settings`) is
 next. The parallel Stratofold provider track (P1) is archived as
 `2026-11-15-add-stratofold-provider` and does not gate the numbered layers. Its
-0.12.0 follow-on, P2 `adopt-stratofold-0-12`, is implemented and verified against
-the deployed shell; archive pending. Each layer is one OpenSpec change. A layer
-is done when its change is archived and its exit criteria are demonstrated
-against the deployed shell - never from a local dev server or local build.
+0.12.0 follow-on, P2 `adopt-stratofold-0-12`, is implemented, verified against
+the deployed shell and archived. P3 `add-remote-recents` is implemented and
+awaiting its deployed checks. Each layer is one OpenSpec change. A layer is done
+when its change is archived and its exit criteria are demonstrated against the
+deployed shell - never from a local dev server or local build.
 
 ## Sequencing rationale
 
@@ -57,7 +58,8 @@ composition.
 | # | Change | Outcome | Depends on | Status |
 | --- | --- | --- | --- | --- |
 | P1 | `add-stratofold-provider` | Stratofold vdir as a workspace: connect/restore, browse, read/write/save, viewer/public read-only | 0, 2, 3 | archived 2026-11-15; verified on the deployed shell with Chromium and Firefox |
-| P2 | `adopt-stratofold-0-12` | Client 0.12.0: connection-string connect and zero-byte remote files | P1 | implemented; verified 2026-11-15 on the deployed shell; archive pending |
+| P2 | `adopt-stratofold-0-12` | Client 0.12.0: connection-string connect and zero-byte remote files | P1 | archived 2026-11-15; verified on the deployed shell |
+| P3 | `add-remote-recents` | Automatic connection persistence and a capped recent-workspaces list with reopen/remove | P1, P2 | implemented; local gate passed, deployed verification pending |
 
 P1 is not part of the numbered v1 critical path. It started after layer 3 and
 lands alongside layers 4-10 without gating one. It integrated through
@@ -78,8 +80,9 @@ shell a workspace path that does not depend on the File System Access API.
 - Runtime provider registry plus a connect dialog (server + token, discover the
   vdir and role through `tokenInfo()`), persisted connection config and restore;
   viewer and public workspaces stay read-only.
-- Credential storage with explicit opt-in. No token in URLs, bundles, logs or
-  plugin messages.
+- Credential storage. P1/P2 used an explicit opt-in; P3 replaced it with
+  automatic recent persistence. No token in URLs, bundles, logs or plugin
+  messages.
 - Conformance and edge tests; verification against the deployed shell.
 
 **Exit criteria**
@@ -123,6 +126,37 @@ the normal upload path and need a 0.12.0 server.
   content truncated it with another version rotation; 42 remote requests and
   zero page errors.
 - Met: the `verify` gate, bundle budget, CSP and custom-element checks pass.
+
+### P3 - `add-remote-recents`
+
+P3 removes the single-connection, opt-in persistence model. Every validated
+Stratofold connection is stored automatically in a keyed IndexedDB list, newest
+first and capped at ten, and the connect dialog can reopen or remove each entry.
+The token stays shell-owned and is never rendered or sent to a plugin;
+disconnect keeps an entry, while removal deletes it. A v1 `last` record is
+migrated into the list.
+
+**Deliverables**
+
+- Keyed `exo-remote` schema v2 with `list/get/put/remove/clear`, newest-first
+  ordering, a ten-entry cap and the v1 migration.
+- Automatic persistence on a validated connect, restore by active marker id,
+  reconnect that replaces the stored token, and disconnect that retains the
+  entry.
+- Connect-dialog recent list with Open and Remove, settings removal for the
+  active workspace, and no token in the snapshot or rendered UI.
+- Store, runtime, App and settings tests; contract, provider and roadmap docs.
+
+**Exit criteria**
+
+- Met: the local `verify` gate passes (lint, format, typecheck, 541 tests,
+  build, CSP and custom elements); the measured bundle is 146,708 gzip bytes
+  against the 148,000 js limit and 12,946 against the 14,000 css limit.
+- Pending: against the deployed shell, two workspaces appear newest-first, each
+  reopens from the list, removal deletes one token, disconnect keeps an entry,
+  reload restores the active entry, and a revoked token surfaces the reconnect
+  state without mounting or deleting it.
+- Pending: no token appears in the DOM, a request URL or `localStorage`.
 
 ---
 

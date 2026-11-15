@@ -3,8 +3,9 @@
 Status: implemented by the OpenSpec change `add-stratofold-provider` and verified
 against the deployed shell on 2026-11-15 (Chromium and Firefox; viewer read-only
 and a live token revocation). The client was upgraded to 0.12.0 by
-`adopt-stratofold-0-12`, which adds connection strings and zero-byte uploads. The
-adapter and the connect flow are in
+`adopt-stratofold-0-12`, which adds connection strings and zero-byte uploads, and
+`add-remote-recents`, which stores every validated connection and lists recent
+workspaces. The adapter and the connect flow are in
 `apps/shell/src/workspace/providers/stratofold/`.
 
 Upstream: `@stratofold/client` 0.12.0, published on the public npm registry and
@@ -48,7 +49,7 @@ client. No provider method was added for this backend.
 | --- | --- | --- |
 | `capabilities()` | `tokenInfo()` role, or no token for a public vdir | `writable` only for an `editor` token; `watchable: false`; `persistent` follows the credential-storage choice; `caseSensitive: false` (conservative, see section 4) |
 | `open()` | No request: the connect flow already validated the connection | The connect form takes a server URL and a token, an `sfconn_v1_` connection string, or a public directory id, and validates before the provider exists, so `capabilities()` can be synchronous and a failed connection never mounts. |
-| `restore(id)` | Stored connection + `tokenInfo()` (public: `list`) | The active-workspace marker selects the provider kind. A remembered connection is revalidated before it mounts; a rejected credential mounts nothing and surfaces the reconnect state. |
+| `restore(id)` | Stored connection + `tokenInfo()` (public: `list`) | The active-workspace marker selects the provider kind and the recent entry. The stored connection is revalidated before it mounts; a rejected credential mounts nothing and surfaces the reconnect state. |
 | `list(path, {depth, signal})` | `list(path)` returns `{name,size,dir,modtime,version}` | One level only; `depth: 'recursive'` is adapter recursion. Directories map to `size: 0`. `modtime` is RFC3339; Exo wants epoch milliseconds. |
 | `stat(path, {signal})` | `stat(path, {signal})` returns `{path,name,kind,size,mtime,version}` | Direct mapping; root is `""`; no parent listing needed. |
 | `read(path, {signal, maxBytes})` | `read(path, {signal})` returns the raw `Response` | Enforce `maxBytes` from `Content-Length` or a capped stream. `stat` first so a directory is `not-a-file` rather than `index.html` or a 404. Map a fetch abort to `aborted` when the signal fired. |
@@ -167,13 +168,18 @@ plus the `filesystem-api`, `client-library`, `vdir-access-tokens` and
   asserts the sentinel never appears in a directory URL. Public discovery is
   impossible without a token, so the form asks for the directory id and
   validates it with `list("")`.
-- **Storage.** Session-only by default. The connect form's opt-in writes
-  `{ server, vdir, name, role, token }` to the `exo-remote` IndexedDB database;
-  "disconnect and forget" deletes it. A connection supplied as a connection
-  string is reduced to those fields, and the raw string is never written. Never
-  bundle a token, put it in a URL, log it, or send it to a plugin frame. Revoking
-  it in Stratofold surfaces as an explicit reconnect state: the adapter stops
-  issuing requests and only a reconnect or disconnect clears it.
+- **Storage.** Every validated connection is written automatically to the
+  `exo-remote` IndexedDB database as a `{ id, connection, lastOpenedAt }` record,
+  where `connection` is `{ server, vdir, name, role, token? }`. The list is keyed
+  by workspace identity, ordered newest first and capped at ten; a v1 `last`
+  record is migrated. A public connection stores no token. A connection
+  supplied as a connection string is reduced to those fields, and the raw string
+  is never written. The workspace snapshot and the recent-list summaries contain
+  metadata only. Removing an entry deletes its record and token; disconnecting
+  keeps the entry, so "disconnect" is not "forget". Never bundle a token, put it
+  in a URL, log it, or send it to a plugin frame. Revoking it in Stratofold
+  surfaces as an explicit reconnect state: the adapter stops issuing requests
+  and only a reconnect or removal clears it.
 - **Reserved paths.** The session enforces `/exo.json` and `/.exo/**` for plugin
   requests. Stratofold itself has no knowledge of Exo, so anyone holding the
   vdir token can read those paths through another client. This is the same trust
@@ -242,7 +248,7 @@ plus the `filesystem-api`, `client-library`, `vdir-access-tokens` and
     after the `Cache-Control: no-cache` fix it passes.
   - Viewer token: explorer mutation actions unavailable, no save action, the
     document is read-only, typing changes nothing, zero mutation requests.
-  - Live revocation: with a remembered connection whose token was revoked
+  - Live revocation: with a stored connection whose token was revoked
     server-side, the deployed shell mounted no workspace, named the rejected
     connection, offered reconnect or disconnect, made no automatic retry, and
     prefilled the dialog from the stored connection.
@@ -253,21 +259,26 @@ plus the `filesystem-api`, `client-library`, `vdir-access-tokens` and
   editor token):
   - A minted connection string filled the server and token, cleared the raw
     field and mounted the workspace; the raw string and token appeared in no
-    request URL, DOM text, local storage or remembered record, and the record
-    held only the decomposed fields.
+    request URL, DOM text, local storage or stored record, and the record held
+    only the decomposed fields.
   - A malformed value failed locally with zero remote requests.
   - A value with `https://stale.invalid` mounted after correcting the server
     field, using the string's directory and token.
-  - A session-only connection was not restored after reload.
+  - Under the P2 default, a session-only connection was not restored after
+    reload. P3 replaces that default with automatic persistence.
+- **Recent workspaces (implemented; deployed verification recorded below when
+  complete).** The store keeps keyed records newest first and caps them at ten,
+  a successful connection is stored without an opt-in, disconnect keeps the
+  entry, removal deletes its token, and the connect dialog lists, opens and
+  removes entries without rendering a token.
   - New File created `empty-check.txt` at size 0 and it opened empty; saving
     `remote content\n` wrote exactly those bytes and rotated the version, and
     saving empty content truncated the file with another version rotation.
   - 42 remote requests and zero page errors.
 - **Packaging.** A clean `npm ci` from the registry, the CI `verify` job, the
-  bundle budget and the CSP checks. Measured after 0.12.0 and the
-  connection-string dialog: `js` 143,622 gzip bytes against a 145,000 limit
-  (1,378 bytes of headroom) and `css` 12,851 against 14,000, so no budget change
-  was needed.
+  bundle budget and the CSP checks. Measured after the recent-workspaces list:
+  `js` 146,708 gzip bytes against a 148,000 limit (1,292 bytes of headroom) and
+  `css` 12,946 against 14,000, so no budget change was needed.
 
 ## 8. Upstream asks
 
@@ -287,18 +298,19 @@ plus the `filesystem-api`, `client-library`, `vdir-access-tokens` and
 - **Scope.** The provider stays a parallel track (D17), not part of the v1
   release gate. Shipping it inside v1 would need a vision/scope change and a
   release-readiness browser-matrix entry.
-- **Credential storage.** Session-only is the default. The connect form's
-  "remember this connection" opt-in writes the record to IndexedDB and states
-  that the token stays in this browser; disconnect deletes it.
+- **Credential storage.** Every validated connection is written automatically to
+  the IndexedDB recent list and the connect UI states that the token stays in
+  this browser. Removing an entry deletes it; disconnecting keeps it. A storage
+  failure leaves the workspace session-only and says so.
 - **Connection string entry.** Accepted as a connect-form input. It is parsed
   locally into server, vdir and token, the raw value is discarded, and the
   editable server field remains the override for a stale embedded origin. A
-  remembered connection stores only the decomposed fields.
+  stored connection contains only the decomposed fields.
 - **Zero-byte files.** Supported through the normal upload path with the 0.12.0
   client and server; there is no adapter workaround and no separate create API.
 - **Multiple workspaces.** One at a time. A new connection replaces the active
-  workspace through the normal switch path; the store keeps only the last
-  remembered connection.
+  workspace through the normal switch path and the previous connection stays in
+  the recent list, which holds up to ten entries.
 - **Browser matrix.** Remote mode is not restricted to Chromium by a browser
   API. The deployed checks run in Chromium and Firefox and the result is recorded
   in the change; Safari is checked when reachable.

@@ -1,18 +1,26 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   connectRequestFromConnectionString,
   type ConnectRequest,
 } from './providers/stratofold/connection'
 import { useWorkspaceRuntime, useWorkspaceSnapshot } from './context'
+import type { RemoteWorkspaceSummary } from './runtime'
 
 interface ConnectRemoteDialogProps {
   open: boolean
   onClose: () => void
 }
 
+const ROLE_LABEL: Record<RemoteWorkspaceSummary['role'], string> = {
+  editor: 'Editor',
+  viewer: 'Read only',
+  public: 'Public',
+}
+
 /**
- * Connects a Stratofold workspace. The token is never prefilled - the shell
- * keeps it out of the snapshot - and the remember choice is off by default.
+ * Connects a Stratofold workspace and lists the recent ones. The token is never
+ * prefilled or rendered - the shell keeps it out of the snapshot - and every
+ * stored entry can be removed from this dialog.
  */
 export function ConnectRemoteDialog({ open, onClose }: ConnectRemoteDialogProps) {
   const runtime = useWorkspaceRuntime()
@@ -22,10 +30,22 @@ export function ConnectRemoteDialog({ open, onClose }: ConnectRemoteDialogProps)
   const [vdir, setVdir] = useState('')
   const [connectionString, setConnectionString] = useState('')
   const [connectionStringError, setConnectionStringError] = useState<string | null>(null)
-  const [remember, setRemember] = useState(false)
+  const [recents, setRecents] = useState<RemoteWorkspaceSummary[]>([])
+  const [recentsError, setRecentsError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const serverInput = useRef<HTMLInputElement>(null)
+
+  const loadRecents = useCallback(async () => {
+    try {
+      setRecents(await runtime.listRemoteConnections())
+      setRecentsError(null)
+    } catch (caught) {
+      setRecentsError(
+        caught instanceof Error ? caught.message : 'The recent workspaces could not be read.',
+      )
+    }
+  }, [runtime])
 
   useEffect(() => {
     if (!open) return
@@ -34,11 +54,15 @@ export function ConnectRemoteDialog({ open, onClose }: ConnectRemoteDialogProps)
     setVdir(snapshot.remote?.vdir ?? '')
     setConnectionString('')
     setConnectionStringError(null)
-    setRemember(snapshot.remote?.remembered ?? false)
     setError(null)
     setBusy(false)
     serverInput.current?.focus()
-  }, [open, snapshot.remote?.server, snapshot.remote?.vdir, snapshot.remote?.remembered])
+  }, [open, snapshot.remote?.server, snapshot.remote?.vdir])
+
+  useEffect(() => {
+    if (!open) return
+    void loadRecents()
+  }, [open, loadRecents])
 
   useEffect(() => {
     if (!open) return
@@ -97,7 +121,7 @@ export function ConnectRemoteDialog({ open, onClose }: ConnectRemoteDialogProps)
       }
     }
 
-    const connected = await runtime.connectRemote(request, { remember })
+    const connected = await runtime.connectRemote(request)
     setBusy(false)
     if (!connected) {
       setError(
@@ -112,6 +136,37 @@ export function ConnectRemoteDialog({ open, onClose }: ConnectRemoteDialogProps)
     onClose()
   }
 
+  const openRecent = async (id: string) => {
+    if (busy) return
+    setBusy(true)
+    setError(null)
+    const connected = await runtime.openRemoteRecent(id)
+    setBusy(false)
+    if (!connected) {
+      setError(
+        runtime.getSnapshot().remoteError?.message ?? 'The recent workspace could not be opened.',
+      )
+      return
+    }
+    setConnectionString('')
+    setToken('')
+    onClose()
+  }
+
+  const removeRecent = async (id: string) => {
+    if (busy) return
+    setBusy(true)
+    setError(null)
+    const removed = await runtime.removeRemoteConnection(id)
+    if (!removed) {
+      setError(
+        runtime.getSnapshot().remoteError?.message ?? 'The recent workspace could not be removed.',
+      )
+    }
+    await loadRecents()
+    setBusy(false)
+  }
+
   return (
     <div className="exo-dialog-backdrop">
       <div
@@ -121,10 +176,54 @@ export function ConnectRemoteDialog({ open, onClose }: ConnectRemoteDialogProps)
         aria-labelledby="exo-connect-title"
       >
         <h2 id="exo-connect-title">Connect Remote Workspace</h2>
+        {recents.length > 0 && (
+          <section className="exo-recents" aria-labelledby="exo-recents-title">
+            <h3 id="exo-recents-title">Recent workspaces</h3>
+            <ul className="exo-recent-list">
+              {recents.map((recent) => (
+                <li key={recent.id} className="exo-recent-row">
+                  <span className="exo-recent-details">
+                    <span className="exo-recent-name">{recent.name}</span>
+                    <span className="exo-recent-meta">
+                      {recent.server} · {recent.vdir} · {ROLE_LABEL[recent.role]}
+                    </span>
+                  </span>
+                  <span className="exo-recent-actions">
+                    <button
+                      type="button"
+                      aria-label={`Open ${recent.name}`}
+                      disabled={busy}
+                      onClick={() => void openRecent(recent.id)}
+                    >
+                      Open
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Remove ${recent.name}`}
+                      disabled={busy}
+                      onClick={() => void removeRecent(recent.id)}
+                    >
+                      Remove
+                    </button>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
         <p className="exo-dialog-hint">
           The browser talks to the server directly. The token is sent only in a request header and
           is never placed in a URL or shown to a plugin.
         </p>
+        <p className="exo-dialog-hint">
+          Connections and their tokens are stored in this browser so you can reopen them. Remove a
+          workspace from the list to delete its token.
+        </p>
+        {snapshot.remote?.stored === false && (
+          <p className="exo-dialog-hint">
+            This connection could not be stored. It works for this session only.
+          </p>
+        )}
         <label className="exo-dialog-field">
           <span>Connection string</span>
           <input
@@ -180,22 +279,9 @@ export function ConnectRemoteDialog({ open, onClose }: ConnectRemoteDialogProps)
             onChange={(event) => setVdir(event.target.value)}
           />
         </label>
-        <label className="exo-settings-option">
-          <input
-            id="exo-connect-remember"
-            type="checkbox"
-            checked={remember}
-            onChange={(event) => setRemember(event.target.checked)}
-          />
-          Remember this connection in this browser
-        </label>
-        <p className="exo-dialog-hint">
-          Remembering stores the token in this browser so the workspace can reopen after a reload.
-          Forget it by disconnecting.
-        </p>
-        {(connectionStringError ?? error ?? snapshot.remoteError?.message) && (
+        {(connectionStringError ?? error ?? recentsError ?? snapshot.remoteError?.message) && (
           <p className="exo-dialog-error" role="alert">
-            {connectionStringError ?? error ?? snapshot.remoteError?.message}
+            {connectionStringError ?? error ?? recentsError ?? snapshot.remoteError?.message}
           </p>
         )}
         <div className="exo-dialog-actions">

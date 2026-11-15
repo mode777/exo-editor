@@ -35,6 +35,7 @@ import {
   type StratofoldConnection,
 } from './providers/stratofold/connection'
 import { StratofoldSource } from './providers/stratofold/source'
+import { stratofoldWorkspaceId } from './providers/stratofold/provider'
 import {
   clearWorkspaceTabs,
   openFileTab,
@@ -49,12 +50,15 @@ export type WorkspacePhase =
 
 /** Shell-facing summary of the remote connection; never contains the token. */
 export interface RemoteWorkspaceSummary {
+  id: string
   server: string
   vdir: string
   name: string
   role: 'editor' | 'viewer' | 'public'
-  remembered: boolean
+  /** False only when the connection could not be written to IndexedDB. */
+  stored: boolean
   rejected: boolean
+  lastOpenedAt?: number
 }
 
 export interface RemoteErrorSummary {
@@ -136,6 +140,7 @@ export class WorkspaceRuntime {
     this.stratofold = new StratofoldSource({
       connectionStore: options.connectionStore ?? new IndexedDbConnectionStore(),
       seams: options.connectSeams,
+      now: options.now,
     })
     this.pluginConfig = new PluginConfigStore({
       eventTarget: options.eventTarget,
@@ -229,14 +234,11 @@ export class WorkspaceRuntime {
   }
 
   /**
-   * Validate a Stratofold connection and make it the active workspace. A failed
-   * validation leaves the active workspace, its tabs and its unsaved documents
-   * untouched.
+   * Validate a Stratofold connection, store it in the recent list and make it
+   * the active workspace. A failed validation leaves the active workspace, its
+   * tabs and its unsaved documents untouched.
    */
-  async connectRemote(
-    request: ConnectRequest,
-    options: { remember?: boolean } = {},
-  ): Promise<boolean> {
+  async connectRemote(request: ConnectRequest): Promise<boolean> {
     if (this.disposed) return false
     this.remoteError = null
     this.patch({ remoteError: undefined })
@@ -244,7 +246,6 @@ export class WorkspaceRuntime {
     let connected
     try {
       connected = await this.stratofold.connect(request, {
-        remember: options.remember ?? false,
         onCredentialRejected: () => this.onCredentialRejected(),
       })
     } catch (error) {
@@ -254,13 +255,58 @@ export class WorkspaceRuntime {
     }
 
     await this.activate(connected.handle, connected.provider)
-    this.remote = summaryOf(connected.connection, connected.remembered)
+    this.remote = summaryOf(connected.connection, connected.stored)
     this.patch({ remote: this.remote })
     await this.persistActive('stratofold', connected.handle.descriptor.id)
     return true
   }
 
-  /** Release the active workspace and forget the remote connection. */
+  /** Newest-first remote workspaces available for reopening; never includes tokens. */
+  async listRemoteConnections(): Promise<RemoteWorkspaceSummary[]> {
+    const records = await this.stratofold.list()
+    return records.map((record) => summaryOf(record.connection, true, false, record.lastOpenedAt))
+  }
+
+  /** Revalidate and open a stored recent workspace without retyping its token. */
+  async openRemoteRecent(id: string): Promise<boolean> {
+    if (this.disposed) return false
+    let record
+    try {
+      record = await this.stratofold.get(id)
+    } catch (error) {
+      this.patch({ remoteError: connectErrorSummary(error) })
+      return false
+    }
+    if (!record) {
+      this.patch({
+        remoteError: {
+          code: 'not-found',
+          message: 'That workspace is no longer in the recent list.',
+        },
+      })
+      return false
+    }
+    return this.connectRemote({
+      server: record.connection.server,
+      token: record.connection.token,
+      vdir: record.connection.vdir,
+    })
+  }
+
+  /** Remove one stored connection and its token, disconnecting it when active. */
+  async removeRemoteConnection(id: string): Promise<boolean> {
+    if (this.disposed) return false
+    try {
+      await this.stratofold.remove(id)
+    } catch (error) {
+      this.patch({ remoteError: connectErrorSummary(error) })
+      return false
+    }
+    if (this.remote?.id === id) await this.disconnect()
+    return true
+  }
+
+  /** Release the active workspace; the recent entry and its token are kept. */
   async disconnect(): Promise<void> {
     if (this.disposed) return
     const hadWorkspace = this.session !== null
@@ -269,7 +315,6 @@ export class WorkspaceRuntime {
     this.remote = null
     this.remoteError = null
     await this.activeStore.clear().catch(() => undefined)
-    await this.stratofold.forget().catch(() => undefined)
     this.patch({
       phase: hadWorkspace || this.current.phase === 'ready' ? 'no-workspace' : this.current.phase,
       generation: this.generationCount,
@@ -446,17 +491,16 @@ export class WorkspaceRuntime {
   private async restoreRemote(id: string): Promise<boolean> {
     try {
       const restored = await this.stratofold.restore(id, {
-        remember: true,
         onCredentialRejected: () => this.onCredentialRejected(),
       })
       if (!restored) return false
       await this.activate(restored.handle, restored.provider)
-      this.remote = summaryOf(restored.connection, true)
+      this.remote = summaryOf(restored.connection, restored.stored)
       this.patch({ remote: this.remote, remoteError: undefined })
       return true
     } catch (error) {
       if (error instanceof StratofoldConnectError) {
-        const stored = await this.stratofold.peek().catch(() => null)
+        const stored = await this.stratofold.peek(id).catch(() => null)
         this.remote = stored ? summaryOf(stored, true, true) : null
         this.remoteError = { code: error.code, message: error.message }
         this.patch({ remote: this.remote ?? undefined, remoteError: this.remoteError })
@@ -578,16 +622,19 @@ export class WorkspaceRuntime {
 
 function summaryOf(
   connection: StratofoldConnection,
-  remembered: boolean,
+  stored: boolean,
   rejected = false,
+  lastOpenedAt?: number,
 ): RemoteWorkspaceSummary {
   return {
+    id: stratofoldWorkspaceId(connection),
     server: connection.server,
     vdir: connection.vdir,
     name: connection.name,
     role: connection.role,
-    remembered,
+    stored,
     rejected,
+    ...(lastOpenedAt === undefined ? {} : { lastOpenedAt }),
   }
 }
 

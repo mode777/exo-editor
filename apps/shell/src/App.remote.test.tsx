@@ -13,6 +13,7 @@ import {
   FAKE_VDIR,
   FakeStratofoldServer,
 } from './workspace/providers/stratofold/fake-server'
+import { stratofoldWorkspaceId } from './workspace/providers/stratofold/provider'
 import { configurePresetStore, clearWorkspaceTabs } from './workbench/tabs'
 import { requestRemoteConnect } from './workspace/connect-bus'
 
@@ -62,7 +63,7 @@ function setValue(element: HTMLInputElement | null, value: string) {
   element.dispatchEvent(new Event('input', { bubbles: true }))
 }
 
-async function connectThroughDialog(mounted: Mounted, token = FAKE_TOKEN, remember = false) {
+async function connectThroughDialog(mounted: Mounted, token = FAKE_TOKEN) {
   click(button(mounted.container, 'Connect Remote…'))
   await vi.waitFor(() =>
     expect(mounted.container.querySelector('#exo-connect-server')).not.toBeNull(),
@@ -73,13 +74,20 @@ async function connectThroughDialog(mounted: Mounted, token = FAKE_TOKEN, rememb
       mounted.server.baseUrl,
     )
     setValue(mounted.container.querySelector<HTMLInputElement>('#exo-connect-token'), token)
-    const checkbox = mounted.container.querySelector<HTMLInputElement>('#exo-connect-remember')
-    if (checkbox && remember) click(checkbox)
   })
   await act(async () => {
     click(button(mounted.container, 'Connect'))
   })
   await vi.waitFor(() => expect(mounted.container.querySelector('#exo-connect-server')).toBeNull())
+}
+
+function remoteId(server: FakeStratofoldServer): string {
+  return stratofoldWorkspaceId({
+    server: server.baseUrl,
+    vdir: server.vdir,
+    name: server.vdirName,
+    role: 'editor',
+  })
 }
 
 function connectionStringFor(parts: { server: string; vdir?: string; token?: string }): string {
@@ -110,12 +118,12 @@ describe('remote workspace ui', () => {
     const mounted = await mount()
     try {
       await vi.waitFor(() => expect(button(mounted.container, 'Connect Remote…')).not.toBeNull())
-      await connectThroughDialog(mounted, FAKE_TOKEN, true)
+      await connectThroughDialog(mounted)
 
       await vi.waitFor(() => expect(mounted.container.textContent).toContain('a.txt'))
       expect(mounted.runtime.getSnapshot()).toMatchObject({
         phase: 'ready',
-        remote: { name: 'demo', remembered: true, rejected: false },
+        remote: { name: 'demo', stored: true, rejected: false },
       })
       expect(mounted.container.innerHTML).not.toContain(FAKE_TOKEN)
       expect(mounted.container.querySelector('.exo-reconnect-banner')).toBeNull()
@@ -164,10 +172,7 @@ describe('remote workspace ui', () => {
     const mounted = await mount()
     try {
       await mounted.runtime.start()
-      await mounted.runtime.connectRemote(
-        { server: mounted.server.baseUrl, token: FAKE_TOKEN },
-        { remember: true },
-      )
+      await mounted.runtime.connectRemote({ server: mounted.server.baseUrl, token: FAKE_TOKEN })
       await act(async () => {
         mounted.runtime.openDocument('/exo.json')
       })
@@ -178,7 +183,7 @@ describe('remote workspace ui', () => {
       const text = mounted.container.textContent ?? ''
       expect(text).toContain('Stratofold: demo')
       expect(text).toContain(mounted.server.baseUrl)
-      expect(text).toContain('remembered in this browser')
+      expect(text).toContain('stored in this browser')
       expect(text).not.toContain(FAKE_TOKEN)
     } finally {
       await act(async () => mounted.root.unmount())
@@ -319,7 +324,7 @@ describe('remote workspace connection strings', () => {
     }
   })
 
-  it('stores only the decomposed fields when a connection string is remembered', async () => {
+  it('stores only the decomposed fields of a connection string', async () => {
     const mounted = await mount()
     try {
       await openDialog(mounted)
@@ -331,10 +336,6 @@ describe('remote workspace connection strings', () => {
         ),
       )
       await act(async () => {
-        const checkbox = mounted.container.querySelector<HTMLInputElement>('#exo-connect-remember')
-        if (checkbox) click(checkbox)
-      })
-      await act(async () => {
         click(button(mounted.container, 'Connect'))
       })
       await vi.waitFor(() =>
@@ -342,7 +343,7 @@ describe('remote workspace connection strings', () => {
       )
       await vi.waitFor(() => expect(mounted.container.textContent).toContain('a.txt'))
 
-      const record = await mounted.connectionStore.get()
+      const record = await mounted.connectionStore.get(remoteId(mounted.server))
       expect(record?.connection).toEqual({
         server: mounted.server.baseUrl,
         vdir: FAKE_VDIR,
@@ -394,6 +395,159 @@ describe('remote workspace connection strings', () => {
         role: 'editor',
       })
       expect(mounted.server.requests[0].url.startsWith(mounted.server.baseUrl)).toBe(true)
+    } finally {
+      await act(async () => mounted.root.unmount())
+      mounted.container.remove()
+      await mounted.runtime.dispose()
+    }
+  })
+})
+
+describe('remote workspace recents', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    configurePresetStore()
+    clearWorkspaceTabs()
+  })
+
+  afterEach(() => {
+    document.body.innerHTML = ''
+    vi.unstubAllGlobals()
+  })
+
+  async function openRecents(mounted: Mounted) {
+    await vi.waitFor(() => expect(button(mounted.container, 'Connect Remote…')).not.toBeNull())
+    click(button(mounted.container, 'Connect Remote…'))
+    await vi.waitFor(() =>
+      expect(mounted.container.querySelector('#exo-recents-title')?.textContent).toContain(
+        'Recent workspaces',
+      ),
+    )
+  }
+
+  it('lists a stored workspace, reopens it and never renders the token', async () => {
+    const mounted = await mount()
+    try {
+      await mounted.runtime.start()
+      await mounted.runtime.connectRemote({
+        server: mounted.server.baseUrl,
+        token: FAKE_TOKEN,
+      })
+      await mounted.runtime.disconnect()
+
+      await openRecents(mounted)
+      expect(mounted.container.querySelector('#exo-connect-remember')).toBeNull()
+      expect(mounted.container.textContent).toContain('Connections and their tokens are stored')
+      expect(mounted.container.textContent).toContain(mounted.server.vdir)
+      expect(mounted.container.innerHTML).not.toContain(FAKE_TOKEN)
+
+      await act(async () => {
+        click(mounted.container.querySelector('[aria-label="Open demo"]'))
+      })
+
+      await vi.waitFor(() =>
+        expect(mounted.container.querySelector('#exo-connect-server')).toBeNull(),
+      )
+      expect(mounted.runtime.getSnapshot()).toMatchObject({
+        phase: 'ready',
+        remote: { name: 'demo', stored: true },
+      })
+      expect(mounted.container.innerHTML).not.toContain(FAKE_TOKEN)
+    } finally {
+      await act(async () => mounted.root.unmount())
+      mounted.container.remove()
+      await mounted.runtime.dispose()
+    }
+  })
+
+  it('removes one entry and deletes its token', async () => {
+    const mounted = await mount()
+    try {
+      await mounted.runtime.start()
+      await mounted.runtime.connectRemote({
+        server: mounted.server.baseUrl,
+        token: FAKE_TOKEN,
+      })
+      await mounted.runtime.disconnect()
+
+      await openRecents(mounted)
+      await act(async () => {
+        click(mounted.container.querySelector('[aria-label="Remove demo"]'))
+      })
+
+      await vi.waitFor(async () => {
+        expect(await mounted.connectionStore.get(remoteId(mounted.server))).toBeNull()
+      })
+      await vi.waitFor(() =>
+        expect(mounted.container.querySelector('#exo-recents-title')).toBeNull(),
+      )
+      expect(mounted.container.innerHTML).not.toContain(FAKE_TOKEN)
+    } finally {
+      await act(async () => mounted.root.unmount())
+      mounted.container.remove()
+      await mounted.runtime.dispose()
+    }
+  })
+
+  it('reports a failed reopen and keeps the entry', async () => {
+    const mounted = await mount()
+    try {
+      await mounted.runtime.start()
+      await mounted.runtime.connectRemote({
+        server: mounted.server.baseUrl,
+        token: FAKE_TOKEN,
+      })
+      await mounted.runtime.disconnect()
+
+      mounted.server.failNext(401)
+      await openRecents(mounted)
+      await act(async () => {
+        click(mounted.container.querySelector('[aria-label="Open demo"]'))
+      })
+
+      await vi.waitFor(() =>
+        expect(mounted.container.textContent).toContain('The server rejected this token'),
+      )
+      expect(mounted.runtime.getSnapshot().phase).toBe('no-workspace')
+      expect(await mounted.connectionStore.get(remoteId(mounted.server))).not.toBeNull()
+      expect(mounted.container.querySelector('#exo-connect-server')).not.toBeNull()
+    } finally {
+      await act(async () => mounted.root.unmount())
+      mounted.container.remove()
+      await mounted.runtime.dispose()
+    }
+  })
+
+  it('removes the active workspace from settings', async () => {
+    const mounted = await mount()
+    try {
+      await mounted.runtime.start()
+      await mounted.runtime.connectRemote({
+        server: mounted.server.baseUrl,
+        token: FAKE_TOKEN,
+      })
+
+      await act(async () => {
+        useWorkbenchStore.getState().setQuickOpen(true, 'commands')
+      })
+      const settingsEntry = Array.from(
+        mounted.container.querySelectorAll('[role="dialog"][aria-label="Command palette"] button'),
+      ).find((element) => element.textContent?.includes('Open Settings'))
+      await act(async () => {
+        ;(settingsEntry as HTMLButtonElement | undefined)?.click()
+      })
+
+      await vi.waitFor(() =>
+        expect(button(mounted.container, 'Remove from Recent Workspaces')).not.toBeNull(),
+      )
+      await act(async () => {
+        click(button(mounted.container, 'Remove from Recent Workspaces'))
+      })
+
+      await vi.waitFor(() => expect(mounted.runtime.getSnapshot().phase).toBe('no-workspace'))
+      expect(await mounted.connectionStore.get(remoteId(mounted.server))).toBeNull()
+      expect(mounted.runtime.getSnapshot().remote).toBeUndefined()
+      expect(mounted.container.textContent).toContain('No workspace is open.')
     } finally {
       await act(async () => mounted.root.unmount())
       mounted.container.remove()

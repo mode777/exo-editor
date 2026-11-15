@@ -5,6 +5,7 @@ interface WorkspaceSettingsProps {
   onOpenFolder: () => void
   onConnectRemote: () => void
   onDisconnect: () => void
+  onRemoveRemote: (id: string) => void
 }
 
 /** Workspace section of the shell settings: provider, connection and actions. */
@@ -12,6 +13,7 @@ export function WorkspaceSettings({
   onOpenFolder,
   onConnectRemote,
   onDisconnect,
+  onRemoveRemote,
 }: WorkspaceSettingsProps) {
   const snapshot = useWorkspaceSnapshot()
   const remote = snapshot.remote
@@ -34,7 +36,7 @@ export function WorkspaceSettings({
               <dt>Access</dt>
               <dd>
                 {remote.role === 'editor' ? 'Editor (read and write)' : 'Read only'}
-                {remote.remembered ? ' · remembered in this browser' : ' · this session only'}
+                {remote.stored ? ' · stored in this browser' : ' · this session only'}
               </dd>
             </dl>
           )}
@@ -53,9 +55,14 @@ export function WorkspaceSettings({
               Connect Remote Workspace…
             </button>
             {remote && (
-              <button type="button" onClick={onDisconnect}>
-                {remote.remembered ? 'Disconnect and forget' : 'Disconnect'}
-              </button>
+              <>
+                <button type="button" onClick={onDisconnect}>
+                  Disconnect
+                </button>
+                <button type="button" onClick={() => onRemoveRemote(remote.id)}>
+                  Remove from Recent Workspaces
+                </button>
+              </>
             )}
           </div>
         </>
@@ -80,8 +87,14 @@ export function WorkspaceSettings({
           {workspaceErrorMessage(snapshot.error.code, snapshot.error.path)}
         </p>
       )}
+      {snapshot.remoteError && (
+        <p className="exo-dialog-error" role="alert">
+          {snapshot.remoteError.message}
+        </p>
+      )}
       <p className="exo-dialog-hint">
-        Remote workspaces are optional. A folder workspace stays local to this browser.
+        Remote workspaces are optional. Connections and their tokens are stored in this browser
+        until you remove them. A folder workspace stays local to this browser.
       </p>
     </section>
   )

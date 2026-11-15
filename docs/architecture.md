@@ -244,10 +244,10 @@ mock workspace, and no fabricated file tree is shown to an unsupported browser.
 
 Remote providers are a parallel track, not a numbered layer (D17). They are
 opt-in: the user connects a remote workspace and supplies its credential.
-Connections are session-only unless the user explicitly asks to remember one, and
-a remembered token lives in the shell's IndexedDB and is deleted on disconnect. A
-rejected or revoked credential moves the workspace into an explicit reconnect
-state rather than a silent retry. A remote provider implements the same session
+Validated connections are kept in a recent-workspaces list in the shell's
+IndexedDB, newest first and capped at ten; disconnecting keeps the entry, and
+removing it deletes the token. A rejected or revoked credential moves the
+workspace into an explicit reconnect state rather than a silent retry. A remote provider implements the same session
 contract, so the plugin protocol and document flow do not change. The first is
 Stratofold; its contract mapping, residual gaps, credential model and published
 client are documented in

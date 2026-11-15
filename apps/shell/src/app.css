@@ -202,6 +202,62 @@
   font: inherit;
 }
 
+.exo-recents {
+  margin: 0 0 12px;
+}
+
+.exo-recents h3 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.exo-recent-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.exo-recent-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 6px;
+  border: 1px solid var(--vscode-widget-border);
+}
+
+.exo-recent-details {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-size: 12px;
+}
+
+.exo-recent-meta {
+  color: var(--vscode-descriptionForeground);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.exo-recent-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 4px;
+}
+
+.exo-recent-actions button {
+  padding: 2px 8px;
+  border: 1px solid var(--vscode-button-border, transparent);
+  background: var(--vscode-button-secondaryBackground, var(--vscode-button-background));
+  color: var(--vscode-button-secondaryForeground, var(--vscode-button-foreground));
+  font: inherit;
+  cursor: pointer;
+}
+
 .exo-dialog-error {
   color: var(--vscode-errorForeground);
 }

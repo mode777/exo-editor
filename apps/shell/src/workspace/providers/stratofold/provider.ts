@@ -18,7 +18,7 @@ import { abortable, mapStratofoldError, rejectionOf } from './errors'
 export interface StratofoldProviderOptions {
   connection: StratofoldConnection
   client: StratofoldClient
-  /** True only when the user asked to remember the connection. */
+  /** True when the connection was written to the recent-workspaces store. */
   persistent?: boolean
   /** Called when the server rejects the credential, never for other failures. */
   onCredentialRejected?: (status: 'unauthorized' | 'forbidden') => void

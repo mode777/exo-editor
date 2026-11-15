@@ -12,6 +12,7 @@ interface SettingsDialogProps {
   onOpenFolder: () => void
   onConnectRemote: () => void
   onDisconnect: () => void
+  onRemoveRemote: (id: string) => void
 }
 
 // The shell-owned settings surface. Theme is global; workspace and plugin
@@ -23,6 +24,7 @@ export function SettingsDialog({
   onOpenFolder,
   onConnectRemote,
   onDisconnect,
+  onRemoveRemote,
 }: SettingsDialogProps) {
   const theme = useWorkbenchStore((state) => state.theme)
   const setTheme = useWorkbenchStore((state) => state.setTheme)
@@ -100,6 +102,7 @@ export function SettingsDialog({
           onOpenFolder={onOpenFolder}
           onConnectRemote={onConnectRemote}
           onDisconnect={onDisconnect}
+          onRemoveRemote={onRemoveRemote}
         />
         <PluginSettings />
       </div>

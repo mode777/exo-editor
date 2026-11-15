@@ -4,7 +4,10 @@ import { WorkspaceRuntime } from './runtime'
 import { MemoryWorkspaceProvider } from './providers/memory'
 import { MemoryHandleStore } from './providers/folder/handle-store'
 import { MemoryActiveWorkspaceStore } from './providers/active-store'
-import { MemoryConnectionStore } from './providers/stratofold/connection-store'
+import {
+  MemoryConnectionStore,
+  type ConnectionStore,
+} from './providers/stratofold/connection-store'
 import {
   FAKE_TOKEN,
   FakeStratofoldServer,
@@ -12,6 +15,7 @@ import {
   FAKE_VDIR,
 } from './providers/stratofold/fake-server'
 import { stratofoldWorkspaceId } from './providers/stratofold/provider'
+import { type ConnectSeams } from './providers/stratofold/connection'
 import { clearWorkspaceTabs, configurePresetStore } from '../workbench/tabs'
 import { EXO_CONFIG_PATH } from '../plugins/config'
 
@@ -23,7 +27,7 @@ interface Harness {
   runtime: WorkspaceRuntime
   server: FakeStratofoldServer
   activeStore: MemoryActiveWorkspaceStore
-  connectionStore: MemoryConnectionStore
+  connectionStore: ConnectionStore
   handleStore: MemoryHandleStore
 }
 
@@ -33,8 +37,9 @@ function harness(
     supportsFolder?: boolean
     providers?: ReturnType<typeof memoryProvider>[]
     activeStore?: MemoryActiveWorkspaceStore
-    connectionStore?: MemoryConnectionStore
+    connectionStore?: ConnectionStore
     handleStore?: MemoryHandleStore
+    connectSeams?: ConnectSeams
   } = {},
 ): Harness {
   const server = options.server ?? new FakeStratofoldServer({ initialFiles: { 'a.txt': 'one' } })
@@ -55,11 +60,31 @@ function harness(
     handleStore,
     activeStore,
     connectionStore,
-    connectSeams: { fetch: server.fetch, createXhr: server.createXhr },
+    connectSeams: options.connectSeams ?? { fetch: server.fetch, createXhr: server.createXhr },
     eventTarget: new EventTarget(),
     now: () => 1,
   })
   return { runtime, server, activeStore, connectionStore, handleStore }
+}
+
+function routedSeams(servers: FakeStratofoldServer[]): ConnectSeams {
+  return {
+    fetch: (input, init) => {
+      const server = servers.find((candidate) => input.startsWith(candidate.baseUrl))
+      if (!server) throw new TypeError(`No fake server for ${input}`)
+      return server.fetch(input, init)
+    },
+    createXhr: () => servers[0].createXhr(),
+  }
+}
+
+function idFor(server: FakeStratofoldServer, vdir = server.vdir): string {
+  return stratofoldWorkspaceId({
+    server: server.baseUrl,
+    vdir,
+    name: server.vdirName,
+    role: 'editor',
+  })
 }
 
 const REMOTE_ID = stratofoldWorkspaceId({
@@ -67,7 +92,6 @@ const REMOTE_ID = stratofoldWorkspaceId({
   vdir: FAKE_VDIR,
   name: 'demo',
   role: 'editor',
-  token: FAKE_TOKEN,
 })
 
 describe('workspace runtime remote workspaces', () => {
@@ -81,23 +105,19 @@ describe('workspace runtime remote workspaces', () => {
     const { runtime, server } = harness()
     await runtime.start()
 
-    expect(
-      await runtime.connectRemote(
-        { server: server.baseUrl, token: FAKE_TOKEN },
-        { remember: true },
-      ),
-    ).toBe(true)
+    expect(await runtime.connectRemote({ server: server.baseUrl, token: FAKE_TOKEN })).toBe(true)
 
     expect(runtime.getSnapshot()).toMatchObject({
       phase: 'ready',
       writable: true,
       descriptor: { providerKind: 'stratofold', name: 'demo' },
       remote: {
+        id: REMOTE_ID,
         server: server.baseUrl,
         vdir: FAKE_VDIR,
         name: 'demo',
         role: 'editor',
-        remembered: true,
+        stored: true,
         rejected: false,
       },
     })
@@ -110,13 +130,28 @@ describe('workspace runtime remote workspaces', () => {
     await runtime.dispose()
   })
 
-  it('restores a remembered connection after a reload', async () => {
+  it('stores a public connection without a credential', async () => {
+    const server = new FakeStratofoldServer({
+      tokens: [],
+      publicRead: true,
+      initialFiles: { 'a.txt': 'one' },
+    })
+    const { runtime, connectionStore } = harness({ server })
+    await runtime.start()
+
+    expect(await runtime.connectRemote({ server: server.baseUrl, vdir: server.vdir })).toBe(true)
+
+    const record = await connectionStore.get(idFor(server))
+    expect(record).not.toBeNull()
+    expect(record?.connection.token).toBeUndefined()
+    expect(runtime.getSnapshot().remote).toMatchObject({ role: 'public', stored: true })
+    await runtime.dispose()
+  })
+
+  it('restores the active recent connection after a reload', async () => {
     const first = harness()
     await first.runtime.start()
-    await first.runtime.connectRemote(
-      { server: first.server.baseUrl, token: FAKE_TOKEN },
-      { remember: true },
-    )
+    await first.runtime.connectRemote({ server: first.server.baseUrl, token: FAKE_TOKEN })
     await first.runtime.dispose()
 
     const second = harness({
@@ -129,19 +164,27 @@ describe('workspace runtime remote workspaces', () => {
     expect(second.runtime.getSnapshot()).toMatchObject({
       phase: 'ready',
       descriptor: { id: REMOTE_ID },
-      remote: { vdir: FAKE_VDIR, remembered: true, rejected: false },
+      remote: { vdir: FAKE_VDIR, stored: true, rejected: false },
     })
     await second.runtime.dispose()
   })
 
-  it('does not restore a session-only connection after a reload', async () => {
+  it('keeps a disconnected recent entry without restoring it after reload', async () => {
     const first = harness()
     await first.runtime.start()
-    await first.runtime.connectRemote(
-      { server: first.server.baseUrl, token: FAKE_TOKEN },
-      { remember: false },
-    )
-    expect(first.runtime.getSnapshot().remote).toMatchObject({ remembered: false })
+    await first.runtime.connectRemote({ server: first.server.baseUrl, token: FAKE_TOKEN })
+
+    await first.runtime.disconnect()
+
+    expect(first.runtime.getSnapshot()).toMatchObject({
+      phase: 'no-workspace',
+      writable: false,
+      restoreAvailable: false,
+    })
+    expect(first.runtime.getSnapshot().remote).toBeUndefined()
+    expect(first.runtime.getSession()).toBeNull()
+    expect(await first.activeStore.get()).toBeNull()
+    expect(await first.connectionStore.get(REMOTE_ID)).not.toBeNull()
     await first.runtime.dispose()
 
     const second = harness({
@@ -152,17 +195,110 @@ describe('workspace runtime remote workspaces', () => {
     await second.runtime.start()
 
     expect(second.runtime.getSnapshot().phase).toBe('no-workspace')
-    expect(await first.connectionStore.get()).toBeNull()
+    expect(await second.runtime.listRemoteConnections()).toHaveLength(1)
     await second.runtime.dispose()
   })
 
-  it('presents the reconnect state when a remembered credential was revoked', async () => {
+  it('lists recent workspaces newest first and updates an existing entry', async () => {
+    const firstServer = new FakeStratofoldServer({
+      baseUrl: 'https://one.test',
+      vdir: 'vdir-1',
+      vdirName: 'one',
+      initialFiles: { 'a.txt': 'one' },
+    })
+    const secondServer = new FakeStratofoldServer({
+      baseUrl: 'https://two.test',
+      vdir: 'vdir-2',
+      vdirName: 'two',
+      initialFiles: { 'a.txt': 'two' },
+    })
+    const { runtime } = harness({
+      server: firstServer,
+      connectSeams: routedSeams([firstServer, secondServer]),
+    })
+    await runtime.start()
+
+    await runtime.connectRemote({ server: firstServer.baseUrl, token: FAKE_TOKEN })
+    await runtime.connectRemote({ server: secondServer.baseUrl, token: FAKE_TOKEN })
+
+    const list = await runtime.listRemoteConnections()
+    expect(list.map((item) => item.name)).toEqual(['two', 'one'])
+    expect(list.every((item) => item.stored)).toBe(true)
+    expect(JSON.stringify(list)).not.toContain(FAKE_TOKEN)
+
+    await runtime.connectRemote({ server: firstServer.baseUrl, token: FAKE_TOKEN })
+    const updated = await runtime.listRemoteConnections()
+    expect(updated.map((item) => item.name)).toEqual(['one', 'two'])
+    expect(updated).toHaveLength(2)
+    await runtime.dispose()
+  })
+
+  it('opens a recent workspace without retyping its token', async () => {
+    const { runtime, server } = harness()
+    await runtime.start()
+    await runtime.connectRemote({ server: server.baseUrl, token: FAKE_TOKEN })
+    await runtime.disconnect()
+
+    expect(await runtime.openRemoteRecent(REMOTE_ID)).toBe(true)
+    expect(runtime.getSnapshot()).toMatchObject({
+      phase: 'ready',
+      remote: { id: REMOTE_ID, name: 'demo', stored: true },
+    })
+    await runtime.dispose()
+  })
+
+  it('reports a missing recent entry and keeps the current workspace', async () => {
+    const { runtime } = harness()
+    await runtime.start()
+    await runtime.openFolder()
+    const generation = runtime.getSnapshot().generation
+
+    expect(await runtime.openRemoteRecent('stratofold:https://missing.test:vdir')).toBe(false)
+    expect(runtime.getSnapshot()).toMatchObject({
+      phase: 'ready',
+      generation,
+      remoteError: { code: 'not-found' },
+    })
+    expect(runtime.getSession()).not.toBeNull()
+    await runtime.dispose()
+  })
+
+  it('removes a recent entry and disconnects when it is active', async () => {
+    const firstServer = new FakeStratofoldServer({
+      baseUrl: 'https://one.test',
+      vdir: 'vdir-1',
+      vdirName: 'one',
+      initialFiles: { 'a.txt': 'one' },
+    })
+    const secondServer = new FakeStratofoldServer({
+      baseUrl: 'https://two.test',
+      vdir: 'vdir-2',
+      vdirName: 'two',
+      initialFiles: { 'a.txt': 'two' },
+    })
+    const { runtime, activeStore, connectionStore } = harness({
+      server: firstServer,
+      connectSeams: routedSeams([firstServer, secondServer]),
+    })
+    await runtime.start()
+    await runtime.connectRemote({ server: firstServer.baseUrl, token: FAKE_TOKEN })
+    await runtime.connectRemote({ server: secondServer.baseUrl, token: FAKE_TOKEN })
+
+    const secondId = idFor(secondServer)
+    await runtime.removeRemoteConnection(secondId)
+
+    expect(runtime.getSnapshot()).toMatchObject({ phase: 'no-workspace' })
+    expect(runtime.getSnapshot().remote).toBeUndefined()
+    expect(await activeStore.get()).toBeNull()
+    expect(await connectionStore.get(secondId)).toBeNull()
+    expect((await runtime.listRemoteConnections()).map((item) => item.name)).toEqual(['one'])
+    await runtime.dispose()
+  })
+
+  it('presents the reconnect state when a stored credential was revoked', async () => {
     const first = harness()
     await first.runtime.start()
-    await first.runtime.connectRemote(
-      { server: first.server.baseUrl, token: FAKE_TOKEN },
-      { remember: true },
-    )
+    await first.runtime.connectRemote({ server: first.server.baseUrl, token: FAKE_TOKEN })
     await first.runtime.dispose()
 
     first.server.failNext(401)
@@ -175,17 +311,19 @@ describe('workspace runtime remote workspaces', () => {
 
     expect(second.runtime.getSnapshot()).toMatchObject({
       phase: 'no-workspace',
-      remote: { vdir: FAKE_VDIR, remembered: true, rejected: true },
+      remote: { vdir: FAKE_VDIR, stored: true, rejected: true },
       remoteError: { code: 'unauthorized' },
     })
+    expect(await second.runtime.listRemoteConnections()).toHaveLength(1)
     await second.runtime.dispose()
   })
 
   it('refuses a stored connection that resolves to another directory', async () => {
     const activeStore = new MemoryActiveWorkspaceStore()
     const connectionStore = new MemoryConnectionStore()
+    const otherId = 'stratofold:https://other.test:other-vdir'
     await connectionStore.put({
-      id: 'stratofold:https://other.test:other-vdir',
+      id: otherId,
       connection: {
         server: FAKE_BASE_URL,
         vdir: 'other-vdir',
@@ -193,8 +331,9 @@ describe('workspace runtime remote workspaces', () => {
         role: 'editor',
         token: FAKE_TOKEN,
       },
+      lastOpenedAt: 1,
     })
-    await activeStore.put({ kind: 'stratofold', id: 'stratofold:https://other.test:other-vdir' })
+    await activeStore.put({ kind: 'stratofold', id: otherId })
 
     const { runtime } = harness({ activeStore, connectionStore })
     await runtime.start()
@@ -202,6 +341,7 @@ describe('workspace runtime remote workspaces', () => {
     expect(runtime.getSnapshot().phase).toBe('no-workspace')
     expect(runtime.getSnapshot().remoteError?.code).toMatch(/not-found|mismatch|unauthorized/)
     expect(runtime.getSession()).toBeNull()
+    expect(await connectionStore.get(otherId)).not.toBeNull()
     await runtime.dispose()
   })
 
@@ -285,23 +425,32 @@ describe('workspace runtime remote workspaces', () => {
     await runtime.dispose()
   })
 
-  it('disconnects, forgetting the workspace and its credential', async () => {
-    const { runtime, server, activeStore, connectionStore } = harness()
+  it('keeps a session-only workspace when the connection cannot be stored', async () => {
+    const failing: ConnectionStore = {
+      list: async () => {
+        throw new Error('storage unavailable')
+      },
+      get: async () => {
+        throw new Error('storage unavailable')
+      },
+      put: async () => {
+        throw new Error('storage unavailable')
+      },
+      remove: async () => {
+        throw new Error('storage unavailable')
+      },
+      clear: async () => {
+        throw new Error('storage unavailable')
+      },
+    }
+    const { runtime, server } = harness({ connectionStore: failing })
     await runtime.start()
-    await runtime.connectRemote({ server: server.baseUrl, token: FAKE_TOKEN }, { remember: true })
 
-    await runtime.disconnect()
-
+    expect(await runtime.connectRemote({ server: server.baseUrl, token: FAKE_TOKEN })).toBe(true)
     expect(runtime.getSnapshot()).toMatchObject({
-      phase: 'no-workspace',
-      writable: false,
-      restoreAvailable: false,
+      phase: 'ready',
+      remote: { stored: false },
     })
-    expect(runtime.getSnapshot().remote).toBeUndefined()
-    expect(runtime.getSession()).toBeNull()
-    expect(useWorkbenchStore.getState().tabs).toEqual([])
-    expect(await activeStore.get()).toBeNull()
-    expect(await connectionStore.get()).toBeNull()
     await runtime.dispose()
   })
 })
@@ -344,10 +493,12 @@ describe('remote workspace plugin boundary', () => {
     expect(new TextDecoder().decode(await session!.read('/exo.json'))).toContain('schemaVersion')
 
     // The credential is absent from everything a plugin or the UI can observe.
+    const recents = await runtime.listRemoteConnections()
     for (const observed of [
       runtime.getSnapshot(),
       runtime.pluginHost.getSnapshot(),
       runtime.pluginConfig.getSnapshot(),
+      recents,
     ]) {
       expect(JSON.stringify(observed)).not.toContain(FAKE_TOKEN)
     }

@@ -326,9 +326,9 @@ gaps and the upstream asks live in
   URL; the directory and token still come from the string.
 - `capabilities()` is `writable` only for an `editor` credential, `watchable:
   false`, `caseSensitive: false` (the server exposes no case capability, so
-  `EXO.JSON` and `.EXO/**` are treated as reserved), `persistent` only when the
-  user opted to remember the connection, and no `maxFileSize` because the
-  server's limit is not discoverable.
+  `EXO.JSON` and `.EXO/**` are treated as reserved), `persistent` when the
+  connection was written to the recent-workspaces store, and no `maxFileSize`
+  because the server's limit is not discoverable.
 - `version` is the server's opaque content version. `ifVersion` becomes a
   conditional upload; a mismatch rejects with `conflict` and no publish.
 - A zero-length write is an ordinary write: it creates an empty file or replaces
@@ -338,11 +338,18 @@ gaps and the upstream asks live in
 - A public connection and a `viewer` credential are read-only. The session
   rejects writes with `unsupported` before any request.
 - The credential is shell-owned: header-only transport, never a URL, a bundle
-  entry, the workspace log or a plugin message. It is stored only after an
-  explicit opt-in and is deleted by "forget", "disconnect" or a failed
-  reconnect. A connection supplied as a connection string is stored as its
-  decomposed server, directory, name, role and token fields; the raw string is
-  never persisted. A session-only connection leaves no stored credential.
+  entry, the workspace log or a plugin message. Every successfully validated
+  connection is written to the recent-workspaces list in IndexedDB, including
+  its token; a connection supplied as a connection string is stored as its
+  decomposed server, directory, name, role and token fields, and the raw string
+  is never persisted. A storage failure leaves the workspace session-only. The
+  workspace snapshot and recent-list summaries carry metadata only.
+- The recent-workspaces list is keyed by workspace identity, ordered newest
+  first and capped at ten. Opening an entry revalidates it before mounting; a
+  rejected entry stays listed and surfaces the reconnect state. Removing an
+  entry deletes its token; disconnecting releases the workspace but keeps the
+  entry. Disconnecting is therefore not forgetting. A v1 single `last` record
+  is migrated into the list.
 - A rejected, expired or revoked credential moves the workspace to an explicit
   reconnect state. The shell makes no further request until the user reconnects
   or disconnects, and it never retries silently or reports the failure as `io`.
@@ -378,7 +385,9 @@ ready -> dispose -> no session
 
 `open` differs by provider kind: a picker for a folder, a validated connection for
 a remote workspace. A workspace switch is the same operation regardless of
-whether the two workspaces use the same provider kind.
+whether the two workspaces use the same provider kind. Opening or reconnecting a
+remote workspace updates its recent entry; disconnecting releases the session
+without deleting that entry.
 
 `dispose()` performs, in order:
 
