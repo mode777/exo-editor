@@ -26,12 +26,17 @@ export interface CommandContext {
   writable: boolean
   hasSelection: boolean
   hasActiveDocument: boolean
+  /** The active workspace is a remote connection. */
+  remote: boolean
 }
 
 export interface ExoCommandHandlers {
   openSettings: () => void
   openPluginSettings: () => void
+  openWorkspaceSettings: () => void
   openFolder: () => void
+  connectRemote: () => void
+  disconnect: () => void
   restoreAccess: () => void
   saveActive: () => void
   newFile: () => void
@@ -50,6 +55,18 @@ export function createExoCommands(handlers: ExoCommandHandlers): WorkbenchComman
       category: 'File',
       keybinding: 'Ctrl+K Ctrl+O',
       run: handlers.openFolder,
+    },
+    {
+      id: 'exo.workspace.connectRemote',
+      title: 'Connect Remote Workspace…',
+      category: 'File',
+      run: handlers.connectRemote,
+    },
+    {
+      id: 'exo.workspace.disconnect',
+      title: 'Disconnect Workspace',
+      category: 'Workspace',
+      run: handlers.disconnect,
     },
     {
       id: 'exo.workspace.restoreAccess',
@@ -112,11 +129,18 @@ export function createExoCommands(handlers: ExoCommandHandlers): WorkbenchComman
       category: 'Preferences',
       run: handlers.openSettings,
     },
+    {
+      id: 'exo.settings.workspace',
+      title: 'Open Workspace Settings',
+      category: 'Preferences',
+      run: handlers.openWorkspaceSettings,
+    },
   ]
 }
 
 const AVAILABILITY: Record<string, (context: CommandContext) => boolean> = {
   'exo.workspace.restoreAccess': (context) => context.hasWorkspace && !context.writable,
+  'exo.workspace.disconnect': (context) => context.hasWorkspace && context.remote,
   'exo.explorer.newFile': (context) => context.hasWorkspace && context.writable,
   'exo.explorer.newFolder': (context) => context.hasWorkspace && context.writable,
   'exo.explorer.rename': (context) =>

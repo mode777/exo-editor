@@ -306,6 +306,47 @@ is not mounted as a fallback for unsupported browsers:
 - A browser without the File System Access API gets an explicit unsupported
   state, never a memory-backed mock workspace.
 
+### Stratofold provider (remote)
+
+`StratofoldWorkspaceProvider` (`kind: 'stratofold'`) maps one Stratofold vdir to
+one workspace. `@stratofold/client` is pinned exactly; the mapping, the residual
+gaps and the upstream asks live in
+[`../providers/stratofold.md`](../providers/stratofold.md).
+
+- `open()` is the connect flow, not a picker. The shell validates the connection
+  against the server before a handle exists: a token's scope is resolved with
+  `tokenInfo()` and a public directory with an initial `list("")`. A connection
+  that fails validation produces no handle.
+- `capabilities()` is `writable` only for an `editor` credential, `watchable:
+  false`, `caseSensitive: false` (the server exposes no case capability, so
+  `EXO.JSON` and `.EXO/**` are treated as reserved), `persistent` only when the
+  user opted to remember the connection, and no `maxFileSize` because the
+  server's limit is not discoverable.
+- `version` is the server's opaque content version. `ifVersion` becomes a
+  conditional upload; a mismatch rejects with `conflict` and no publish.
+- A public connection and a `viewer` credential are read-only. The session
+  rejects writes with `unsupported` before any request.
+- The credential is shell-owned: header-only transport, never a URL, a bundle
+  entry, the workspace log or a plugin message. It is stored only after an
+  explicit opt-in and is deleted by "forget", "disconnect" or a failed
+  reconnect. A session-only connection leaves no stored credential.
+- A rejected, expired or revoked credential moves the workspace to an explicit
+  reconnect state. The shell makes no further request until the user reconnects
+  or disconnects, and it never retries silently or reports the failure as `io`.
+- Reconnect is a workspace switch: the old session is disposed and the workspace
+  is activated again, so no tab, cached content or loaded version survives it.
+- The provider exposes no `fileUrl()` or `temporaryUrl()`; bytes move only
+  through `read()` and `write()`.
+
+### Provider selection
+
+The runtime holds one provider entry per kind and opens exactly one workspace at
+a time. A persisted workspace record carries its provider kind; restore uses that
+kind and returns no workspace rather than mounting another provider's record. A
+record written before provider selection existed is a folder workspace. A
+browser without the File System Access API still reports the folder path as
+unsupported, and may open a remote workspace.
+
 ### Future providers
 
 OPFS, read-only bundles (for demos) and remote stores implement the same
@@ -316,10 +357,15 @@ weaken the contract.
 ## 7. Session lifecycle (normative)
 
 ```text
-create provider -> open/restore -> create session -> ready
-ready -> switch request -> dispose session -> create provider -> open -> ready
+select provider kind -> open/restore -> create session -> ready
+ready -> switch request -> dispose session -> select provider kind -> open -> ready
+ready -> credential rejected -> reconnect state -> reconnect or disconnect -> ready / no session
 ready -> dispose -> no session
 ```
+
+`open` differs by provider kind: a picker for a folder, a validated connection for
+a remote workspace. A workspace switch is the same operation regardless of
+whether the two workspaces use the same provider kind.
 
 `dispose()` performs, in order:
 

@@ -242,11 +242,14 @@ provider exists for tests and the conformance suite; it is never mounted as a
 mock workspace, and no fabricated file tree is shown to an unsupported browser.
 
 Remote providers are a parallel track, not a numbered layer (D17). They are
-opt-in: the user connects a remote workspace and supplies its credential, which
-the shell stores only with explicit consent. A remote provider implements the
-same session contract, so the plugin protocol and document flow do not change.
-The first is Stratofold; its contract mapping, residual gaps, credential model
-and distribution blocker are documented in
+opt-in: the user connects a remote workspace and supplies its credential.
+Connections are session-only unless the user explicitly asks to remember one, and
+a remembered token lives in the shell's IndexedDB and is deleted on disconnect. A
+rejected or revoked credential moves the workspace into an explicit reconnect
+state rather than a silent retry. A remote provider implements the same session
+contract, so the plugin protocol and document flow do not change. The first is
+Stratofold; its contract mapping, residual gaps, credential model and published
+client are documented in
 [`providers/stratofold.md`](./providers/stratofold.md). A remote workspace is the
 path out of D10's folder-only browser limitation, but it does not weaken D10 for
 folder-backed workspaces.

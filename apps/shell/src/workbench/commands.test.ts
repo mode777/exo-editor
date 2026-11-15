@@ -7,13 +7,17 @@ const NO_WORKSPACE: CommandContext = {
   writable: false,
   hasSelection: false,
   hasActiveDocument: false,
+  remote: false,
 }
 
 function setup(context: CommandContext = NO_WORKSPACE) {
   const handlers: ExoCommandHandlers = {
     openSettings: vi.fn(),
     openPluginSettings: vi.fn(),
+    openWorkspaceSettings: vi.fn(),
     openFolder: vi.fn(),
+    connectRemote: vi.fn(),
+    disconnect: vi.fn(),
     restoreAccess: vi.fn(),
     saveActive: vi.fn(),
     newFile: vi.fn(),
@@ -74,6 +78,7 @@ describe('exo command registry', () => {
       writable: true,
       hasSelection: false,
       hasActiveDocument: false,
+      remote: false,
     })
     const ids = writable.registry.list().map((command) => command.id)
     expect(ids).toEqual(
@@ -91,6 +96,7 @@ describe('exo command registry', () => {
       writable: true,
       hasSelection: true,
       hasActiveDocument: true,
+      remote: false,
     })
     const selectedIds = withSelection.registry.list().map((command) => command.id)
     expect(selectedIds).toEqual(
@@ -104,6 +110,7 @@ describe('exo command registry', () => {
       writable: false,
       hasSelection: false,
       hasActiveDocument: false,
+      remote: false,
     })
     expect(readOnly.registry.list().map((command) => command.id)).toContain(
       'exo.workspace.restoreAccess',
@@ -114,6 +121,7 @@ describe('exo command registry', () => {
       writable: true,
       hasSelection: false,
       hasActiveDocument: false,
+      remote: false,
     })
     expect(writable.registry.list().map((command) => command.id)).not.toContain(
       'exo.workspace.restoreAccess',

@@ -15,6 +15,7 @@ import {
   validateEntryName,
 } from '../workspace/paths'
 import { useWorkspaceRuntime, useWorkspaceSnapshot } from '../workspace/context'
+import { requestRemoteConnect } from '../workspace/connect-bus'
 import { onExplorerCommand } from './bus'
 
 interface Row {
@@ -393,6 +394,18 @@ function Explorer() {
           >
             Open Folder…
           </button>
+        )}
+        <button
+          type="button"
+          className="exo-explorer-action"
+          onClick={() => requestRemoteConnect()}
+        >
+          Connect Remote…
+        </button>
+        {snapshot.remoteError && (
+          <p className="exo-explorer-error" role="alert">
+            {snapshot.remoteError.message}
+          </p>
         )}
         {snapshot.error && (
           <p className="exo-explorer-error" role="alert">

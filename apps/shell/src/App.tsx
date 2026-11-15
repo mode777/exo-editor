@@ -7,6 +7,8 @@ import {
 } from 'vscode-workbench'
 import { DocumentArea } from './document/DocumentArea'
 import { requestExplorerCommand } from './explorer/bus'
+import { ConnectRemoteDialog } from './workspace/ConnectRemoteDialog'
+import { onRemoteConnect, requestRemoteConnect } from './workspace/connect-bus'
 import { ConsentDialog } from './plugins/ConsentDialog'
 import { SettingsDialog, type SettingsSection } from './settings/SettingsDialog'
 import { ThemeSync } from './theme-sync'
@@ -66,6 +68,7 @@ function Shell({ runtime }: { runtime: WorkspaceRuntime }) {
   const host = usePluginHost()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [settingsSection, setSettingsSection] = useState<SettingsSection>('general')
+  const [connectOpen, setConnectOpen] = useState(false)
   const [pendingClose, setPendingClose] = useState<PendingClose | null>(null)
   const [closeError, setCloseError] = useState<string | null>(null)
 
@@ -76,6 +79,11 @@ function Shell({ runtime }: { runtime: WorkspaceRuntime }) {
 
   const openPluginSettings = useCallback(() => {
     setSettingsSection('plugins')
+    setSettingsOpen(true)
+  }, [])
+
+  const openWorkspaceSettings = useCallback(() => {
+    setSettingsSection('workspace')
     setSettingsOpen(true)
   }, [])
 
@@ -132,24 +140,41 @@ function Shell({ runtime }: { runtime: WorkspaceRuntime }) {
     )
   }, [runtime])
 
+  const guardDirty = useCallback(
+    (action: () => void) => {
+      const dirtyPaths = runtime.documents.dirtyPaths()
+      if (dirtyPaths.length > 0) {
+        setCloseError(null)
+        setPendingClose({ paths: dirtyPaths, proceed: action })
+        return
+      }
+      action()
+    },
+    [runtime],
+  )
+
   const openFolder = useCallback(() => {
-    const dirtyPaths = runtime.documents.dirtyPaths()
-    if (dirtyPaths.length > 0) {
-      setCloseError(null)
-      setPendingClose({
-        paths: dirtyPaths,
-        proceed: () => void runtime.openFolder(),
-      })
-      return
-    }
-    void runtime.openFolder()
-  }, [runtime])
+    guardDirty(() => void runtime.openFolder())
+  }, [guardDirty, runtime])
+
+  const openConnect = useCallback(() => {
+    guardDirty(() => setConnectOpen(true))
+  }, [guardDirty])
+
+  const disconnectWorkspace = useCallback(() => {
+    guardDirty(() => void runtime.disconnect())
+  }, [guardDirty, runtime])
+
+  useEffect(() => onRemoteConnect(openConnect), [openConnect])
 
   const handlers = useMemo<ExoCommandHandlers>(
     () => ({
       openSettings,
       openPluginSettings,
+      openWorkspaceSettings,
       openFolder,
+      connectRemote: () => requestRemoteConnect(),
+      disconnect: disconnectWorkspace,
       restoreAccess: () => void runtime.requestPermission(),
       saveActive: () => void runtime.saveActiveDocument(),
       newFile: () => requestExplorerCommand('new-file'),
@@ -158,7 +183,14 @@ function Shell({ runtime }: { runtime: WorkspaceRuntime }) {
       delete: () => requestExplorerCommand('delete'),
       refreshExplorer: () => runtime.refreshExplorer(),
     }),
-    [openFolder, openPluginSettings, openSettings, runtime],
+    [
+      disconnectWorkspace,
+      openFolder,
+      openPluginSettings,
+      openSettings,
+      openWorkspaceSettings,
+      runtime,
+    ],
   )
 
   const getContext = useCallback((): CommandContext => {
@@ -168,6 +200,7 @@ function Shell({ runtime }: { runtime: WorkspaceRuntime }) {
       writable: current.writable,
       hasSelection: Boolean(current.selection),
       hasActiveDocument: Boolean(activeDocumentPath()),
+      remote: Boolean(current.remote),
     }
   }, [runtime])
 
@@ -227,7 +260,22 @@ function Shell({ runtime }: { runtime: WorkspaceRuntime }) {
         open={settingsOpen}
         section={settingsSection}
         onClose={() => setSettingsOpen(false)}
+        onOpenFolder={openFolder}
+        onConnectRemote={openConnect}
+        onDisconnect={disconnectWorkspace}
       />
+      <ConnectRemoteDialog open={connectOpen} onClose={() => setConnectOpen(false)} />
+      {snapshot.remote?.rejected && (
+        <div className="exo-reconnect-banner" role="alert">
+          <span>The connection to {snapshot.remote.name} was rejected.</span>
+          <button type="button" onClick={openConnect}>
+            Reconnect
+          </button>
+          <button type="button" onClick={disconnectWorkspace}>
+            Disconnect
+          </button>
+        </div>
+      )}
       <ConsentDialog
         request={host.consentRequest}
         shellOrigin={typeof window === 'undefined' ? '' : window.location.origin}

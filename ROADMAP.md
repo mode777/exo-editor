@@ -1,8 +1,8 @@
 # Exo Editor - Roadmap
 
 Status: layers 0-4 are complete and archived. Layer 5 (`plugin-file-editors`) is
-next. The parallel Stratofold provider track (P1) is documented and blocked on the
-client's npm publication; it does not gate the numbered layers. Each layer is one
+next. The parallel Stratofold provider track (P1) is implemented by the change
+`add-stratofold-provider` and does not gate the numbered layers. Each layer is one
 OpenSpec change. A layer is done when its change is archived and its exit criteria
 are demonstrated against the deployed shell - never from a local dev server or
 local build.
@@ -55,14 +55,13 @@ composition.
 
 | # | Change | Outcome | Depends on | Status |
 | --- | --- | --- | --- | --- |
-| P1 | `add-stratofold-provider` | Stratofold vdir as a workspace: connect/restore, browse, read/write/save, viewer/public read-only | 0, 2, 3 | blocked on npm |
+| P1 | `add-stratofold-provider` | Stratofold vdir as a workspace: connect/restore, browse, read/write/save, viewer/public read-only | 0, 2, 3 | implementation complete; deployed verification open |
 
-P1 is not part of the numbered v1 critical path. It can start after layer 3 and
-may land alongside layers 4-10, but it never gates a numbered layer. Prefer
-landing after layer 4 because both touch `WorkspaceRuntime` and the app
-composition; the adapter spike can start earlier. See
+P1 is not part of the numbered v1 critical path. It started after layer 3 and
+lands alongside layers 4-10 without gating one. It integrated through
+`WorkspaceRuntime` and the app composition after layer 4, as planned. See
 [`docs/providers/stratofold.md`](./docs/providers/stratofold.md) for the contract
-mapping, upstream status, residual gaps and the npm blocker.
+mapping, the verified 0.11.0 package surface, residual gaps and upstream asks.
 
 **Goal:** prove the provider abstraction with a real remote store and give the
 shell a workspace path that does not depend on the File System Access API.
@@ -83,11 +82,10 @@ shell a workspace path that does not depend on the File System Access API.
 
 **Exit criteria**
 
-- `@stratofold/client` installs from the registry in a clean `npm ci`, or a
-  vendoring exception is recorded in the provider document and this roadmap.
-- `runProviderConformance` passes for the adapter; the documented edge tests
-  (same-size rapid save, rename onto an existing file, non-recursive remove,
-  abort/dispose, case-insensitive reserved path, directory read) pass.
+- Met: `@stratofold/client` 0.11.0 installs from the registry in a clean
+  `npm ci`, pinned exactly; no vendoring exception was needed.
+- Met: provider conformance plus the documented edge tests pass against a
+  deterministic fake server using the published client.
 - Against the deployed shell: connect, browse, open a text file, edit/save,
   reload and restore; a viewer/public workspace is read-only; revoking the token
   surfaces an explicit reconnect state; no token appears in network URLs or the
@@ -95,12 +93,6 @@ shell a workspace path that does not depend on the File System Access API.
 - Switching workspaces leaves no session state, and plugin-originated access to
   `/exo.json` and `/.exo/**` is denied.
 - The normal `verify` gate, bundle budget and CSP checks pass.
-
-**Blocker**
-
-- `@stratofold/client` 0.11.0 is not on npm (404 as of 2026-11-14). Publish and
-  verify it, or record a vendoring decision, before the change exits. The
-  proposal and adapter spike may proceed while blocked.
 
 **Not in this track:** multi-root workspaces, sync/offline, file watching,
 remote providers beyond Stratofold, OAuth or token brokering.

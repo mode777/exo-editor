@@ -787,3 +787,82 @@
   outline: 1px solid var(--vscode-focusBorder);
   outline-offset: 2px;
 }
+
+.exo-settings-value {
+  margin: 0;
+  font-size: 12px;
+}
+
+.exo-settings-details {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 12px;
+  margin: 0;
+  font-size: 12px;
+}
+
+.exo-settings-details dt {
+  color: var(--vscode-descriptionForeground);
+}
+
+.exo-settings-details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.exo-settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.exo-settings-actions button {
+  padding: 4px 10px;
+  border: 1px solid var(--vscode-button-border, transparent);
+  background: var(--vscode-button-secondaryBackground, var(--vscode-button-background));
+  color: var(--vscode-button-secondaryForeground, var(--vscode-button-foreground));
+  font: inherit;
+  cursor: pointer;
+}
+
+.exo-dialog-field {
+  display: block;
+  margin: 0 0 10px;
+  font-size: 12px;
+}
+
+.exo-dialog-field span {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.exo-reconnect-banner {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  z-index: 1200;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100vw - 48px);
+  padding: 8px 12px;
+  transform: translateX(-50%);
+  border: 1px solid var(--vscode-inputValidation-warningBorder, var(--vscode-widget-border));
+  background: var(
+    --vscode-inputValidation-warningBackground,
+    var(--vscode-editorWidget-background)
+  );
+  color: var(--vscode-foreground);
+  font-size: 12px;
+  box-shadow: 0 4px 12px var(--vscode-widget-shadow);
+}
+
+.exo-reconnect-banner button {
+  padding: 3px 10px;
+  border: 1px solid var(--vscode-button-border, transparent);
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  font: inherit;
+  cursor: pointer;
+}

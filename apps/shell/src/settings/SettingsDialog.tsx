@@ -1,18 +1,29 @@
 import { useEffect, useRef } from 'react'
 import { useWorkbenchStore } from 'vscode-workbench'
 import { PluginSettings } from './PluginSettings'
+import { WorkspaceSettings } from './WorkspaceSettings'
 
-export type SettingsSection = 'general' | 'plugins'
+export type SettingsSection = 'general' | 'workspace' | 'plugins'
 
 interface SettingsDialogProps {
   open: boolean
   section?: SettingsSection
   onClose: () => void
+  onOpenFolder: () => void
+  onConnectRemote: () => void
+  onDisconnect: () => void
 }
 
-// The shell-owned settings surface. Theme is global; plugin configuration is
-// workspace-scoped and rendered by PluginSettings.
-export function SettingsDialog({ open, section = 'general', onClose }: SettingsDialogProps) {
+// The shell-owned settings surface. Theme is global; workspace and plugin
+// configuration are workspace-scoped.
+export function SettingsDialog({
+  open,
+  section = 'general',
+  onClose,
+  onOpenFolder,
+  onConnectRemote,
+  onDisconnect,
+}: SettingsDialogProps) {
   const theme = useWorkbenchStore((state) => state.theme)
   const setTheme = useWorkbenchStore((state) => state.setTheme)
   const closeButton = useRef<HTMLButtonElement>(null)
@@ -21,6 +32,10 @@ export function SettingsDialog({ open, section = 'general', onClose }: SettingsD
     if (!open) return
     if (section === 'plugins') {
       document.getElementById('exo-settings-plugins')?.focus()
+      return
+    }
+    if (section === 'workspace') {
+      document.getElementById('exo-settings-workspace')?.focus()
       return
     }
     closeButton.current?.focus()
@@ -81,6 +96,11 @@ export function SettingsDialog({ open, section = 'general', onClose }: SettingsD
             Light
           </label>
         </section>
+        <WorkspaceSettings
+          onOpenFolder={onOpenFolder}
+          onConnectRemote={onConnectRemote}
+          onDisconnect={onDisconnect}
+        />
         <PluginSettings />
       </div>
     </div>
