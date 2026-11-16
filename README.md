@@ -12,15 +12,15 @@ content is a plugin: a cross-origin iframe talking to the shell over a versioned
 
 ## Status
 
-Layers 0-8 are complete and archived: the contracts are ratified OpenSpec
+Layers 0-9 are complete and archived: the contracts are ratified OpenSpec
 specs, the shell is deployed at `https://mode777.github.io/exo-editor/` through
 the GitHub Pages workflow, and the workspace, plugin-host, file-editor, event,
-settings and SDK/template layers are verified against it. Layer 9
-(`monaco-code-plugin`) adds the Monaco reference plugin, the opt-in visible
-handler surface and its child-path deployment. The parallel Stratofold provider
-track (P1) is documented and blocked on its client's npm publication; it does not
-gate the numbered layers. Verification is always against the deployed URL, never
-a local dev server.
+settings, SDK/template and Monaco reference-plugin layers are verified against
+it. Layer 9 (`monaco-code-plugin`) adds the opt-in visible handler surface and
+the child-path code plugin, verified in same-origin and cross-origin sandboxes.
+The parallel Stratofold provider track (P1) is documented and blocked on its
+client's npm publication; it does not gate the numbered layers. Verification is
+always against the deployed URL, never a local dev server.
 
 ## How it fits together
 

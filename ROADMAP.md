@@ -1,7 +1,9 @@
 # Exo Editor - Roadmap
 
-Status: layers 0-8 are complete and archived. Layer 9
-(`monaco-code-plugin`) is next. The parallel Stratofold provider track (P1) is
+Status: layers 0-9 are complete and archived. Layer 9 (`monaco-code-plugin`)
+adds the Monaco reference plugin, its opt-in visible handler surface and its
+child-path deployment, verified against the deployed shell in both same-origin
+and cross-origin sandboxes. The parallel Stratofold provider track (P1) is
 archived as `2026-11-15-add-stratofold-provider` and does not gate the numbered
 layers. Its 0.12.0 follow-on, P2 `adopt-stratofold-0-12`, is implemented,
 verified against the deployed shell and archived. P3 `add-remote-recents` is
@@ -49,7 +51,7 @@ composition.
 | 6 | `plugin-events` | Topic bus and catalog | 4 |
 | 7 | `plugin-settings` | Plugin-declared settings in the shell's settings UI | 3, 4 |
 | 8 | `plugin-sdk-template` | Typed SDK, plugin template, compatibility policy | 4, 5, 6 |
-| 9 | `monaco-code-plugin` | Reference plugin, separate deploy, no shell changes | 8 |
+| 9 | `monaco-code-plugin` | Monaco reference plugin, visible handler surface, child-path deploy | 8 |
 | 10 | `release-readiness` | Security review, a11y, browser matrix, author docs | 9 |
 
 ---
@@ -597,32 +599,71 @@ local build or dev server was used.
 
 ## Layer 9 - `monaco-code-plugin`
 
+**Status:** complete - change archived as `2026-11-16-monaco-code-plugin` after
+deployed verification on 2026-11-16.
+
 **Goal:** prove the architecture with the real editor users expect, deployed like
 any third-party plugin.
 
 **Deliverables**
 
-- Monaco-based plugin built with the template and SDK; languages registered by
-  the plugin, no LSP.
-- Dirty/save/external-change handling; large-file guard; theme sync via
+- Monaco-based plugin built with the SDK; languages registered by the plugin, no
+  LSP. The plugin adds no protocol message, envelope field or shell dependency.
+- Opt-in `rendering: "frame"` on `contributes.fileEditors` (default `"hidden"`)
+  and a generic shell surface that displays the active document's handler iframe
+  in the document area. Registration frames stay hidden; tab, header, Save action
+  and notices stay outside the frame; a tab switch hides without disposing.
+- Dirty/save/external-change handling; a 5 MiB Monaco guard; theme sync via
   `theme/changed`.
-- Sibling or child path of the shell's GitHub Pages site by default (same origin,
-  stricter sandbox); a separate origin if the plugin needs storage or stricter
-  separation, with its own base path and CI.
+- Child path of the shell's GitHub Pages site by default (same origin, stricter
+  sandbox), copied after the shell budget checks; the same build runs cross-origin
+  from the dev server for the looser sandbox check.
 - An example workspace whose `exo.json` points at the deployed manifest, plus
   documented manual test steps.
 - Explicit statement that the shell has no Monaco dependency and no privileged
-  code path.
+  code path: source and dist guards fail CI if Monaco or the reference plugin
+  enters the shell bundle.
 
-**Exit criteria**
+**Exit criteria (met)**
 
-- Against the deployed shell, opening `.ts`, `.json` and `.md` files uses the
-  plugin; editing and saving round-trips.
-- Disabling the plugin in settings falls back to the shell's text renderer.
-- The shell bundle contains no Monaco code.
-- The plugin is sandboxed according to its origin relationship: a same-origin
-  first-party deploy gets `allow-scripts` only and has no storage, verified in the
-  browser; a cross-origin deploy keeps `allow-same-origin` and is verified too.
+- Met (2026-11-16): against the deployed shell, opening `.ts`, `.json` and `.md`
+  files uses the Monaco plugin, and keyboard input, dirty reporting, Save and
+  exact-text persistence round-trip.
+- Met (2026-11-16): disabling the plugin in settings falls back to the shell's
+  text renderer with no visible plugin frame.
+- Met: the shell bundle contains no Monaco code and the CI `Monaco absent from
+  shell bundle` step passes, as does the source composition guard.
+- Met (2026-11-16): the same-origin deploy uses `sandbox="allow-scripts"`,
+  `localStorage` throws `SecurityError` in the frame, and editing still works;
+  the cross-origin `localhost:5176` deploy uses
+  `sandbox="allow-scripts allow-same-origin"` and its storage check succeeds.
+
+**Commands:** `npm run dev:code`, `npm run build:code`,
+`npm run deploy:copy-code`, `npm run check:dist-no-monaco`.
+
+**Deployed verification (2026-11-16):** Chrome for Testing 131.0.6778.264 drove
+`https://mode777.github.io/exo-editor/` with folder workspaces served from OPFS
+handles through a `showDirectoryPicker` stub, as in layers 5-8. The deployed
+shell, code-plugin manifest, controller and editor code were the real artifacts;
+no local build or dev server was used.
+
+- Same-origin: the consent dialog showed the same-origin warning and the
+  frame-rendering disclosure. `hello.ts` mounted a visible `TypeScript editor`
+  surface at 1052x746 with `sandbox="allow-scripts"`; keyboard input reached
+  Monaco, dirty state reached the shell, Save wrote the exact text, and
+  `localStorage` access threw `SecurityError`.
+- Same-origin: `.json` and `.md` files selected the JSON and Markdown languages
+  and saved exact text. Toggling the shell theme changed Monaco from `vs-dark` to
+  `vs`; an external clean write reloaded the model; a 6.0 MiB `.ts` file showed
+  the 5 MiB refusal without creating a Monaco model. Disabling the plugin wrote
+  `"enabled": false`, closed the frames and opened `hello.ts` in the text area.
+- Cross-origin: the same build served on `http://localhost:5176/` showed its exact
+  origin, no same-origin warning, the frame-rendering disclosure,
+  `sandbox="allow-scripts allow-same-origin"`, working storage, and an exact-text
+  edit/save round-trip.
+- The local gate passed: 666 tests, bundle budget 150,494/152,000 js and
+  13,006/14,000 css gzip bytes, CSP, custom elements, no-SDK and no-Monaco
+  checks, template and code-plugin builds, and `openspec validate --all`.
 
 ---
 

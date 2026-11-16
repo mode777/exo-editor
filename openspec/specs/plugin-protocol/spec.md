@@ -58,8 +58,11 @@ to messages that fail origin or source validation.
 
 ### Requirement: Bootstrap and handshake
 
-The shell SHALL mount plugin frames hidden with no top navigation, popups, modals,
-downloads or fullscreen, and `referrerpolicy="no-referrer"`, SHALL apply
+The shell SHALL mount registration frames hidden, SHALL mount handler frames
+hidden unless the approved contribution declares `rendering: "frame"`, in which
+case the active document's handler frame is displayed in the document area, and
+SHALL allow no top navigation, popups, modals, downloads or fullscreen in either
+case. Every frame SHALL use `referrerpolicy="no-referrer"`, SHALL apply
 `sandbox="allow-scripts allow-same-origin"` to cross-origin plugin origins and
 `sandbox="allow-scripts"` to plugin origins equal to the shell origin, SHALL pass
 the shell origin and session id in the URL fragment, SHALL send `shell/init` only
@@ -114,6 +117,19 @@ editor modes.
 
 - **WHEN** a frame sends three messages from the wrong origin
 - **THEN** the shell removes it with `protocol-violation`
+
+#### Scenario: Registration frame stays hidden
+
+- **WHEN** a plugin controller performs the registration phase
+- **THEN** its iframe is never displayed in the document area even if its
+  contributions declare `rendering: "frame"`
+
+#### Scenario: Visible handler frame keeps its sandbox
+
+- **WHEN** a same-origin contribution declares `rendering: "frame"` and its
+  handler is displayed
+- **THEN** the iframe still uses `sandbox="allow-scripts"` and the visibility
+  change adds no storage, popup, navigation or parent access
 
 ### Requirement: Registration phase
 

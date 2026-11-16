@@ -69,7 +69,7 @@ surface.
 | Plugin content, dirty state | Plugin iframe | The shell never parses editor content |
 | Themes, file change notifications | Exo event bus | Topics are the only workspace-wide push channel; the open-document `shell/file-changed` message is targeted and separate |
 | Persistence (handle, consent, settings, layout) | Shell | IndexedDB for handles and workspace state, `localStorage` for consent |
-| Plugin authoring | Plugin SDK and template | Private workspace packages; the shell has no runtime dependency on the SDK |
+| Plugin authoring | Plugin SDK, template and code plugin | Private workspace packages; the shell has no runtime dependency on the SDK or Monaco |
 
 ## 3. Workspace lifecycle
 
@@ -326,6 +326,12 @@ Reuse rules:
   template code. The template build is copied to `/exo-editor/plugin-template/`
   after the shell budget, CSP and custom-element checks, so the budget keeps
   measuring the shell only.
+- The Monaco reference plugin is `apps/code-plugin`, deployed to
+  `/exo-editor/code-plugin/` after the same shell checks. The shell has no
+  Monaco dependency and no reference-editor branch; it only displays a handler
+  frame when the manifest declares `rendering: "frame"`. The source composition
+  guard and the post-build `check-dist-no-monaco` script fail if Monaco or the
+  plugin enters the shell bundle.
 - `vscode-workbench` is a normal npm dependency (`0.1.x` at time of writing,
   verified against 0.1.3). Its public preset exports are `vscode-workbench`
   (preset), `vscode-workbench/react`, `/core`, `/elements/*` and `/styles/*`.

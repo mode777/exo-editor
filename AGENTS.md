@@ -4,8 +4,10 @@ Exo Editor is a frontend-only, serverless editor shell. **The shell is the
 product; editors are plugins.** Plugins are untrusted cross-origin iframes; the
 shell owns the workbench, workspace access and consent.
 
-**Current state:** layers 0-8 are complete and archived. Layer 9 (the Monaco
-reference plugin) is next. The parallel Stratofold provider track (P1) is
+**Current state:** layers 0-9 are complete and archived. Layer 9
+(`monaco-code-plugin`) adds the Monaco reference plugin, the opt-in visible
+handler surface and its child-path deployment, verified against the deployed
+shell in both sandbox modes. The parallel Stratofold provider track (P1) is
 documented and blocked on its client's npm publication; it does not gate the
 numbered layers. The contracts are ratified, and the shell app (`apps/shell`)
 builds, tests and deploys to GitHub Pages through CI. Do not scaffold code ahead
@@ -17,7 +19,7 @@ commands or scripts that do not exist yet.
 | Document | Why |
 | --- | --- |
 | [`docs/vision.md`](./docs/vision.md) | Product intent, principles, non-goals |
-| [`docs/architecture.md`](./docs/architecture.md) | Runtime model, lifecycle, trust boundaries, decisions D1-D17 |
+| [`docs/architecture.md`](./docs/architecture.md) | Runtime model, lifecycle, trust boundaries, decisions D1-D18 |
 | [`docs/contracts/`](./docs/contracts/) | Normative contracts; ratified by `define-core-contracts` and mirrored in `openspec/specs/` |
 | [`docs/contracts/plugin-sdk.md`](./docs/contracts/plugin-sdk.md) | Typed plugin client, origin rules, compatibility policy and template |
 | [`docs/providers/stratofold.md`](./docs/providers/stratofold.md) | Remote-provider track, upstream status and npm blocker |
@@ -43,6 +45,11 @@ These are decisions, not suggestions. Changing one requires an OpenSpec change.
   `event.origin === "null"`, so identity is the iframe instance plus the session
   id echoed in `plugin/ready`, and consent must say it cannot be isolated by
   origin.
+- **Handler frames are hidden unless opted in.** Registration frames are always
+  hidden. A contribution with `rendering: "frame"` may display its handler iframe
+  in the active document area; the tab, header, Save action and notices stay
+  outside the frame, a tab switch hides without disposal, and the plugin never
+  receives a shell DOM node. The default remains `"hidden"`.
 - **Consent covers a page root, not individual pages.** The root is the directory
   of the controller entry (`runtime.entry`). Editor pages and later documents may
   be siblings or descendants of that root; parents and unrelated directories are
@@ -205,6 +212,8 @@ docs/architecture.md    runtime model, trust boundaries, decisions
 docs/contracts/         normative contracts, one file per surface
 docs/providers/         provider-specific analysis, upstream status, blockers
 schema/exo.schema.json  shared JSON Schema for exo.json and exo-manifest.json
+apps/code-plugin/       Monaco reference plugin, child-path deploy
+examples/               example workspaces (code plugin)
 packages/plugin-sdk/    typed client for plugin authors
 packages/plugin-template/ starter plugin built only on the SDK
 ROADMAP.md              layered OpenSpec change plan

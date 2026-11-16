@@ -55,6 +55,11 @@ The shell's **Save** action initiates saves. Keyboard events inside the plugin
 iframe do not reach the shell and v1 has no plugin-initiated save message, so
 `Ctrl+S` inside Monaco is deliberately not wired to the shell.
 
+The editor exposes `window.__exoCode` inside its own sandboxed document for
+diagnostics (`value()`, `setValue(text)`, `state()`). It carries no shell state
+and is not a protocol surface; the deployed verification uses it to inspect the
+model after keyboard and save checks.
+
 ## Manual checks
 
 1. Add the deployed manifest URL, approve consent, and confirm the dialog shows
