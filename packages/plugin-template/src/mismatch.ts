@@ -19,7 +19,7 @@ function report(details: {
   message: string
 }): void {
   renderObservation({ phase: 'mismatch', ...details }, 'Exo template protocol mismatch')
-  console.error('EXO_TEMPLATE_PROTOCOL_MISMATCH', details)
+  console.error(`EXO_TEMPLATE_PROTOCOL_MISMATCH ${JSON.stringify(details)}`)
 }
 
 report({
