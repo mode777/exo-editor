@@ -4,11 +4,12 @@ Exo Editor is a frontend-only, serverless editor shell. **The shell is the
 product; editors are plugins.** Plugins are untrusted cross-origin iframes; the
 shell owns the workbench, workspace access and consent.
 
-**Current state:** layers 0-9 are complete and archived. Layer 10
-(`release-readiness`) adds the security review, accessibility pass, browser
-matrix, performance budgets, plugin author guide, demo workspace, walkthrough and
-release plan; its deployed verification is recorded in `ROADMAP.md` before
-archive. Layer 9 (`monaco-code-plugin`) adds the Monaco reference plugin, the
+**Current state:** layers 0-10 are complete and archived. Layer 10
+(`release-readiness`, archived as `2026-11-16-release-readiness`) adds the
+security review, accessibility pass, browser matrix, performance budgets, plugin
+author guide, demo workspace, walkthrough and release plan; its deployed
+verification is recorded in `ROADMAP.md` and its deltas are synced into the main
+specs. Layer 9 (`monaco-code-plugin`) adds the Monaco reference plugin, the
 opt-in visible handler surface and its child-path deployment. A post-layer-9
 change (`plugin-initiated-save`, archived as
 `2026-11-16-plugin-initiated-save`) adds the id-less `plugin/request-save` intent

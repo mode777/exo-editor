@@ -12,11 +12,12 @@ content is a plugin: a cross-origin iframe talking to the shell over a versioned
 
 ## Status
 
-Layers 0-9 are complete and archived: the contracts are ratified OpenSpec
+Layers 0-10 are complete and archived: the contracts are ratified OpenSpec
 specs, the shell is deployed at `https://mode777.github.io/exo-editor/` through
 the GitHub Pages workflow, and the workspace, plugin-host, file-editor, event,
-settings, SDK/template and Monaco reference-plugin layers are verified against
-it. Layer 10 (`release-readiness`) adds the security review, accessibility pass,
+settings, SDK/template, Monaco reference-plugin and release-readiness layers are
+verified against it. Layer 10 (`release-readiness`, archived as
+`2026-11-16-release-readiness`) adds the security review, accessibility pass,
 browser matrix, performance budgets, plugin author guide, demo workspace,
 walkthrough and release plan; its deployed verification is recorded in
 [`ROADMAP.md`](./ROADMAP.md). A post-layer-9 change

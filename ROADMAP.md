@@ -1,10 +1,11 @@
 # Exo Editor - Roadmap
 
-Status: layers 0-9 are complete and archived. Layer 10 (`release-readiness`) is
-implemented and verified against the deployed shell; its change is ready to
-archive. Layer 9 (`monaco-code-plugin`) adds the Monaco reference plugin, its
-opt-in visible handler surface and its child-path deployment, verified against
-the deployed shell in both same-origin and cross-origin sandboxes. The parallel Stratofold provider track (P1) is
+Status: layers 0-10 are complete and archived. Layer 10 (`release-readiness`,
+archived as `2026-11-16-release-readiness`) adds the release evidence and author
+handoff, verified against the deployed shell and synced into the main specs.
+Layer 9 (`monaco-code-plugin`) adds the Monaco reference plugin, its opt-in
+visible handler surface and its child-path deployment, verified against the
+deployed shell in both same-origin and cross-origin sandboxes. The parallel Stratofold provider track (P1) is
 archived as `2026-11-15-add-stratofold-provider` and does not gate the numbered
 layers. Its 0.12.0 follow-on, P2 `adopt-stratofold-0-12`, is implemented,
 verified against the deployed shell and archived. P3 `add-remote-recents` is
@@ -679,8 +680,10 @@ gate passed with 675 tests and a 150,607/152,000 js gzip budget.
 
 ## Layer 10 - `release-readiness`
 
-**Status:** complete - deployed verification recorded on 2026-11-16 against
-commit `90172af`; archive the `release-readiness` change after review.
+**Status:** complete and archived as `2026-11-16-release-readiness` after the
+deployed verification on 2026-11-16 against commit `90172af`. The
+`plugin-authoring`, `editor-shell` and `workspace-access` deltas are synced into
+`openspec/specs/`.
 
 **Goal:** a v1 that can be handed to someone who did not build it.
 
@@ -713,8 +716,8 @@ commit `90172af`; archive the `release-readiness` change after review.
 - Met: no open security finding; every control is mutation-checked, the deployed
   artifact scan and CSP pass, and the two dependency advisories are accepted with
   rationale and owners in [`docs/security-review.md`](./docs/security-review.md).
-- Met: layers 0-9 are archived. The layer-10 deltas are the remaining sync; the
-  change is archived after this row.
+- Met: layers 0-9 are archived and the layer-10 deltas are synced into the main
+  specs.
 
 **Deployed verification (2026-11-16):** Chrome for Testing 131.0.6778.264 drove
 `https://mode777.github.io/exo-editor/` at commit `90172af` with the demo
