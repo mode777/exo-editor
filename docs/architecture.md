@@ -67,6 +67,7 @@ preview.
 | Plugin content, dirty state | Plugin iframe | The shell never parses editor content |
 | Themes, file change notifications | Exo event bus | Topics are the only workspace-wide push channel; the open-document `shell/file-changed` message is targeted and separate |
 | Persistence (handle, consent, settings, layout) | Shell | IndexedDB for handles and workspace state, `localStorage` for consent |
+| Plugin authoring | Plugin SDK and template | Private workspace packages; the shell has no runtime dependency on the SDK |
 
 ## 3. Workspace lifecycle
 
@@ -316,6 +317,12 @@ openspec/
 
 Reuse rules:
 
+- The SDK and template are real workspace packages in `packages/` after layer 8.
+  The shell depends on `@exo/plugin-sdk` only from its conformance tests; no
+  production import is allowed and the built shell bundle contains no SDK or
+  template code. The template build is copied to `/exo-editor/plugin-template/`
+  after the shell budget, CSP and custom-element checks, so the budget keeps
+  measuring the shell only.
 - `vscode-workbench` is a normal npm dependency (`0.1.x` at time of writing,
   verified against 0.1.3). Its public preset exports are `vscode-workbench`
   (preset), `vscode-workbench/react`, `/core`, `/elements/*` and `/styles/*`.

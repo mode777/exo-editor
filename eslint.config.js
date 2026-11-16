@@ -16,6 +16,21 @@ export default tseslint.config(
     },
   },
   {
+    files: ['packages/**/*.ts'],
+    languageOptions: {
+      globals: { ...globals.browser, ...globals.node },
+    },
+  },
+  {
+    // The SDK core must stay usable outside a browser. Only the explicit
+    // browser adapter may read these globals.
+    files: ['packages/plugin-sdk/src/**/*.ts'],
+    ignores: ['packages/plugin-sdk/src/browser.ts', 'packages/plugin-sdk/src/**/*.test.ts'],
+    rules: {
+      'no-restricted-globals': ['error', 'window', 'document', 'location', 'parent'],
+    },
+  },
+  {
     files: ['apps/shell/vite.config.ts', 'apps/shell/scripts/**/*.mjs'],
     languageOptions: {
       globals: { ...globals.node },

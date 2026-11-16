@@ -859,4 +859,32 @@ describe('manifest schema parity', () => {
     expect(defs.relativeAsset.pattern).toBe(MANIFEST_RELATIVE_ASSET_PATTERN)
     expect(defs.httpsUrl.pattern).toBe(MANIFEST_HTTPS_URL_PATTERN)
   })
+
+  it('accepts the deployed plugin template manifests', () => {
+    const template = JSON.parse(
+      readFileSync(
+        join(process.cwd(), '../../packages/plugin-template/public/exo-manifest.json'),
+        'utf8',
+      ),
+    ) as unknown
+    const templateResult = validateManifest(
+      template,
+      'https://mode777.github.io/exo-editor/plugin-template/exo-manifest.json',
+      SHELL_VERSION,
+    )
+    expect(templateResult.ok).toBe(true)
+
+    const mismatch = JSON.parse(
+      readFileSync(
+        join(process.cwd(), '../../packages/plugin-template/public/exo-manifest-mismatch.json'),
+        'utf8',
+      ),
+    ) as unknown
+    const mismatchResult = validateManifest(
+      mismatch,
+      'https://mode777.github.io/exo-editor/plugin-template/exo-manifest-mismatch.json',
+      SHELL_VERSION,
+    )
+    expect(mismatchResult.ok).toBe(true)
+  })
 })

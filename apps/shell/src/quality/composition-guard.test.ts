@@ -71,4 +71,18 @@ describe('composition guard', () => {
 
     expect(violations).toEqual([])
   })
+
+  it('never imports the plugin SDK in production source', () => {
+    const violations = files.flatMap((file) => {
+      const source = readFileSync(file, 'utf8')
+      return importSpecifiers(source)
+        .filter(
+          (specifier) =>
+            specifier === '@exo/plugin-sdk' || specifier.startsWith('@exo/plugin-sdk/'),
+        )
+        .map((specifier) => `${relative(srcRoot, file)}: ${specifier}`)
+    })
+
+    expect(violations).toEqual([])
+  })
 })

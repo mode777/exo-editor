@@ -12,13 +12,14 @@ content is a plugin: a cross-origin iframe talking to the shell over a versioned
 
 ## Status
 
-Layers 0-4 are complete and archived: the five contracts are ratified OpenSpec
+Layers 0-7 are complete and archived: the contracts are ratified OpenSpec
 specs, the shell is deployed at `https://mode777.github.io/exo-editor/` through
-the GitHub Pages workflow, and the workspace provider, plugin-config and
-plugin-host layers are verified against it. Layer 5 (plugin file editors) is next.
-The parallel Stratofold provider track (P1) is documented and blocked on its
-client's npm publication; it does not gate the numbered layers. Verification is
-always against the deployed URL, never a local dev server.
+the GitHub Pages workflow, and the workspace, plugin-host, file-editor, event
+and settings layers are verified against it. Layer 8 (`plugin-sdk-template`) is
+implemented and awaiting deployed verification. The parallel Stratofold provider
+track (P1) is documented and blocked on its client's npm publication; it does not
+gate the numbered layers. Verification is always against the deployed URL, never
+a local dev server.
 
 ## How it fits together
 
@@ -32,9 +33,12 @@ always against the deployed URL, never a local dev server.
   The user consents to the exact origin before any code loads. A manifest declares
   file editors as a glob plus a relative editor page; matching files get a
   per-tab handler iframe.
-- **SDK and reference plugin** - a typed messaging library, a starter template,
-  and a Monaco-based code editor deployed separately as the proof that the shell
-  has no privileged editor.
+- **SDK and template** - `packages/plugin-sdk` is a typed client for the
+  handshake, registration, file-handler and event flows; `packages/plugin-template`
+  is a starter plugin built only on it. The template dev server runs at
+  `http://localhost:5175/` (`npm run dev:template`), and its build ships at
+  `https://mode777.github.io/exo-editor/plugin-template/`. The Monaco-based
+  reference editor arrives in layer 9.
 
 ## Documents
 
@@ -46,6 +50,7 @@ always against the deployed URL, never a local dev server.
 | [Manifest contract](./docs/contracts/plugin-manifest.md) | `exo.json`, `exo-manifest.json`, consent, fingerprint |
 | [Protocol contract](./docs/contracts/plugin-protocol.md) | Envelope, handshake, registration, handler sessions |
 | [Events contract](./docs/contracts/events.md) | Topics, ordering, limits |
+| [Plugin SDK contract](./docs/contracts/plugin-sdk.md) | Typed client, origin rules, compatibility policy, template |
 | [Manifest schema](./schema/exo.schema.json) | Shared JSON Schema for `exo.json` and `exo-manifest.json` |
 | [Stratofold provider](./docs/providers/stratofold.md) | Remote-provider track, upstream status, npm blocker |
 | [Roadmap](./ROADMAP.md) | Layered OpenSpec changes and exit criteria |

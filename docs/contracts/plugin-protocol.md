@@ -391,7 +391,8 @@ for repeated violations, tears down the frame.
 - Additive optional fields are allowed within a major. Removed or reinterpreted
   fields require a new major and a new OpenSpec change.
 - The SDK exposes the protocol version as a constant so plugins do not hard-code
-  it.
+  it. The SDK major tracks the protocol major; its compatibility and deprecation
+  policy is in [`plugin-sdk.md`](./plugin-sdk.md#9-compatibility-and-deprecation-policy).
 - `shell/init` advertises `shell.version`; plugins must not infer capabilities
   from it, only log it.
 

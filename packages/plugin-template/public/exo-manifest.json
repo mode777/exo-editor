@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "id": "com.example.exo.template",
+  "name": "Exo Template Plugin",
+  "version": "0.1.0",
+  "description": "Starter plugin built only with @exo/plugin-sdk.",
+  "publisher": {
+    "name": "Exo"
+  },
+  "engines": {
+    "exo": ">=0.1.0"
+  },
+  "runtime": {
+    "entry": "plugin.html"
+  },
+  "permissions": ["workspace:read", "workspace:write"],
+  "contributes": {
+    "fileEditors": [
+      {
+        "glob": "**/*.template.txt",
+        "entry": "editor.html",
+        "label": "Exo Template",
+        "priority": 50
+      }
+    ]
+  }
+}

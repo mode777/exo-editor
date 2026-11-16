@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "com.example.exo.template-mismatch",
+  "name": "Exo Template Protocol Mismatch",
+  "version": "0.1.0",
+  "description": "Diagnostic plugin that reports protocol major 2 and contributes nothing.",
+  "publisher": {
+    "name": "Exo"
+  },
+  "engines": {
+    "exo": ">=0.1.0"
+  },
+  "runtime": {
+    "entry": "negative/protocol-mismatch.html"
+  },
+  "permissions": ["workspace:read"]
+}

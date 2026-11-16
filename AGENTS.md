@@ -4,13 +4,14 @@ Exo Editor is a frontend-only, serverless editor shell. **The shell is the
 product; editors are plugins.** Plugins are untrusted cross-origin iframes; the
 shell owns the workbench, workspace access and consent.
 
-**Current state:** layers 0-4 are complete and archived. Layer 5 (plugin file
-editors) is next. The parallel Stratofold provider track (P1) is documented and
-blocked on its client's npm publication; it does not gate the numbered layers.
-The contracts are ratified, and the shell app (`apps/shell`) builds, tests and
-deploys to GitHub Pages through CI. Do not scaffold code ahead of the
-[roadmap](./ROADMAP.md) layer you were asked to work on, and do not invent
-commands or scripts that do not exist yet.
+**Current state:** layers 0-7 are complete and archived. Layer 8
+(`plugin-sdk-template`) is implemented and awaiting deployed verification. The
+parallel Stratofold provider track (P1) is documented and blocked on its client's
+npm publication; it does not gate the numbered layers. The contracts are
+ratified, and the shell app (`apps/shell`) builds, tests and deploys to GitHub
+Pages through CI. Do not scaffold code ahead of the [roadmap](./ROADMAP.md) layer
+you were asked to work on, and do not invent commands or scripts that do not
+exist yet.
 
 ## Read this first
 
@@ -19,6 +20,7 @@ commands or scripts that do not exist yet.
 | [`docs/vision.md`](./docs/vision.md) | Product intent, principles, non-goals |
 | [`docs/architecture.md`](./docs/architecture.md) | Runtime model, lifecycle, trust boundaries, decisions D1-D17 |
 | [`docs/contracts/`](./docs/contracts/) | Normative contracts; ratified by `define-core-contracts` and mirrored in `openspec/specs/` |
+| [`docs/contracts/plugin-sdk.md`](./docs/contracts/plugin-sdk.md) | Typed plugin client, origin rules, compatibility policy and template |
 | [`docs/providers/stratofold.md`](./docs/providers/stratofold.md) | Remote-provider track, upstream status and npm blocker |
 | [`ROADMAP.md`](./ROADMAP.md) | Layer order, one OpenSpec change per layer, exit criteria |
 
@@ -122,6 +124,9 @@ npm install        # npm ci in CI
 | Bundle budget | `npm run budget` |
 | Deployed CSP check | `npm run check:dist-csp` (after a build) |
 | Custom elements check | `npm run check:dist-elements` (after a build) |
+| SDK absent from shell bundle | `npm run check:dist-no-sdk` (after a build) |
+| Template build | `npm run build:template` |
+| Template deploy copy | `npm run deploy:copy-template` (after the shell build and dist checks) |
 
 Dev server: `npm run dev` serves `http://localhost:5173/exo-editor/`. It is a
 development aid, not a verification target.
@@ -141,6 +146,15 @@ topics and records subscription sequences and events. Editor state is mirrored
 into the page title and `#observation`; see
 `apps/shell/public/plugin-host-fixture/README.md` for the manual checks.
 
+Plugin template: `npm run dev:template` serves the SDK-built starter at
+`http://localhost:5175/` with CORS. Use
+`http://localhost:5175/exo-manifest.json` in `exo.json`. The deployed same-origin
+copy is
+`https://mode777.github.io/exo-editor/plugin-template/exo-manifest.json`; the
+protocol-mismatch diagnostic is `exo-manifest-mismatch.json` next to it. The
+template uses no storage and works under the stricter same-origin sandbox. See
+`packages/plugin-template/README.md` for the manual checks.
+
 The deployed verification surface is
 `https://mode777.github.io/exo-editor/`. Every push to `main` runs the gate below
 and deploys on success; behaviour and exit criteria are demonstrated there, never
@@ -158,7 +172,14 @@ npm run build
 node apps/shell/scripts/check-bundle-budget.mjs apps/shell/dist apps/shell/budget.json
 node apps/shell/scripts/check-dist-csp.mjs apps/shell/dist/index.html
 node apps/shell/scripts/check-dist-elements.mjs apps/shell/dist
+npm run check:dist-no-sdk
+npm run build:template
+npm run deploy:copy-template
 ```
+
+The budget, CSP and custom-element checks run before the template copy, so the
+budget measures the shell only; the copy adds the template child path to the
+deployed artifact.
 
 Specs and change proposals still validate with `openspec validate --all`.
 
@@ -170,6 +191,8 @@ docs/architecture.md    runtime model, trust boundaries, decisions
 docs/contracts/         normative contracts, one file per surface
 docs/providers/         provider-specific analysis, upstream status, blockers
 schema/exo.schema.json  shared JSON Schema for exo.json and exo-manifest.json
+packages/plugin-sdk/    typed client for plugin authors
+packages/plugin-template/ starter plugin built only on the SDK
 ROADMAP.md              layered OpenSpec change plan
 openspec/specs/         ratified capabilities
 openspec/changes/       active changes; archive when done

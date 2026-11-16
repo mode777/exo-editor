@@ -407,6 +407,9 @@ interface ConsentRecord {
   newer shell is listed as incompatible rather than attempted.
 - The protocol version is separate from both and is negotiated in the handshake
   (see [`plugin-protocol.md`](./plugin-protocol.md)).
+- The SDK does not parse, validate or rewrite a manifest, and it does not infer
+  capabilities from `engines.exo` or the shell version. Its compatibility policy
+  is in [`plugin-sdk.md`](./plugin-sdk.md#9-compatibility-and-deprecation-policy).
 
 ## 8. Out of scope for v1
 
