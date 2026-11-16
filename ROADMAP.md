@@ -748,6 +748,16 @@ workspace on an OPFS handle through a `showDirectoryPicker` stub.
   and SDK `1.1.0`; the release checklist and upgrade-note rule are in
   [`docs/releases.md`](./docs/releases.md).
 
+**Follow-up (2026-11-16):** the post-layer change `file-menu-connect-remote`
+adds `Connect Remote Workspace…` to the File menu, directly after
+`Open Folder…`. The entry runs the existing `exo.workspace.connectRemote`
+command, so the menu, palette, settings and empty-explorer paths share one
+dialog and one dirty-document guard. Verified against the deployed shell at
+commit `90172af`: the File menu listed the entry with and without a workspace,
+both states opened the same connect dialog, and Cancel on the unsaved-changes
+prompt left the document dirty and unchanged with the dialog closed. The local
+gate passed with 666 shell tests and a 151,022/152,000 js gzip budget.
+
 ---
 
 ## Deferred beyond v1

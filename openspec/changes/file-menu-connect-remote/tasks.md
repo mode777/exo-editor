@@ -9,9 +9,9 @@
 
 - [x] 2.1 Add an App-level test in `apps/shell/src/App.remote.test.tsx` that mounts the shell, opens the File menu, selects `Connect Remote Workspace…` through the context menu's selection event, and asserts the existing remote-connect dialog appears; verify the test fails when the entry is removed and the dialog is not mounted twice
 - [x] 2.2 Run the full local gate from `AGENTS.md` (`npm ci`, lint, format check, typecheck, tests, shell build, budget, CSP, custom elements, no-SDK, no-Monaco, template build/copy, code-plugin build/copy, secrets check) plus `openspec validate --all`; verify every command passes
-- [ ] 2.3 Push `main`, confirm the CI `verify` and Pages deploy jobs pass, and confirm the deployed artifact is the commit under test
-- [ ] 2.4 Against the deployed shell, open the File menu with no workspace and again with a folder workspace, choose `Connect Remote Workspace…` from the menu in both states, and confirm the same connect dialog opens; with a dirty document open, confirm the dirty prompt resolves before the dialog and that Cancel leaves the document unchanged and the dialog closed
-- [ ] 2.5 Record the post-layer follow-up in `ROADMAP.md` with the change name, the File-menu entry and the deployed evidence; verify the note matches the deployed behavior and the archived change name
+- [x] 2.3 Push `main`, confirm the CI `verify` and Pages deploy jobs pass, and confirm the deployed artifact is the commit under test
+- [x] 2.4 Against the deployed shell, open the File menu with no workspace and again with a folder workspace, choose `Connect Remote Workspace…` from the menu in both states, and confirm the same connect dialog opens; with a dirty document open, confirm the dirty prompt resolves before the dialog and that Cancel leaves the document unchanged and the dialog closed
+- [x] 2.5 Record the post-layer follow-up in `ROADMAP.md` with the change name, the File-menu entry and the deployed evidence; verify the note matches the deployed behavior and the archived change name
 
 ## Workflow follow-up
 
