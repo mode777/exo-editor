@@ -79,6 +79,16 @@ this repository in v1; see the compatibility section of
 - [Testing and troubleshooting](./testing.md) covers the local and deployed
   checks.
 
+## Dry run
+
+On 2026-11-16 the quickstart was followed from this guide and the template
+README alone, without reading shell source. Two gaps were found and fixed: the
+SDK editor example used a nonexistent `isDirty` getter, and the event example
+checked a nonexistent `capabilities.events` flag instead of
+`initialization.permissions`. The deployed template then registered, read the
+36-byte file, saved `[template save 1]` and had its frame removed when the tab
+closed. See the [walkthrough](../walkthrough.md) for the recorded path.
+
 All normative limits, error codes and field tables live in
 [`docs/contracts/`](../contracts/). This guide links to them instead of copying
 them; if a value differs, the contract wins.

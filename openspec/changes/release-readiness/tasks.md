@@ -22,7 +22,7 @@
   `check:dist-secrets` script and a test that injects a fake credential into a
   built asset; verify the scan passes on the real `apps/shell/dist`, fails on the
   injected asset, and is wired into CI after `deploy:copy-code`
-- [ ] 1.5 Finalise the review with the dated findings table (no open finding
+- [x] 1.5 Finalise the review with the dated findings table (no open finding
   above accepted, every accepted finding has rationale and owner) and link it
   from `README.md` and `docs/architecture.md`; verify the deployed artifact scan
   result and review date/commit are recorded
@@ -44,7 +44,7 @@
   regression tests plus a contrast test that parses the pinned dark and light
   token palettes; verify the contrast test fails when a documented pair is
   lowered below 4.5:1 or 3:1
-- [ ] 2.4 Write `docs/accessibility.md` with scope, automated results, the
+- [x] 2.4 Write `docs/accessibility.md` with scope, automated results, the
   manual keyboard-only and screen-reader smoke script, upstream exceptions and
   known limitations; verify the script against the deployed shell and record the
   date and result
@@ -71,7 +71,7 @@
   measurement procedure and result table; verify it names Chrome for Testing
   131.0.6778.264, the verification server, warm-up, five runs and median/maximum
   reporting, and links the CI bundle-budget check
-- [ ] 4.3 Measure plugin frame startup, the 10k-entry listing, and 1 MiB open
+- [x] 4.3 Measure plugin frame startup, the 10k-entry listing, and 1 MiB open
   and save against the deployed shell on the reference environment and record
   the results; if a ceiling is exceeded, add batched row rendering or record an
   accepted miss with owner and follow-up; verify the final table has no
@@ -89,7 +89,7 @@
   `<!-- exo:manifest -->` blocks validated with the real manifest validator;
   verify the test passes and fails when a link, path, script or manifest value is
   broken
-- [ ] 5.3 Run the guide-only dry run: build a minimal editor from the guide and
+- [x] 5.3 Run the guide-only dry run: build a minimal editor from the guide and
   template README alone, record every gap, and fix the guide or template README;
   verify the dry-run plugin registers, reads, saves and disposes on the deployed
   shell using only documented steps
@@ -101,7 +101,7 @@
   `draft.md`, `greeting.template.txt`, `plain.txt` and a README of expected
   observations; verify the manifest validates with the real validator and each
   file selects the documented surface
-- [ ] 6.2 Write `docs/walkthrough.md` with numbered steps and expected
+- [x] 6.2 Write `docs/walkthrough.md` with numbered steps and expected
   observations, then capture the committed PNGs under
   `docs/media/walkthrough/` from the deployed URL with the demo workspace on an
   OPFS handle; verify each screenshot's documented date/commit/URL matches the
@@ -136,14 +136,14 @@
   tests, build, bundle budget, CSP, custom elements, no-SDK, no-Monaco,
   `check:dist-secrets`, template build/copy and code-plugin build/copy; verify
   every command passes and the bundle stays within the committed budget
-- [ ] 8.3 Deploy by pushing `main`; verify the CI `verify` job is green and the
+- [x] 8.3 Deploy by pushing `main`; verify the CI `verify` job is green and the
   Pages artifact contains the shell plus the template and code-plugin child
   paths
-- [ ] 8.4 Verify the layer-10 exit criteria against the deployed shell: rerun
+- [x] 8.4 Verify the layer-10 exit criteria against the deployed shell: rerun
   the security scan, the accessibility manual script, the browser matrix states,
   the performance measurements, the demo workspace and the walkthrough; record
   every result, date and deployed commit
-- [ ] 8.5 Update the `ROADMAP.md` layer-10 status, exit criteria and evidence
+- [x] 8.5 Update the `ROADMAP.md` layer-10 status, exit criteria and evidence
   from 8.4, then run `openspec validate --all` and verify the change, the three
   deltas and every existing spec validate
 

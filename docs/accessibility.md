@@ -102,6 +102,20 @@ Run against the deployed URL with the demo workspace from
 
 ## Deployed verification
 
-Filled at task 8.4 with the deployed commit, date, browser and result of the
-keyboard and screen-reader script. Until then, the automated suite above is the
-evidence for the working tree.
+Run on 2026-11-16 against deployed commit `677b44d`
+(`https://mode777.github.io/exo-editor/`) with Chrome for Testing
+131.0.6778.264 at 1280x800, using the demo workspace on an OPFS handle and the
+same `showDirectoryPicker` stub as the layer 5-9 verification.
+
+- Consent dialog: focus starts on Deny; Tab reaches Allow plugin and the plugin
+  homepage link; the next Tab wraps to Deny. Escape closes the Exo Code dialog
+  and the next consent prompt appears in order. Result: pass.
+- Settings dialog: focus enters the dialog, twelve Tab presses stay inside it,
+  and Escape closes it. Result: pass.
+- The automated axe and contrast suites above pass in the same run; the shell's
+  keyboard navigation through the explorer, tabs, document area and status bar
+  matched the script.
+- Screen reader: no VoiceOver or NVDA host was available on the verification
+  server, so that step is not run. It remains a human release checklist item
+  and is not claimed as verified. Keyboard-only traversal, focus traps and
+  programmatic semantics are the recorded evidence.

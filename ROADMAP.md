@@ -1,9 +1,10 @@
 # Exo Editor - Roadmap
 
-Status: layers 0-9 are complete and archived. Layer 9 (`monaco-code-plugin`)
-adds the Monaco reference plugin, its opt-in visible handler surface and its
-child-path deployment, verified against the deployed shell in both same-origin
-and cross-origin sandboxes. The parallel Stratofold provider track (P1) is
+Status: layers 0-9 are complete and archived. Layer 10 (`release-readiness`) is
+implemented and verified against the deployed shell; its change is ready to
+archive. Layer 9 (`monaco-code-plugin`) adds the Monaco reference plugin, its
+opt-in visible handler surface and its child-path deployment, verified against
+the deployed shell in both same-origin and cross-origin sandboxes. The parallel Stratofold provider track (P1) is
 archived as `2026-11-15-add-stratofold-provider` and does not gate the numbered
 layers. Its 0.12.0 follow-on, P2 `adopt-stratofold-0-12`, is implemented,
 verified against the deployed shell and archived. P3 `add-remote-recents` is
@@ -678,9 +679,8 @@ gate passed with 675 tests and a 150,607/152,000 js gzip budget.
 
 ## Layer 10 - `release-readiness`
 
-**Status:** implemented; deployed verification and archive are tracked in the
-`release-readiness` change. Evidence lands in the linked documents and this row
-is updated at task 8.5.
+**Status:** complete - deployed verification recorded on 2026-11-16 against
+commit `677b44d`; archive the `release-readiness` change after review.
 
 **Goal:** a v1 that can be handed to someone who did not build it.
 
@@ -704,13 +704,49 @@ is updated at task 8.5.
 - Versioning/communication plan for breaking protocol changes. See
   [`docs/releases.md`](./docs/releases.md) and [`CHANGELOG.md`](./CHANGELOG.md).
 
-**Exit criteria**
+**Exit criteria (met)**
 
-- A new developer can build a plugin from the guide without reading shell source.
-- All budgets are enforced by CI or a documented manual check.
-- No open security finding above "accepted with rationale".
-- Roadmap layers 0-9 are archived or explicitly deferred, and `openspec/specs/`
-  reflects the shipped system.
+- Met: the guide-only dry run fixed the two SDK sample gaps and the deployed
+  template registered, read, saved and disposed using only documented steps.
+- Met: the bundle budget is CI-enforced and the runtime budgets are recorded in
+  [`docs/performance.md`](./docs/performance.md) with the procedure and results.
+- Met: no open security finding; every control is mutation-checked, the deployed
+  artifact scan and CSP pass, and the two dependency advisories are accepted with
+  rationale and owners in [`docs/security-review.md`](./docs/security-review.md).
+- Met: layers 0-9 are archived. The layer-10 deltas are the remaining sync; the
+  change is archived after this row.
+
+**Deployed verification (2026-11-16):** Chrome for Testing 131.0.6778.264 drove
+`https://mode777.github.io/exo-editor/` at commit `677b44d` with the demo
+workspace on an OPFS handle through a `showDirectoryPicker` stub.
+
+- Security: all ten controls failed a named test when mutated; the downloaded
+  `shell-dist` artifact has no credential pattern and its CSP check passes. No
+  finding is open without a disposition; F4 (Monaco's pinned DOMPurify) and F5
+  (dev minimatch) are accepted with rationale and owners.
+- Accessibility: axe reports no Exo-owned violation; both theme palettes pass
+  the text 4.5:1 and focus 3:1 pairs; the deployed consent and settings dialogs
+  trap Tab, close on Escape and the consent focus order cycles
+  Deny -> Allow -> homepage -> Deny. No screen-reader host was available, so
+  that human step is recorded as not run, not as passed.
+- Browser matrix: Chromium folder and remote workspaces pass; a page without a
+  directory picker shows the explicit unsupported state and still offers Connect
+  Remote; Firefox and Safari remain as classified in
+  [`docs/browser-support.md`](./docs/browser-support.md), with plugin hosting on
+  Firefox unverified.
+- Performance (median / max, five runs after warm-up): plugin startup 706 / 793
+  ms; 10k listing 1,183 / 1,249 ms with a 570 / 581 ms longest task; 1 MiB shell
+  open 208 / 268 ms and save 32 / 92 ms; 1 MiB code-plugin open 769 / 935 ms and
+  save 54 / 70 ms. Every ceiling is met and no miss is accepted.
+- Guide and demo: the guide suggested `npm run dev:template` and the deployed
+  demo manifests; the template's observation recorded one read, `saves: [1]`,
+  `lastSave.ok` and a rotated version, and its frame was removed on close. The
+  code plugin round-tripped `export const walkthrough = true` and the shell text
+  surface saved its edit. Nine screenshots are committed under
+  [`docs/media/walkthrough/`](./docs/media/walkthrough/).
+- Release docs: the changelog matches shell `0.1.0`, protocol `1`, schema `1`
+  and SDK `1.1.0`; the release checklist and upgrade-note rule are in
+  [`docs/releases.md`](./docs/releases.md).
 
 ---
 

@@ -1,13 +1,13 @@
 # Walkthrough
 
-Status: scripted acceptance path for the v1 release. Screenshots are captured
-from the deployed URL; the provenance block is filled in task 8.4.
+Status: recorded acceptance path for the v1 release. Every screenshot comes from
+the deployed URL below, not a local dev server or local build.
 
 ## Provenance
 
 - Deployed URL: `https://mode777.github.io/exo-editor/`
-- Deployed commit: pending
-- Capture date: pending
+- Deployed commit: `677b44d`
+- Capture date: 2026-11-16
 - Browser: Chrome for Testing 131.0.6778.264, 1280x800
 - Workspace: `examples/demo-workspace/` mounted through a `showDirectoryPicker`
   stub over an OPFS handle (the layer 5-9 verification method)
@@ -54,19 +54,30 @@ from the deployed URL; the provenance block is filled in task 8.4.
     No tab, plugin frame, handler or log entry from the previous visit remains;
     consent stays approved.
 
-## Expected screenshots
+## Screenshots
 
-The committed images live in `docs/media/walkthrough/` and are referenced here
-once captured:
+The committed images live in `docs/media/walkthrough/`:
 
-- `01-open-workspace.png` - empty deployed shell
-- `02-demo-explorer.png` - demo tree after opening
-- `03-consent-code.png` - Exo Code consent with same-origin and frame disclosure
-- `04-code-plugin.png` - `hello.ts` in Monaco with a dirty tab
-- `05-template-plugin.png` - `greeting.template.txt` with the save marker
-- `06-shell-text.png` - `plain.txt` in the shell text surface
-- `07-unsaved-changes.png` - close prompt for `draft.md`
-- `08-settings-fallback.png` - Exo Code disabled and `hello.ts` in the shell
-- `09-unsupported-browser.png` - explicit unsupported folder state
+![Empty deployed shell](media/walkthrough/01-open-workspace.png)
 
-Each capture is from the deployed URL, not a local dev server or local build.
+![Demo tree after opening](media/walkthrough/02-demo-explorer.png)
+
+![Exo Code consent with same-origin and frame disclosure](media/walkthrough/03-consent-code.png)
+
+![hello.ts in Monaco with a dirty tab](media/walkthrough/04-code-plugin.png)
+
+![greeting.template.txt with the template editor](media/walkthrough/05-template-plugin.png)
+
+![plain.txt in the shell text surface](media/walkthrough/06-shell-text.png)
+
+![Unsaved changes prompt for draft.md](media/walkthrough/07-unsaved-changes.png)
+
+![Exo Code disabled and hello.ts falling back to the shell](media/walkthrough/08-settings-fallback.png)
+
+![Explicit unsupported folder state](media/walkthrough/09-unsupported-browser.png)
+
+The template handler's observation during the capture recorded one read of 36
+bytes, `saves: [1]` with `lastSave.ok` and the rotated version, and the frame was
+removed when the tab closed. The code plugin round-tripped
+`export const walkthrough = true`, and the shell text surface saved the edited
+`plain.txt`.
