@@ -1,15 +1,14 @@
 # Exo Editor - Roadmap
 
-Status: layers 0-7 are complete and archived. Layer 8 (`plugin-sdk-template`) is
-implemented and verified against the deployed shell; its change is ready to
-archive. Layer 9 (`monaco-code-plugin`) is next. The parallel Stratofold provider
-track (P1) is archived as `2026-11-15-add-stratofold-provider` and does not gate
-the numbered layers. Its 0.12.0 follow-on, P2 `adopt-stratofold-0-12`, is
-implemented, verified against the deployed shell and archived. P3
-`add-remote-recents` is implemented, verified against the deployed shell and
-archived. Each layer is one OpenSpec change. A layer is done when its change is
-archived and its exit criteria are demonstrated against the deployed shell -
-never from a local dev server or local build.
+Status: layers 0-8 are complete and archived. Layer 9
+(`monaco-code-plugin`) is next. The parallel Stratofold provider track (P1) is
+archived as `2026-11-15-add-stratofold-provider` and does not gate the numbered
+layers. Its 0.12.0 follow-on, P2 `adopt-stratofold-0-12`, is implemented,
+verified against the deployed shell and archived. P3 `add-remote-recents` is
+implemented, verified against the deployed shell and archived. Each layer is one
+OpenSpec change. A layer is done when its change is archived and its exit
+criteria are demonstrated against the deployed shell - never from a local dev
+server or local build.
 
 ## Sequencing rationale
 
@@ -530,8 +529,8 @@ No local build or dev server was used.
 
 ## Layer 8 - `plugin-sdk-template`
 
-**Status:** complete - implemented 2026-11-16 and verified against the deployed
-shell; the change awaits archive.
+**Status:** complete - change archived as
+`2026-11-16-plugin-sdk-template` after deployed verification.
 
 **Goal:** remove the protocol hand-rolling cost and freeze a compatibility story.
 

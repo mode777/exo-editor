@@ -4,15 +4,13 @@ Exo Editor is a frontend-only, serverless editor shell. **The shell is the
 product; editors are plugins.** Plugins are untrusted cross-origin iframes; the
 shell owns the workbench, workspace access and consent.
 
-**Current state:** layers 0-7 are complete and archived. Layer 8
-(`plugin-sdk-template`) is implemented and verified against the deployed shell;
-its change is ready to archive. Layer 9 (the Monaco reference plugin) is next.
-The parallel Stratofold provider track (P1) is documented and blocked on its
-client's npm publication; it does not gate the numbered layers. The contracts are
-ratified, and the shell app (`apps/shell`) builds, tests and deploys to GitHub
-Pages through CI. Do not scaffold code ahead of the [roadmap](./ROADMAP.md) layer
-you were asked to work on, and do not invent commands or scripts that do not
-exist yet.
+**Current state:** layers 0-8 are complete and archived. Layer 9 (the Monaco
+reference plugin) is next. The parallel Stratofold provider track (P1) is
+documented and blocked on its client's npm publication; it does not gate the
+numbered layers. The contracts are ratified, and the shell app (`apps/shell`)
+builds, tests and deploys to GitHub Pages through CI. Do not scaffold code ahead
+of the [roadmap](./ROADMAP.md) layer you were asked to work on, and do not invent
+commands or scripts that do not exist yet.
 
 ## Read this first
 
