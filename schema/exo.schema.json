@@ -82,6 +82,10 @@
           "minimum": -100,
           "maximum": 100,
           "default": 0
+        },
+        "rendering": {
+          "enum": ["hidden", "frame"],
+          "default": "hidden"
         }
       }
     },

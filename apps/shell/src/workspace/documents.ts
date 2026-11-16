@@ -30,6 +30,8 @@ export interface DocumentEditor {
   pluginName: string
   label: string
   entryUrl: string
+  /** `frame` displays the handler in the document area; `hidden` is headless. */
+  rendering: 'hidden' | 'frame'
   /** `workspace:write` declared and the workspace session is writable. */
   canWrite: boolean
 }
@@ -544,6 +546,7 @@ export class DocumentStore {
                 pluginName: candidate.pluginName,
                 label: candidate.label,
                 entryUrl: candidate.entryUrl,
+                rendering: candidate.rendering ?? 'hidden',
                 canWrite,
               },
               pluginPhase: 'mounting',

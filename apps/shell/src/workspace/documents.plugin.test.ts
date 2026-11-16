@@ -133,11 +133,18 @@ describe('plugin-backed documents', () => {
       status: 'plugin',
       surface: 'plugin',
       pluginPhase: 'mounting',
-      editor: { pluginName: 'Code Plugin', canWrite: true },
+      editor: { pluginName: 'Code Plugin', canWrite: true, rendering: 'hidden' },
       dirty: false,
     })
     expect(editors.opened).toHaveLength(1)
     expect(read).not.toHaveBeenCalled()
+  })
+
+  it('carries a frame rendering contribution to the document state', async () => {
+    const { store, editors } = await setup()
+    editors.list = [candidate({ rendering: 'frame' })]
+    const document = await store.open('/a.txt')
+    expect(document?.editor).toMatchObject({ rendering: 'frame' })
   })
 
   it('keeps the text surface when no editor matches', async () => {

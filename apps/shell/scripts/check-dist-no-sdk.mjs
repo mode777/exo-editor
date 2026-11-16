@@ -7,6 +7,7 @@ import { pathToFileURL } from 'node:url'
 // guard catches source imports; this catches a build-time or vendored copy.
 
 const SDK_MARKERS = ['ExoProtocolError', '@exo/plugin-sdk', 'EXO_TEMPLATE_']
+const DEPLOYED_PLUGIN_PATHS = new Set(['plugin-template', 'code-plugin'])
 const ASSET_EXTENSIONS = ['.js', '.mjs', '.css', '.html']
 
 /**
@@ -27,9 +28,9 @@ export function scanDistForSdk(distDir) {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       const path = join(dir, entry.name)
       if (entry.isDirectory()) {
-        // The template is deliberately deployed as a child path; it is not
-        // part of the shell bundle this check protects.
-        if (entry.name === 'plugin-template') continue
+        // Deployed plugins are deliberately served as child paths; they are
+        // not part of the shell bundle this check protects.
+        if (DEPLOYED_PLUGIN_PATHS.has(entry.name)) continue
         walk(path)
         continue
       }

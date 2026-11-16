@@ -105,6 +105,23 @@ describe('consent dialog', () => {
     expect(text).not.toContain('same origin as the shell')
   })
 
+  it('discloses a frame-rendering editor surface', async () => {
+    const frame = request({
+      fileEditors: [
+        {
+          glob: '**/*.ts',
+          entry: 'editors/code.html',
+          entryUrl: 'https://plugins.example.com/monaco/editors/code.html',
+          label: 'Code',
+          priority: 10,
+          rendering: 'frame',
+        },
+      ],
+    })
+    const { container: rendered } = await render(frame)
+    expect(rendered.textContent).toContain('Renders its own editor surface')
+  })
+
   it('warns when the plugin shares the shell origin', async () => {
     const sameOrigin = request({
       manifestOrigin: SHELL_ORIGIN,

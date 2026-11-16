@@ -406,6 +406,12 @@
   font-size: 12px;
 }
 
+.exo-plugin-surface {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+
 .exo-document-banner {
   display: flex;
   align-items: center;

@@ -46,6 +46,8 @@ export interface RegisteredEditor {
   entryUrl: string
   label: string
   priority: number
+  /** From the manifest contribution; not part of `plugin/register`. */
+  rendering?: ManifestFileEditor['rendering']
   /** Arrival order within this plugin, starting at zero. */
   registrationOrder: number
 }
@@ -405,6 +407,7 @@ export class RegistrationSession {
       entryUrl: entry.url,
       label,
       priority: declared.priority,
+      rendering: declared.rendering,
     }
   }
 

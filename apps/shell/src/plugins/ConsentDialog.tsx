@@ -105,6 +105,11 @@ export function ConsentDialog({ request, shellOrigin, onApprove, onDeny }: Conse
                   <div className="exo-consent-page">
                     <code>{editor.entryUrl}</code>
                   </div>
+                  {editor.rendering === 'frame' && (
+                    <div className="exo-consent-page">
+                      Renders its own editor surface in the document area.
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>

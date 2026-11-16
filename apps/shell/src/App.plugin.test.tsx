@@ -39,6 +39,7 @@ class FakePool implements DocumentEditorHost {
   saveContent = 'edited'
   baseVersion = ''
   seq = 0
+  surfaces = new Map<WorkspacePath, HTMLElement | null>()
 
   candidates(): EditorCandidate[] {
     return this.list
@@ -52,6 +53,9 @@ class FakePool implements DocumentEditorHost {
   }
   close(path: WorkspacePath): void {
     this.closed.push(path)
+  }
+  attachSurface(path: WorkspacePath, element: HTMLElement | null): void {
+    this.surfaces.set(path, element)
   }
   save(): Promise<HandlerSaveRequest> {
     return Promise.resolve({
@@ -131,7 +135,18 @@ describe('plugin document surface', () => {
     await activate(workspace)
     expect(workspace.container.textContent).toContain('Code · Code Plugin')
     expect(workspace.container.querySelector('.exo-document-editor')).toBeNull()
+    expect(workspace.container.querySelector('.exo-plugin-surface')).toBeNull()
     expect(workspace.container.textContent).toContain('Opened with Code')
+  })
+
+  it('reserves a document-area slot for a frame contribution', async () => {
+    workspace.editors.list = [candidate({ rendering: 'frame' })]
+    await act(async () => workspace.runtime.openDocument('/a.txt'))
+    await activate(workspace)
+    const slot = workspace.container.querySelector('.exo-plugin-surface')
+    expect(slot).not.toBeNull()
+    expect(workspace.editors.surfaces.get('/a.txt')).toBe(slot)
+    expect(workspace.container.textContent).not.toContain('Opened with Code')
   })
 
   it('prompts before closing a dirty plugin document and keeps it on cancel', async () => {

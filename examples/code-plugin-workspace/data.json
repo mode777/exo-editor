@@ -1,0 +1,9 @@
+{
+  "name": "exo-code-example",
+  "private": true,
+  "editors": ["typescript", "javascript", "json", "markdown"],
+  "features": {
+    "plugins": true,
+    "languageServer": false
+  }
+}

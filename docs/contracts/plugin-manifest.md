@@ -151,7 +151,8 @@ settings view fails with `conflict` rather than overwriting an external edit.
         "glob": "**/*.{ts,tsx,js,jsx,json,css,md}",
         "entry": "editors/code.html",
         "label": "Code",
-        "priority": 10
+        "priority": 10,
+        "rendering": "frame"
       }
     ]
   }
@@ -175,7 +176,7 @@ settings view fails with `conflict` rather than overwriting an external edit.
 | `engines.exo` | string | yes | SemVer range. The shell refuses a plugin whose range excludes its version. |
 | `runtime.entry` | string | yes | Relative HTML path to the controller document, loaded as a hidden registration iframe. No query, fragment or `..` segment. Must share the manifest's origin. Its directory is the plugin root: every other page the plugin loads must be a sibling or descendant of it. |
 | `permissions` | array | yes | Subset of `workspace:read`, `workspace:write`, `events:subscribe`. No duplicates. `workspace:write` implies `workspace:read`. A `contributes.fileEditors` entry requires `workspace:read` or `workspace:write`; registrations from a plugin without either are rejected with `permission-denied`. |
-| `contributes.fileEditors` | array | no | Maximum 20. Each entry: `glob` (required), `entry` (required, relative HTML URL for the per-document iframe, inside the plugin root), `label` (required, 1-40 chars), `priority` (integer -100..100, default 0). Every editor entry uses the entry-resolution rules in section 4 and requires `workspace:read` or `workspace:write`. |
+| `contributes.fileEditors` | array | no | Maximum 20. Each entry: `glob` (required), `entry` (required, relative HTML URL for the per-document iframe, inside the plugin root), `label` (required, 1-40 chars), `priority` (integer -100..100, default 0), `rendering` (`"hidden"` or `"frame"`, default `"hidden"`). Every editor entry uses the entry-resolution rules in section 4 and requires `workspace:read` or `workspace:write`. |
 | `contributes.configuration` | object | no | Optional workspace settings declaration. `configuration.properties` is an object of at most 50 named settings, each with `type` (`boolean`, `string` or `number`), a required matching `default`, an optional `enum`, an optional `description`, and an optional `scope` that must be `workspace`. See section 3.1. |
 
 Unknown manifest fields are rejected at every level, like unknown `exo.json`
@@ -232,6 +233,22 @@ workspace and plugin identity (D11); they are never written to `exo.json` or the
 workspace. The settings UI and delivery rules are in
 [`plugin-settings`](../../openspec/specs/plugin-settings/spec.md) and
 [`plugin-protocol.md`](./plugin-protocol.md).
+
+### Editor rendering
+
+`rendering` selects how the shell presents a handler frame; it is not a new
+capability and never changes the sandbox or origin rules.
+
+- `"hidden"` (the default) keeps the handler headless. The shell owns the visible
+  document surface and the plugin reports content only through the protocol.
+- `"frame"` asks the shell to display the handler iframe in the measured document
+  area for the active tab. The tab strip, header, Save action and shell notices
+  stay outside the frame. The frame is hidden, not disposed, while another tab is
+  active.
+
+The value is manifest metadata: no `plugin/register` message carries it, and the
+shell ignores a registration that tries to change it. A hidden-to-frame change
+re-prompts because frame rendering is included in the consent fingerprint below.
 
 ### Glob rules
 
@@ -338,6 +355,7 @@ different origin is a different plugin.
 - Plugin `name`, `id`, `version`, `publisher.name` (verbatim, quoted).
 - The **exact origin** the manifest was loaded from: scheme, host and port.
 - The controller entry URL and the plugin root, plus each declared editor entry.
+- Whether each editor renders its own frame or stays headless.
 - The requested permissions in plain language.
 - The declared file-editor glob patterns and labels.
 - Whether the plugin can write to the workspace.
@@ -358,15 +376,21 @@ fingerprint = "v1:" + hex(sha256(JSON.stringify({
   root: pluginRootPath,
   permissions: [...permissions].sort(),
   fileEditors: contributes.fileEditors
-    .map(e => ({ glob: e.glob, priority: e.priority ?? 0 }))
+    .map(e => ({
+      glob: e.glob,
+      priority: e.priority ?? 0,
+      ...(e.rendering === 'frame' ? { rendering: 'frame' } : {}),
+    }))
     .sort((a, b) => a.glob.localeCompare(b.glob) || a.priority - b.priority),
 })))
 ```
 
 `name`, `description`, `version`, `icon`, `publisher` and individual page paths
 are excluded: they are display metadata or pages inside the already-approved
-root. Changing the origin, the approved root, a permission or a declared glob
-changes the fingerprint and re-prompts. Adding, removing or renaming a page
+root. The `rendering` flag is included only when it is `"frame"`, so existing
+hidden manifests keep their stored consent and a hidden-to-frame change
+re-prompts. Changing the origin, the approved root, a permission or a declared
+glob changes the fingerprint and re-prompts. Adding, removing or renaming a page
 inside the root does not, because the user approved the directory tree (D14).
 The input list is exhaustive: a new manifest field that changes what the plugin
 can do must be added to the fingerprint in the same change, or consent would

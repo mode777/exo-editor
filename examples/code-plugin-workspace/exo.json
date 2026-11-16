@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "plugins": [
+    {
+      "manifest": "https://mode777.github.io/exo-editor/code-plugin/exo-manifest.json",
+      "enabled": true
+    }
+  ]
+}

@@ -43,6 +43,16 @@ describe('shell bundle SDK guard', () => {
     expect(scanDistForSdk(dist)).toEqual([])
   })
 
+  it('ignores the deployed code plugin child path', () => {
+    const dist = makeDist()
+    mkdirSync(join(dist, 'code-plugin', 'assets'), { recursive: true })
+    writeFileSync(
+      join(dist, 'code-plugin', 'assets', 'editor.js'),
+      'console.log("ExoProtocolError")',
+    )
+    expect(scanDistForSdk(dist)).toEqual([])
+  })
+
   it('fails clearly when the build is missing', () => {
     expect(() => scanDistForSdk(join(makeDist(), 'missing'))).toThrow(/not found/)
   })

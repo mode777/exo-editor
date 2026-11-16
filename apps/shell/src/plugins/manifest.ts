@@ -37,9 +37,11 @@ export const MANIFEST_HTTPS_URL_PATTERN = '^https://[^\\s@#]+$'
 
 export const PLUGIN_PERMISSIONS = ['workspace:read', 'workspace:write', 'events:subscribe'] as const
 export const MANIFEST_SETTING_TYPES = ['boolean', 'string', 'number'] as const
+export const MANIFEST_RENDERINGS = ['hidden', 'frame'] as const
 
 export type PluginPermission = (typeof PLUGIN_PERMISSIONS)[number]
 export type ManifestSettingType = (typeof MANIFEST_SETTING_TYPES)[number]
+export type ManifestRendering = (typeof MANIFEST_RENDERINGS)[number]
 export type SettingValue = boolean | string | number
 
 /** `workspace:write` implies read, so either permission grants reads. */
@@ -98,6 +100,8 @@ export interface ManifestFileEditor {
   entryUrl: string
   label: string
   priority: number
+  /** Whether the handler frame is displayed in the document area. Absent = hidden. */
+  rendering?: ManifestRendering
 }
 
 export interface ManifestSetting {
@@ -352,7 +356,7 @@ function parseFileEditors(
     if (!isPlainObject(raw)) {
       return issue('invalid-manifest', { field: base })
     }
-    const unknown = unknownKeys(raw, ['glob', 'entry', 'label', 'priority'], base)
+    const unknown = unknownKeys(raw, ['glob', 'entry', 'label', 'priority', 'rendering'], base)
     if (unknown) return unknown
     if (!hasOwn(raw, 'glob') || typeof raw.glob !== 'string') {
       return issue('invalid-manifest', { field: `${base}/glob` })
@@ -393,12 +397,23 @@ function parseFileEditors(
       }
       priority = raw.priority
     }
+    let rendering: ManifestRendering = 'hidden'
+    if (hasOwn(raw, 'rendering')) {
+      if (
+        typeof raw.rendering !== 'string' ||
+        !(MANIFEST_RENDERINGS as readonly string[]).includes(raw.rendering)
+      ) {
+        return issue('invalid-manifest', { field: `${base}/rendering` })
+      }
+      rendering = raw.rendering as ManifestRendering
+    }
     editors.push({
       glob: raw.glob,
       entry: raw.entry as string,
       entryUrl: entry.url,
       label: raw.label,
       priority,
+      rendering,
     })
   }
   return editors

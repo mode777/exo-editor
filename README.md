@@ -12,15 +12,15 @@ content is a plugin: a cross-origin iframe talking to the shell over a versioned
 
 ## Status
 
-Layers 0-7 are complete and archived: the contracts are ratified OpenSpec
+Layers 0-8 are complete and archived: the contracts are ratified OpenSpec
 specs, the shell is deployed at `https://mode777.github.io/exo-editor/` through
-the GitHub Pages workflow, and the workspace, plugin-host, file-editor, event
-and settings layers are verified against it. Layer 8 (`plugin-sdk-template`) is
-implemented and verified against the deployed shell; its change is archived as
-`2026-11-16-plugin-sdk-template`. Layer 9 (the Monaco reference plugin) is next.
-The parallel Stratofold provider track (P1) is documented and blocked on its
-client's npm publication; it does not gate the numbered layers. Verification is
-always against the deployed URL, never a local dev server.
+the GitHub Pages workflow, and the workspace, plugin-host, file-editor, event,
+settings and SDK/template layers are verified against it. Layer 9
+(`monaco-code-plugin`) adds the Monaco reference plugin, the opt-in visible
+handler surface and its child-path deployment. The parallel Stratofold provider
+track (P1) is documented and blocked on its client's npm publication; it does not
+gate the numbered layers. Verification is always against the deployed URL, never
+a local dev server.
 
 ## How it fits together
 
@@ -38,8 +38,14 @@ always against the deployed URL, never a local dev server.
   handshake, registration, file-handler and event flows; `packages/plugin-template`
   is a starter plugin built only on it. The template dev server runs at
   `http://localhost:5175/` (`npm run dev:template`), and its build ships at
-  `https://mode777.github.io/exo-editor/plugin-template/`. The Monaco-based
-  reference editor arrives in layer 9.
+  `https://mode777.github.io/exo-editor/plugin-template/`.
+- **Reference code plugin** - `apps/code-plugin` is a Monaco editor built only on
+  the SDK and deployed at
+  `https://mode777.github.io/exo-editor/code-plugin/`. Its manifest opts into
+  `rendering: "frame"`, so the shell displays the sandboxed handler in the
+  document area while the tab, header and Save action stay shell-owned. The shell
+  bundle contains no Monaco. The dev server runs at `http://localhost:5176/`
+  (`npm run dev:code`), and `examples/code-plugin-workspace/` is a ready workspace.
 
 ## Documents
 

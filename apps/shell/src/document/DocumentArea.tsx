@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useCallback, useEffect } from 'react'
 import type { WorkbenchTab } from 'vscode-workbench'
 import { workspaceErrorMessage, type WorkspacePath } from '../workspace/contract'
 import { useDocument, useWorkspaceRuntime, useWorkspaceSnapshot } from '../workspace/context'
@@ -14,6 +14,13 @@ function DocumentSurface({ path }: { path: WorkspacePath }) {
   const runtime = useWorkspaceRuntime()
   const snapshot = useWorkspaceSnapshot()
   const document = useDocument(path)
+
+  const bindSurface = useCallback(
+    (element: HTMLDivElement | null) => {
+      runtime.handlers.attachSurface(path, element)
+    },
+    [path, runtime],
+  )
 
   useEffect(() => {
     if (!document) void runtime.documents.open(path)
@@ -154,6 +161,14 @@ function DocumentSurface({ path }: { path: WorkspacePath }) {
         />
       )}
 
+      {plugin && document.editor?.rendering === 'frame' && document.pluginPhase !== 'failed' && (
+        <div
+          ref={bindSurface}
+          className="exo-plugin-surface"
+          aria-label={`Plugin editor for ${document.title}`}
+        />
+      )}
+
       {plugin && document.pluginPhase === 'mounting' && (
         <div className="exo-document-state">
           <h2>Starting plugin editor</h2>
@@ -184,11 +199,14 @@ function DocumentSurface({ path }: { path: WorkspacePath }) {
         </div>
       )}
 
-      {plugin && document.pluginPhase === 'active' && !document.dirty && (
-        <p className="exo-document-plugin-idle" role="status">
-          Opened with {document.editor?.label}. Edits are reported by the plugin.
-        </p>
-      )}
+      {plugin &&
+        document.editor?.rendering !== 'frame' &&
+        document.pluginPhase === 'active' &&
+        !document.dirty && (
+          <p className="exo-document-plugin-idle" role="status">
+            Opened with {document.editor?.label}. Edits are reported by the plugin.
+          </p>
+        )}
     </div>
   )
 }

@@ -6,7 +6,7 @@ import {
   type WorkspaceSession,
 } from '../workspace/contract'
 import { basename, dirname, isReservedPath, normalizePath } from '../workspace/paths'
-import type { FrameHandle, FrameTransport, PluginMessage } from './frame'
+import type { FrameHandle, FrameSurface, FrameTransport, PluginMessage } from './frame'
 import { hasEventsSubscribe, hasWorkspaceRead, hasWorkspaceWrite } from './manifest'
 import type { EventBus, EventSubscriber } from './events'
 import type { EditorCandidate } from './registry'
@@ -273,6 +273,11 @@ export class HandlerSession {
     return this.phase === 'active'
   }
 
+  /** Present only for a manifest contribution with `rendering: "frame"`. */
+  get surface(): FrameSurface | undefined {
+    return this.frame?.surface
+  }
+
   dirtySequence(): number {
     return this.dirtySeq
   }
@@ -289,6 +294,9 @@ export class HandlerSession {
           this.sessionId,
         ),
         sandbox: this.boundary.sandbox,
+        ...(this.options.candidate.rendering === 'frame'
+          ? { visible: true, title: `${this.options.candidate.label} editor` }
+          : {}),
         onMessage: (message) => this.handleMessage(message),
         onLoadError: () => this.fail('loading-failed', this.phaseName()),
       })

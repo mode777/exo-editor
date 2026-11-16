@@ -206,6 +206,12 @@ editor.onEvent(topic, listener)
   custom-element checks, so the deployment contains both the shell and the
   template child path while the budget continues to measure the shell only.
 
+The reference code plugin (`apps/code-plugin`) consumes the same SDK for its
+controller and every handler. It adds no SDK method, message or envelope field:
+its visible surface, Monaco instance and language support are plugin-owned, and
+the shell only reads the `rendering` manifest field. The plugin build is copied
+to `/exo-editor/code-plugin/` after the same shell checks.
+
 ## 11. Conformance and isolation
 
 - `apps/shell/src/plugins/sdk-conformance.test.ts` runs the SDK handshake,

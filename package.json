@@ -15,17 +15,21 @@
     "dev": "npm run dev --workspace @exo/shell",
     "dev:plugin": "npm run dev:plugin --workspace @exo/shell",
     "dev:template": "npm run dev --workspace @exo/plugin-template",
+    "dev:code": "npm run dev --workspace @exo/code-plugin",
     "lint": "eslint .",
-    "format": "prettier --write \"apps/shell/src/**/*.{ts,tsx,css}\" \"apps/shell/*.html\" \"apps/shell/*.json\" \"apps/shell/scripts/**/*.mjs\" \"apps/shell/public/plugin-host-fixture/**/*.{js,html,json,md}\" \"packages/**/*.{ts,tsx,js,mjs,html,json,md}\"",
-    "format:check": "prettier --check \"apps/shell/src/**/*.{ts,tsx,css}\" \"apps/shell/*.html\" \"apps/shell/*.json\" \"apps/shell/scripts/**/*.mjs\" \"apps/shell/public/plugin-host-fixture/**/*.{js,html,json,md}\" \"packages/**/*.{ts,tsx,js,mjs,html,json,md}\"",
+    "format": "prettier --write \"apps/shell/src/**/*.{ts,tsx,css}\" \"apps/shell/*.html\" \"apps/shell/*.json\" \"apps/shell/scripts/**/*.mjs\" \"apps/shell/public/plugin-host-fixture/**/*.{js,html,json,md}\" \"apps/code-plugin/**/*.{ts,tsx,js,mjs,css,html,json,md}\" \"packages/**/*.{ts,tsx,js,mjs,html,json,md}\"",
+    "format:check": "prettier --check \"apps/shell/src/**/*.{ts,tsx,css}\" \"apps/shell/*.html\" \"apps/shell/*.json\" \"apps/shell/scripts/**/*.mjs\" \"apps/shell/public/plugin-host-fixture/**/*.{js,html,json,md}\" \"apps/code-plugin/**/*.{ts,tsx,js,mjs,css,html,json,md}\" \"packages/**/*.{ts,tsx,js,mjs,html,json,md}\"",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "budget": "npm run budget --workspace @exo/shell",
     "check:dist-csp": "npm run check:dist-csp --workspace @exo/shell",
     "check:dist-elements": "npm run check:dist-elements --workspace @exo/shell",
     "check:dist-no-sdk": "node apps/shell/scripts/check-dist-no-sdk.mjs apps/shell/dist",
+    "check:dist-no-monaco": "node apps/shell/scripts/check-dist-no-monaco.mjs apps/shell/dist",
     "build": "npm run build --workspace @exo/shell",
     "build:template": "npm run build --workspace @exo/plugin-template",
-    "deploy:copy-template": "node apps/shell/scripts/copy-template.mjs"
+    "deploy:copy-template": "node apps/shell/scripts/copy-template.mjs",
+    "build:code": "npm run build --workspace @exo/code-plugin",
+    "deploy:copy-code": "node apps/shell/scripts/copy-code-plugin.mjs"
   }
 }

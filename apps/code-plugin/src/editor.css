@@ -1,0 +1,59 @@
+:root {
+  color-scheme: dark light;
+  --exo-code-background: #1e1e1e;
+  --exo-code-foreground: #d4d4d4;
+  --exo-code-border: #2b2b2b;
+  --exo-code-status: #007acc;
+  --exo-code-status-foreground: #ffffff;
+  --exo-code-notice: #3a2f16;
+  --exo-code-notice-foreground: #f2cc60;
+  --exo-code-font: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: var(--exo-code-background);
+  color: var(--exo-code-foreground);
+  font-family: var(--exo-code-font);
+}
+
+#app {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.exo-code-notice {
+  flex: 0 0 auto;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--exo-code-border);
+  background: var(--exo-code-notice);
+  color: var(--exo-code-notice-foreground);
+  font-size: 12px;
+}
+
+.exo-code-editor {
+  flex: 1;
+  min-height: 0;
+}
+
+.exo-code-status {
+  display: flex;
+  flex: 0 0 auto;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 10px;
+  background: var(--exo-code-status);
+  color: var(--exo-code-status-foreground);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.exo-code-status span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

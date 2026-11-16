@@ -117,6 +117,8 @@ export class HandlerPool {
   private readonly onHandlerClosed:
     ((path: WorkspacePath, reason: HandlerDisposeReason) => void) | undefined
   private readonly records = new Map<WorkspacePath, HandlerRecord>()
+  private readonly surfaces = new Map<WorkspacePath, HTMLElement>()
+  private readonly surfaceObservers = new Map<WorkspacePath, ResizeObserver>()
   private attachOptions: HandlerPoolAttachOptions | null = null
 
   constructor(options: HandlerPoolOptions = {}) {
@@ -140,6 +142,9 @@ export class HandlerPool {
     this.clearTimeoutImpl = options.clearTimeoutImpl
     this.maxRequestBytes = options.maxRequestBytes ?? DEFAULT_MAX_REQUEST_BYTES
     this.onHandlerClosed = options.onHandlerClosed
+    if (typeof window !== 'undefined') {
+      window.addEventListener('resize', this.handleViewportResize)
+    }
   }
 
   attach(options: HandlerPoolAttachOptions): void {
@@ -149,6 +154,7 @@ export class HandlerPool {
 
   async detach(): Promise<void> {
     const sessions = [...this.records.values()]
+    for (const path of [...this.surfaces.keys()]) this.dropSurface(path)
     this.records.clear()
     this.attachOptions = null
     await Promise.all(sessions.map((record) => record.session.dispose('workspace-switch')))
@@ -168,6 +174,28 @@ export class HandlerPool {
 
   get(path: WorkspacePath): HandlerSession | undefined {
     return this.records.get(path)?.session
+  }
+
+  /**
+   * Register the document area slot for a visible handler. The iframe stays in
+   * the transport container; only its fixed position and visibility change.
+   * Passing `null` hides the frame without disposing the session.
+   */
+  attachSurface(path: WorkspacePath, element: HTMLElement | null): void {
+    this.surfaceObservers.get(path)?.disconnect()
+    this.surfaceObservers.delete(path)
+    if (!element) {
+      this.surfaces.delete(path)
+      this.records.get(path)?.session.surface?.hide()
+      return
+    }
+    this.surfaces.set(path, element)
+    if (typeof ResizeObserver !== 'undefined') {
+      const observer = new ResizeObserver(() => this.updateSurface(path))
+      observer.observe(element)
+      this.surfaceObservers.set(path, observer)
+    }
+    this.updateSurface(path)
   }
 
   count(identity: string): number {
@@ -208,11 +236,15 @@ export class HandlerPool {
       createSessionId: this.createSessionId,
       setTimeoutImpl: this.setTimeoutImpl,
       clearTimeoutImpl: this.clearTimeoutImpl,
-      onActive: () => callbacks.onActive(),
+      onActive: () => {
+        callbacks.onActive()
+        this.updateSurface(input.path)
+      },
       onDirty: (dirty) => callbacks.onDirty(dirty),
       onVersion: (version) => callbacks.onVersion(version),
       onFailure: (failure) => {
         if (record && this.records.get(input.path) !== record) return
+        this.dropSurface(input.path)
         if (record) this.records.delete(input.path)
         attached.host.logHandler(
           input.candidate.identity,
@@ -244,6 +276,7 @@ export class HandlerPool {
   dispose(path: WorkspacePath, reason: HandlerDisposeReason): void {
     const record = this.records.get(path)
     if (!record) return
+    this.dropSurface(path)
     this.records.delete(path)
     this.attachOptions?.host.logHandler(record.identity, 'handler-dispose', reason, path)
     void record.session.dispose(reason)
@@ -256,6 +289,7 @@ export class HandlerPool {
   closeFor(identity: string, reason: HandlerDisposeReason): void {
     for (const [path, record] of [...this.records]) {
       if (record.identity !== identity) continue
+      this.dropSurface(path)
       this.records.delete(path)
       this.attachOptions?.host.logHandler(record.identity, 'handler-dispose', reason, path)
       void record.session.dispose(reason)
@@ -265,6 +299,7 @@ export class HandlerPool {
 
   async disposeAll(reason: HandlerDisposeReason): Promise<void> {
     const sessions = [...this.records.values()]
+    for (const path of [...this.surfaces.keys()]) this.dropSurface(path)
     this.records.clear()
     await Promise.all(sessions.map((record) => record.session.dispose(reason)))
   }
@@ -274,6 +309,12 @@ export class HandlerPool {
     if (!record) return
     this.records.delete(previousPath)
     this.records.set(nextPath, record)
+    const surface = this.surfaces.get(previousPath)
+    const observer = this.surfaceObservers.get(previousPath)
+    this.surfaces.delete(previousPath)
+    this.surfaceObservers.delete(previousPath)
+    if (surface) this.attachSurface(nextPath, surface)
+    else if (observer) observer.disconnect()
     record.session.rename(nextPath)
   }
 
@@ -330,6 +371,41 @@ export class HandlerPool {
   }
 
   disposeTransport(): void {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('resize', this.handleViewportResize)
+    }
+    for (const path of [...this.surfaces.keys()]) this.dropSurface(path)
     if (this.ownsTransport) this.transport.dispose?.()
+  }
+
+  private handleViewportResize = (): void => {
+    for (const path of [...this.surfaces.keys()]) this.updateSurface(path)
+  }
+
+  private updateSurface(path: WorkspacePath): void {
+    const record = this.records.get(path)
+    const element = this.surfaces.get(path)
+    if (!record?.session.active || !element) {
+      record?.session.surface?.hide()
+      return
+    }
+    const rect = element.getBoundingClientRect()
+    if (rect.width < 1 || rect.height < 1) {
+      record.session.surface?.hide()
+      return
+    }
+    record.session.surface?.show({
+      left: rect.left,
+      top: rect.top,
+      width: rect.width,
+      height: rect.height,
+    })
+  }
+
+  private dropSurface(path: WorkspacePath): void {
+    this.surfaceObservers.get(path)?.disconnect()
+    this.surfaceObservers.delete(path)
+    this.surfaces.delete(path)
+    this.records.get(path)?.session.surface?.hide()
   }
 }

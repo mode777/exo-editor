@@ -16,7 +16,10 @@ There are two frame lifetimes and one protocol:
 | Registration | One per plugin per workspace load (or on add) | `runtime.entry` (controller) | Confirm contributions, then unload |
 | Handler | One per open document | `contributes.fileEditors[].entry` for the matched editor | Init with metadata, answer reads, report dirty, produce content on save |
 
-A frame is always hidden. It never renders shell UI.
+A registration frame is always hidden. A handler frame is hidden unless its
+manifest contribution declares `rendering: "frame"`, in which case the shell
+displays it in the document area for the active document. A visible handler frame
+renders only inside its own iframe; it never renders shell chrome.
 
 ## 2. Envelope
 
@@ -103,6 +106,12 @@ https://plugins.example.com/monaco/editors/code.html
    A same-origin plugin never receives `allow-same-origin`, because that
    combination would let it remove its own sandbox. Same-origin plugins are
    first-party only and lose plugin storage (D3, D9).
+
+   Registration frames are always hidden. A handler frame is hidden unless the
+   selected manifest contribution declares `rendering: "frame"`; a visible
+   handler is positioned inside the active document area, hidden without
+   disposal when its tab is inactive, and still has no shell DOM access. The
+   visibility flag is manifest metadata and is not sent in `shell/init`.
 2. Plugin sends `plugin/ready` with
    `{ protocolVersion: "1", sessionId: "<echo of exo-session>" }`.
 3. Shell verifies origin and source, then replies `shell/init`:

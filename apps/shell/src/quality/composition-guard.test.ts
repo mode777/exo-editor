@@ -85,4 +85,24 @@ describe('composition guard', () => {
 
     expect(violations).toEqual([])
   })
+
+  it('never imports Monaco or the reference code plugin', () => {
+    const violations = files.flatMap((file) => {
+      const source = readFileSync(file, 'utf8')
+      const imports = importSpecifiers(source)
+        .filter(
+          (specifier) =>
+            specifier === 'monaco-editor' ||
+            specifier.startsWith('monaco-editor/') ||
+            specifier === '@exo/code-plugin' ||
+            specifier.startsWith('@exo/code-plugin/'),
+        )
+        .map((specifier) => `${relative(srcRoot, file)}: ${specifier}`)
+      return source.includes('MonacoEnvironment')
+        ? [...imports, `${relative(srcRoot, file)}: MonacoEnvironment`]
+        : imports
+    })
+
+    expect(violations).toEqual([])
+  })
 })

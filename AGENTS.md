@@ -124,8 +124,11 @@ npm install        # npm ci in CI
 | Deployed CSP check | `npm run check:dist-csp` (after a build) |
 | Custom elements check | `npm run check:dist-elements` (after a build) |
 | SDK absent from shell bundle | `npm run check:dist-no-sdk` (after a build) |
+| Monaco absent from shell bundle | `npm run check:dist-no-monaco` (after a build) |
 | Template build | `npm run build:template` |
 | Template deploy copy | `npm run deploy:copy-template` (after the shell build and dist checks) |
+| Code plugin build | `npm run build:code` |
+| Code plugin deploy copy | `npm run deploy:copy-code` (after the shell build and dist checks) |
 
 Dev server: `npm run dev` serves `http://localhost:5173/exo-editor/`. It is a
 development aid, not a verification target.
@@ -154,6 +157,15 @@ protocol-mismatch diagnostic is `exo-manifest-mismatch.json` next to it. The
 template uses no storage and works under the stricter same-origin sandbox. See
 `packages/plugin-template/README.md` for the manual checks.
 
+Reference code plugin: `npm run dev:code` serves the Monaco editor at
+`http://localhost:5176/` with CORS. Use
+`http://localhost:5176/exo-manifest.json` in `exo.json`. The deployed same-origin
+copy is
+`https://mode777.github.io/exo-editor/code-plugin/exo-manifest.json`; it runs
+with `sandbox="allow-scripts"` and no storage. The example workspace is
+`examples/code-plugin-workspace/`. See `apps/code-plugin/README.md` for the
+manual checks and the 5 MiB guard.
+
 The deployed verification surface is
 `https://mode777.github.io/exo-editor/`. Every push to `main` runs the gate below
 and deploys on success; behaviour and exit criteria are demonstrated there, never
@@ -172,13 +184,16 @@ node apps/shell/scripts/check-bundle-budget.mjs apps/shell/dist apps/shell/budge
 node apps/shell/scripts/check-dist-csp.mjs apps/shell/dist/index.html
 node apps/shell/scripts/check-dist-elements.mjs apps/shell/dist
 npm run check:dist-no-sdk
+npm run check:dist-no-monaco
 npm run build:template
 npm run deploy:copy-template
+npm run build:code
+npm run deploy:copy-code
 ```
 
-The budget, CSP and custom-element checks run before the template copy, so the
-budget measures the shell only; the copy adds the template child path to the
-deployed artifact.
+The budget, CSP and custom-element checks run before the plugin copies, so the
+budget measures the shell only; the copies add the template and code-plugin child
+paths to the deployed artifact.
 
 Specs and change proposals still validate with `openspec validate --all`.
 

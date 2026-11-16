@@ -44,15 +44,17 @@ Everything runs in one browser tab. There is no server component.
   └──────────────────────┘                  │                      │
   ┌──────────────────────┐   postMessage    │                      │
   │ file handler frame   │ ◄──────────────► │                      │
-  │ (hidden, per tab)    │                  │                      │
+  │ (per tab, visible    │                  │                      │
+  │  only with rendering)│                  │                      │
   └──────────────────────┘                  └──────────────────────┘
 ```
 
-The plugin iframes are hidden. They render into nothing; the shell owns the
-visible surface and the tab. A plugin is a headless controller that produces
-content on request. This is deliberate: it removes DOM and CSS coupling, makes
-the protocol the only contract, and lets the same plugin serve a tab and a
-preview.
+The registration iframe is hidden. Handler iframes are hidden by default; a
+manifest contribution may declare `rendering: "frame"`, in which case its handler
+is displayed inside the active document area. Either way the plugin renders only
+inside its own iframe, never into shell markup. A plugin is a controller that
+produces content on request; a frame-rendering editor also owns its own visible
+surface.
 
 ## 2. Ownership
 
@@ -259,9 +261,10 @@ folder-backed workspaces.
 ## 6. Hosting topology
 
 ```text
-GitHub Pages (shell + first-party plugin)      third-party plugin host
+GitHub Pages (shell + first-party plugins)      third-party plugin host
 https://<owner>.github.io/exo-editor/           https://plugins.example.com/...
-https://<owner>.github.io/exo-editor/code/      (any HTTPS origin)
+https://<owner>.github.io/exo-editor/code-plugin/
+https://<owner>.github.io/exo-editor/plugin-template/
         │                                             │
         └───────────── exo.json references ───────────┘
 ```
@@ -301,7 +304,7 @@ AGENTS.md                agent rules and invariants
 ROADMAP.md               layered OpenSpec change plan
 apps/
   shell/                 Exo editor shell (the deployable)
-  code-plugin/           Monaco reference plugin (separate deploy target)
+  code-plugin/           Monaco reference plugin (child-path deploy)
 packages/
   plugin-sdk/            typed postMessage client, shared by plugins
   plugin-template/       starter plugin, published or copied
@@ -361,3 +364,4 @@ layer named in the last column.
 | D15 | Plugin identity is the final manifest origin plus plugin id; a later duplicate identity in one workspace is reported and not mounted | decided | layer 4 |
 | D16 | Enabled entries initialize in `exo.json` declaration order, and that order is the editor-selection tie-break, independent of fetch or handshake completion | decided | layer 4 |
 | D17 | Remote providers are opt-in workspace providers implementing the same session contract; credentials are shell-owned and never exposed to plugins or URLs; they are not a sync or cloud-storage feature | decided | P1 |
+| D18 | Handler frames are hidden by default; a manifest contribution with `rendering: "frame"` may be displayed in the active document area, with the same sandbox, no shell DOM access and shell chrome outside the frame | decided | layer 9 |

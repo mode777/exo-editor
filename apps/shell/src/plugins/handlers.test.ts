@@ -111,6 +111,41 @@ function eventsFor(frame: ReturnType<FakeFrameTransport['open']>): unknown[] {
 }
 
 describe('handler pool', () => {
+  it('shows a frame surface only after the handler is active and hides on detach', async () => {
+    const context = await harness({ '/src/a.ts': 'a' })
+    const frameCandidate = candidate(undefined, { rendering: 'frame' })
+    await openWith(context, '/src/a.ts', frameCandidate)
+    const frame = context.transport.frames[0]
+    expect(frame.options.visible).toBe(true)
+
+    const slot = document.createElement('div')
+    slot.getBoundingClientRect = () => ({ left: 10, top: 20, width: 800, height: 600 }) as DOMRect
+    context.pool.attachSurface('/src/a.ts', slot)
+    expect(frame.surfaceShown).toBe(false)
+
+    readyFrame(frame, PLUGIN_ORIGIN)
+    expect(frame.surfaceShown).toBe(true)
+    expect(frame.surfaceBounds).toEqual({ left: 10, top: 20, width: 800, height: 600 })
+
+    context.pool.attachSurface('/src/a.ts', null)
+    expect(frame.surfaceShown).toBe(false)
+    expect(frame.closed).toBe(false)
+  })
+
+  it('keeps hidden contributions headless when a surface is attached', async () => {
+    const context = await harness({ '/src/a.ts': 'a' })
+    await open(context, '/src/a.ts')
+    const frame = context.transport.frames[0]
+    expect(frame.options.visible).toBeUndefined()
+
+    const slot = document.createElement('div')
+    slot.getBoundingClientRect = () => ({ left: 10, top: 20, width: 800, height: 600 }) as DOMRect
+    context.pool.attachSurface('/src/a.ts', slot)
+    readyFrame(frame, PLUGIN_ORIGIN)
+    expect(frame.surfaceShown).toBe(false)
+    expect(frame.surface).toBeUndefined()
+  })
+
   it('delivers config changes only to the target plugin frame', async () => {
     const context = await harness({ '/src/a.ts': 'a', '/src/b.ts': 'b' })
     const first = candidate('https://a.example.com::com.example.a', {

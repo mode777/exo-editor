@@ -1,0 +1,23 @@
+{
+  "name": "@exo/code-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Monaco reference code editor for the Exo shell",
+  "scripts": {
+    "dev": "vite --port 5176 --strictPort",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@exo/plugin-sdk": "1.0.0",
+    "monaco-editor": "^0.57.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "~5.9.3",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.0"
+  }
+}

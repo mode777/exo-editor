@@ -98,4 +98,57 @@ describe('DOM frame transport', () => {
     expect(onLoadError).toHaveBeenCalledTimes(1)
     transport.dispose()
   })
+
+  it('shows and hides a visible handler surface without moving the iframe', () => {
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const transport = new DomFrameTransport({ container })
+    const frame = transport.open({
+      url: 'https://plugins.example.com/code/editor.html',
+      sandbox: 'allow-scripts',
+      visible: true,
+      title: 'Exo Code editor',
+      onMessage: vi.fn(),
+      onLoadError: vi.fn(),
+    })
+    const surfaces = document.querySelector('[data-exo-plugin-surfaces]')
+    const iframe = surfaces?.querySelector('iframe')
+    expect(container.querySelector('iframe')).toBeNull()
+    expect(iframe?.title).toBe('Exo Code editor')
+    expect(iframe?.style.display).toBe('none')
+    expect(frame.surface).toBeDefined()
+
+    frame.surface?.show({ left: 10, top: 20, width: 800, height: 600 })
+    expect(iframe?.style.left).toBe('10px')
+    expect(iframe?.style.top).toBe('20px')
+    expect(iframe?.style.width).toBe('800px')
+    expect(iframe?.style.height).toBe('600px')
+    expect(iframe?.style.display).toBe('block')
+    expect(iframe?.getAttribute('aria-hidden')).toBe('false')
+    expect(iframe?.tabIndex).toBe(0)
+
+    frame.surface?.hide()
+    expect(iframe?.style.display).toBe('none')
+    expect(iframe?.getAttribute('aria-hidden')).toBe('true')
+    expect(iframe?.tabIndex).toBe(-1)
+
+    frame.close()
+    expect(surfaces?.querySelector('iframe')).toBeNull()
+    transport.dispose()
+  })
+
+  it('does not expose a surface for hidden frames', () => {
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const transport = new DomFrameTransport({ container })
+    const frame = transport.open({
+      url: 'https://plugins.example.com/plugin.html',
+      sandbox: 'allow-scripts',
+      onMessage: vi.fn(),
+      onLoadError: vi.fn(),
+    })
+    expect(frame.surface).toBeUndefined()
+    frame.close()
+    transport.dispose()
+  })
 })

@@ -9,6 +9,8 @@ export interface FakeFrame extends FrameHandle {
   readonly options: FrameOpenOptions
   readonly window: Window
   readonly posted: PostedMessage[]
+  readonly surfaceShown: boolean
+  readonly surfaceBounds: { left: number; top: number; width: number; height: number } | null
   closed: boolean
   close(): void
   emit(data: unknown, origin: string, source?: Window | null): void
@@ -36,6 +38,21 @@ export class FakeFrameTransport implements FrameTransport {
       window,
       posted,
       closed: false,
+      surfaceShown: false,
+      surfaceBounds: null,
+      ...(options.visible
+        ? {
+            surface: {
+              show: (bounds) => {
+                Object.defineProperty(frame, 'surfaceShown', { value: true, configurable: true })
+                Object.defineProperty(frame, 'surfaceBounds', { value: bounds, configurable: true })
+              },
+              hide: () => {
+                Object.defineProperty(frame, 'surfaceShown', { value: false, configurable: true })
+              },
+            },
+          }
+        : {}),
       close: () => {
         frame.closed = true
       },

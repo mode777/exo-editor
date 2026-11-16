@@ -153,6 +153,26 @@ describe('consent fingerprint', () => {
     expect(cosmetic).toBe(base)
   })
 
+  it('includes frame rendering but not hidden rendering', async () => {
+    const hidden = fingerprintInput(manifest())
+    const frame = fingerprintInput(
+      manifest({
+        fileEditors: [
+          {
+            glob: '**/*.ts',
+            entry: 'editors/code.html',
+            entryUrl: 'https://plugins.example.com/monaco/editors/code.html',
+            label: 'Code',
+            priority: 10,
+            rendering: 'frame',
+          },
+        ],
+      }),
+    )
+    expect(hidden.fileEditors).toEqual([{ glob: '**/*.ts', priority: 10 }])
+    expect(frame.fileEditors).toEqual([{ glob: '**/*.ts', priority: 10, rendering: 'frame' }])
+  })
+
   it('ignores contributed configuration', async () => {
     const base = await computeFingerprint(manifest(), digest)
     const configured = await computeFingerprint(

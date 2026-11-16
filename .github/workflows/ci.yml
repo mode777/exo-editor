@@ -56,11 +56,22 @@ jobs:
       - name: Plugin SDK absent from shell bundle
         run: npm run check:dist-no-sdk
 
+      - name: Monaco absent from shell bundle
+        run: npm run check:dist-no-monaco
+
       - name: Build plugin template
         run: npm run build:template
 
       - name: Copy plugin template into the site
         run: npm run deploy:copy-template
+
+      - name: Build reference code plugin
+        run: npm run build:code
+        env:
+          EXO_CODE_PLUGIN_BASE_PATH: /exo-editor/code-plugin/
+
+      - name: Copy reference code plugin into the site
+        run: npm run deploy:copy-code
 
       - name: Upload shell build
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'

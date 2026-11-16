@@ -20,6 +20,7 @@ import {
   MANIFEST_RELATIVE_ASSET_PATTERN,
   MANIFEST_RELATIVE_PAGE_PATTERN,
   MANIFEST_REQUIRED_FIELDS,
+  MANIFEST_RENDERINGS,
   MANIFEST_SCHEMA_VERSION,
   MANIFEST_SEMVER_PATTERN,
   MANIFEST_SETTING_KEY_PATTERN,
@@ -149,6 +150,7 @@ describe('manifest validation', () => {
     expect(withoutPriority.ok).toBe(true)
     if (withoutPriority.ok) {
       expect(withoutPriority.manifest.fileEditors[0].priority).toBe(0)
+      expect(withoutPriority.manifest.fileEditors[0].rendering).toBe('hidden')
     }
 
     const withoutContributes = manifest()
@@ -158,6 +160,26 @@ describe('manifest validation', () => {
     if (withoutContributions.ok) {
       expect(withoutContributions.manifest.fileEditors).toEqual([])
     }
+  })
+
+  it('accepts frame rendering and rejects unknown values', () => {
+    const frame = validate({
+      contributes: {
+        fileEditors: [{ glob: '**/*.ts', entry: 'editor.html', label: 'Code', rendering: 'frame' }],
+      },
+    })
+    expect(frame.ok).toBe(true)
+    if (frame.ok) expect(frame.manifest.fileEditors[0].rendering).toBe('frame')
+
+    expect(
+      errorOf(
+        validate({
+          contributes: {
+            fileEditors: [{ glob: '**/*.ts', entry: 'editor.html', label: 'Code', rendering: 'x' }],
+          },
+        }),
+      ).field,
+    ).toBe('/contributes/fileEditors/0/rendering')
   })
 
   it('rejects unknown fields at every level', () => {
@@ -785,6 +807,7 @@ interface SchemaDefs {
       glob: { $ref: string }
       label: { maxLength: number }
       priority: { minimum: number; maximum: number; default: number }
+      rendering: { enum: string[]; default: string }
     }
   }
   glob: { maxLength: number; pattern: string }
@@ -853,6 +876,8 @@ describe('manifest schema parity', () => {
     expect(defs.fileEditor.properties.priority.minimum).toBe(MANIFEST_PRIORITY_MIN)
     expect(defs.fileEditor.properties.priority.maximum).toBe(MANIFEST_PRIORITY_MAX)
     expect(defs.fileEditor.properties.priority.default).toBe(0)
+    expect(defs.fileEditor.properties.rendering.enum).toEqual([...MANIFEST_RENDERINGS])
+    expect(defs.fileEditor.properties.rendering.default).toBe('hidden')
     expect(defs.glob.maxLength).toBe(MANIFEST_MAX_GLOB_LENGTH)
     expect(defs.relativePage.pattern).toBe(MANIFEST_RELATIVE_PAGE_PATTERN)
     expect(defs.relativePage.maxLength).toBe(MANIFEST_MAX_PAGE)
@@ -886,5 +911,21 @@ describe('manifest schema parity', () => {
       SHELL_VERSION,
     )
     expect(mismatchResult.ok).toBe(true)
+
+    const code = JSON.parse(
+      readFileSync(join(process.cwd(), '../../apps/code-plugin/public/exo-manifest.json'), 'utf8'),
+    ) as unknown
+    const codeResult = validateManifest(
+      code,
+      'https://mode777.github.io/exo-editor/code-plugin/exo-manifest.json',
+      SHELL_VERSION,
+    )
+    expect(codeResult.ok).toBe(true)
+    if (codeResult.ok) {
+      expect(codeResult.manifest.fileEditors).toHaveLength(4)
+      expect(codeResult.manifest.fileEditors.every((editor) => editor.rendering === 'frame')).toBe(
+        true,
+      )
+    }
   })
 })

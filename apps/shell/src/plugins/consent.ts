@@ -25,7 +25,7 @@ export interface FingerprintInput {
   entryOrigin: string
   root: string
   permissions: string[]
-  fileEditors: Array<{ glob: string; priority: number }>
+  fileEditors: Array<{ glob: string; priority: number; rendering?: 'frame' }>
 }
 
 export type Digest = (bytes: Uint8Array) => Promise<ArrayBuffer>
@@ -58,7 +58,11 @@ export function fingerprintInput(
     root: manifest.pluginRoot,
     permissions: [...manifest.permissions].sort(),
     fileEditors: manifest.fileEditors
-      .map((editor) => ({ glob: editor.glob, priority: editor.priority }))
+      .map((editor) => ({
+        glob: editor.glob,
+        priority: editor.priority,
+        ...(editor.rendering === 'frame' ? { rendering: 'frame' as const } : {}),
+      }))
       .sort((left, right) => left.glob.localeCompare(right.glob) || left.priority - right.priority),
   }
 }
