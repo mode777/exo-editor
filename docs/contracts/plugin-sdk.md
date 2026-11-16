@@ -192,6 +192,8 @@ editor.onEvent(topic, listener)
 - A protocol mismatch is actionable: the SDK raises a named error with expected
   and received versions before any phase message, and the shell's plugin log
   reports `unsupported-version`.
+- The release checklist, communication channels and upgrade-note requirement for
+  a breaking change are in [`releases.md`](../releases.md).
 
 ## 10. Starter template and deployment
 

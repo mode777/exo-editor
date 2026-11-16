@@ -16,14 +16,15 @@ Layers 0-9 are complete and archived: the contracts are ratified OpenSpec
 specs, the shell is deployed at `https://mode777.github.io/exo-editor/` through
 the GitHub Pages workflow, and the workspace, plugin-host, file-editor, event,
 settings, SDK/template and Monaco reference-plugin layers are verified against
-it. Layer 9 (`monaco-code-plugin`) adds the opt-in visible handler surface and
-the child-path code plugin, verified in same-origin and cross-origin sandboxes.
-A post-layer-9 change (`plugin-initiated-save`, archived as
-`2026-11-16-plugin-initiated-save`) adds the id-less `plugin/request-save` intent
-and Ctrl/Cmd+S in the reference editor, still additive within protocol major `1`. The parallel Stratofold provider track (P1)
-is documented and blocked on its client's npm publication; it does not gate the
-numbered layers. Verification is always against the deployed URL, never a local
-dev server.
+it. Layer 10 (`release-readiness`) adds the security review, accessibility pass,
+browser matrix, performance budgets, plugin author guide, demo workspace,
+walkthrough and release plan; its deployed verification is recorded in
+[`ROADMAP.md`](./ROADMAP.md). A post-layer-9 change
+(`plugin-initiated-save`, archived as `2026-11-16-plugin-initiated-save`) adds
+the id-less `plugin/request-save` intent and Ctrl/Cmd+S in the reference editor,
+still additive within protocol major `1`. The parallel Stratofold provider track
+(P1-P3) is archived and verified; it does not gate the numbered layers.
+Verification is always against the deployed URL, never a local dev server.
 
 ## How it fits together
 
@@ -49,6 +50,10 @@ dev server.
   document area while the tab, header and Save action stay shell-owned. The shell
   bundle contains no Monaco. The dev server runs at `http://localhost:5176/`
   (`npm run dev:code`), and `examples/code-plugin-workspace/` is a ready workspace.
+- **Guide and demo** - [`docs/guide/`](./docs/guide/README.md) is the author
+  handoff, and [`examples/demo-workspace/`](./examples/demo-workspace/README.md)
+  declares both deployed plugins so the release walkthrough can exercise the
+  code plugin, the template plugin and the shell text surface in one folder.
 
 ## Documents
 
@@ -56,12 +61,22 @@ dev server.
 | --- | --- |
 | [Vision](./docs/vision.md) | Product intent, principles, scope, non-goals |
 | [Architecture](./docs/architecture.md) | Runtime model, lifecycles, trust boundaries, decisions |
+| [Security review](./docs/security-review.md) | Trust-boundary controls, mutation evidence, findings |
 | [Workspace contract](./docs/contracts/workspace-api.md) | Provider interface, paths, errors, isolation |
 | [Manifest contract](./docs/contracts/plugin-manifest.md) | `exo.json`, `exo-manifest.json`, consent, fingerprint |
 | [Protocol contract](./docs/contracts/plugin-protocol.md) | Envelope, handshake, registration, handler sessions |
 | [Events contract](./docs/contracts/events.md) | Topics, ordering, limits |
 | [Plugin SDK contract](./docs/contracts/plugin-sdk.md) | Typed client, origin rules, compatibility policy, template |
 | [Manifest schema](./schema/exo.schema.json) | Shared JSON Schema for `exo.json` and `exo-manifest.json` |
+| [Plugin author guide](./docs/guide/README.md) | Quickstart, manifest, protocol, SDK, hosting, consent, testing |
+| [Demo workspace](./examples/demo-workspace/README.md) | Shipped code and template plugins in one workspace |
+| [Walkthrough](./docs/walkthrough.md) | Recorded acceptance path with screenshots |
+| [Accessibility](./docs/accessibility.md) | Scope, automated checks, manual script, upstream exceptions |
+| [Browser support](./docs/browser-support.md) | Supported, unsupported and unverified combinations |
+| [Performance](./docs/performance.md) | Runtime budgets, reference environment, measurements |
+| [Security review](./docs/security-review.md) | Trust-boundary controls, mutation evidence, findings |
+| [Releases](./docs/releases.md) | Version axes, release checklist, deprecation and breaking changes |
+| [Changelog](./CHANGELOG.md) | Release history |
 | [Stratofold provider](./docs/providers/stratofold.md) | Remote-provider track, upstream status, npm blocker |
 | [Roadmap](./ROADMAP.md) | Layered OpenSpec changes and exit criteria |
 | [Agent guide](./AGENTS.md) | Instructions for coding agents working here |

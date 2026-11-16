@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react'
+import { useRef } from 'react'
+import { useModalDialog } from '../components/useModalDialog'
 import type { PluginManifest, PluginPermission } from './manifest'
 
 export interface ConsentRequestView {
@@ -26,22 +27,13 @@ function rootUrl(manifest: PluginManifest): string {
 
 export function ConsentDialog({ request, shellOrigin, onApprove, onDeny }: ConsentDialogProps) {
   const denyButton = useRef<HTMLButtonElement>(null)
-
-  useEffect(() => {
-    if (request) denyButton.current?.focus()
-  }, [request])
-
-  useEffect(() => {
-    if (!request) return
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        onDeny(request.identity)
-      }
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [request, onDeny])
+  const dialogRef = useModalDialog({
+    open: Boolean(request),
+    onClose: () => {
+      if (request) onDeny(request.identity)
+    },
+    initialFocus: () => denyButton.current,
+  })
 
   if (!request) return null
   const { manifest } = request
@@ -55,6 +47,7 @@ export function ConsentDialog({ request, shellOrigin, onApprove, onDeny }: Conse
       data-testid="consent-backdrop"
     >
       <div
+        ref={dialogRef}
         className="exo-consent"
         role="dialog"
         aria-modal="true"

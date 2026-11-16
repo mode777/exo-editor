@@ -1,0 +1,5 @@
+{
+  "name": "Exo demo",
+  "editors": ["code", "template", "shell-text"],
+  "version": 1
+}

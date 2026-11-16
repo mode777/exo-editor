@@ -3,6 +3,7 @@ import {
   connectRequestFromConnectionString,
   type ConnectRequest,
 } from './providers/stratofold/connection'
+import { useModalDialog } from '../components/useModalDialog'
 import { useWorkspaceRuntime, useWorkspaceSnapshot } from './context'
 import type { RemoteWorkspaceSummary } from './runtime'
 
@@ -35,6 +36,11 @@ export function ConnectRemoteDialog({ open, onClose }: ConnectRemoteDialogProps)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const serverInput = useRef<HTMLInputElement>(null)
+  const dialogRef = useModalDialog({
+    open,
+    onClose,
+    initialFocus: () => serverInput.current,
+  })
 
   const loadRecents = useCallback(async () => {
     try {
@@ -56,22 +62,12 @@ export function ConnectRemoteDialog({ open, onClose }: ConnectRemoteDialogProps)
     setConnectionStringError(null)
     setError(null)
     setBusy(false)
-    serverInput.current?.focus()
   }, [open, snapshot.remote?.server, snapshot.remote?.vdir])
 
   useEffect(() => {
     if (!open) return
     void loadRecents()
   }, [open, loadRecents])
-
-  useEffect(() => {
-    if (!open) return
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [open, onClose])
 
   if (!open) return null
 
@@ -170,6 +166,7 @@ export function ConnectRemoteDialog({ open, onClose }: ConnectRemoteDialogProps)
   return (
     <div className="exo-dialog-backdrop">
       <div
+        ref={dialogRef}
         className="exo-dialog"
         role="dialog"
         aria-modal="true"

@@ -418,6 +418,8 @@ for repeated violations, tears down the frame.
   policy is in [`plugin-sdk.md`](./plugin-sdk.md#9-compatibility-and-deprecation-policy).
 - `shell/init` advertises `shell.version`; plugins must not infer capabilities
   from it, only log it.
+- The release checklist, communication policy and upgrade-note requirement for a
+  breaking change are in [`releases.md`](../releases.md).
 
 ## 9. Security checklist for the host implementation
 

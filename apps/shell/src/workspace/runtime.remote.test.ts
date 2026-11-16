@@ -233,6 +233,21 @@ describe('workspace runtime remote workspaces', () => {
     await runtime.dispose()
   })
 
+  it('never puts the token in the shell-facing remote snapshot', async () => {
+    const { runtime, server } = harness()
+    await runtime.start()
+    expect(await runtime.connectRemote({ server: server.baseUrl, token: FAKE_TOKEN })).toBe(true)
+
+    const remote = runtime.getSnapshot().remote
+    expect(remote).toBeDefined()
+    expect(Object.keys(remote ?? {})).not.toContain('token')
+    expect(JSON.stringify(remote)).not.toContain(FAKE_TOKEN)
+    const recents = await runtime.listRemoteConnections()
+    expect(recents.every((item) => !Object.keys(item).includes('token'))).toBe(true)
+    expect(JSON.stringify(recents)).not.toContain(FAKE_TOKEN)
+    await runtime.dispose()
+  })
+
   it('opens a recent workspace without retyping its token', async () => {
     const { runtime, server } = harness()
     await runtime.start()

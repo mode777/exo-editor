@@ -4,16 +4,18 @@ Exo Editor is a frontend-only, serverless editor shell. **The shell is the
 product; editors are plugins.** Plugins are untrusted cross-origin iframes; the
 shell owns the workbench, workspace access and consent.
 
-**Current state:** layers 0-9 are complete and archived. Layer 9
-(`monaco-code-plugin`) adds the Monaco reference plugin, the opt-in visible
-handler surface and its child-path deployment, verified against the deployed
-shell in both sandbox modes. A post-layer-9 change (`plugin-initiated-save`,
-archived as `2026-11-16-plugin-initiated-save`) adds the id-less
-`plugin/request-save` intent and Ctrl/Cmd+S in the reference editor.
-The parallel Stratofold provider track (P1) is documented and blocked on its
-client's npm publication; it does not gate the numbered layers. The contracts are
-ratified, and the shell app (`apps/shell`) builds, tests and deploys to GitHub
-Pages through CI. Do not scaffold code ahead of the [roadmap](./ROADMAP.md) layer
+**Current state:** layers 0-9 are complete and archived. Layer 10
+(`release-readiness`) adds the security review, accessibility pass, browser
+matrix, performance budgets, plugin author guide, demo workspace, walkthrough and
+release plan; its deployed verification is recorded in `ROADMAP.md` before
+archive. Layer 9 (`monaco-code-plugin`) adds the Monaco reference plugin, the
+opt-in visible handler surface and its child-path deployment. A post-layer-9
+change (`plugin-initiated-save`, archived as
+`2026-11-16-plugin-initiated-save`) adds the id-less `plugin/request-save` intent
+and Ctrl/Cmd+S in the reference editor. The parallel Stratofold provider track
+(P1-P3) is archived and verified; it does not gate the numbered layers. The
+contracts are ratified, and the shell app (`apps/shell`) builds, tests and
+deploys to GitHub Pages through CI. Do not scaffold code ahead of the [roadmap](./ROADMAP.md) layer
 you were asked to work on, and do not invent commands or scripts that do not
 exist yet.
 
@@ -25,6 +27,13 @@ exist yet.
 | [`docs/architecture.md`](./docs/architecture.md) | Runtime model, lifecycle, trust boundaries, decisions D1-D19 |
 | [`docs/contracts/`](./docs/contracts/) | Normative contracts; ratified by `define-core-contracts` and mirrored in `openspec/specs/` |
 | [`docs/contracts/plugin-sdk.md`](./docs/contracts/plugin-sdk.md) | Typed plugin client, origin rules, compatibility policy and template |
+| [`docs/guide/`](./docs/guide/README.md) | Author handoff: quickstart, manifest, protocol, SDK, hosting, consent, testing |
+| [`docs/security-review.md`](./docs/security-review.md) | Trust-boundary control map, mutation evidence, findings |
+| [`docs/accessibility.md`](./docs/accessibility.md) | A11y scope, automated checks, manual script, upstream exceptions |
+| [`docs/browser-support.md`](./docs/browser-support.md) | Supported, unsupported and unverified browser/provider combinations |
+| [`docs/performance.md`](./docs/performance.md) | Runtime budgets, reference environment and measurements |
+| [`docs/walkthrough.md`](./docs/walkthrough.md) | Recorded acceptance path for the release |
+| [`docs/releases.md`](./docs/releases.md) | Version axes, release checklist, deprecation and breaking changes |
 | [`docs/providers/stratofold.md`](./docs/providers/stratofold.md) | Remote-provider track, upstream status and npm blocker |
 | [`ROADMAP.md`](./ROADMAP.md) | Layer order, one OpenSpec change per layer, exit criteria |
 
@@ -138,6 +147,7 @@ npm install        # npm ci in CI
 | Custom elements check | `npm run check:dist-elements` (after a build) |
 | SDK absent from shell bundle | `npm run check:dist-no-sdk` (after a build) |
 | Monaco absent from shell bundle | `npm run check:dist-no-monaco` (after a build) |
+| No credentials in deployed artifact | `npm run check:dist-secrets` (after the shell build and plugin copies) |
 | Template build | `npm run build:template` |
 | Template deploy copy | `npm run deploy:copy-template` (after the shell build and dist checks) |
 | Code plugin build | `npm run build:code` |
@@ -179,6 +189,13 @@ with `sandbox="allow-scripts"` and no storage. The example workspace is
 `examples/code-plugin-workspace/`. See `apps/code-plugin/README.md` for the
 manual checks and the 5 MiB guard.
 
+Release demo: `examples/demo-workspace/` declares both deployed plugins and
+includes files for the code plugin, the template plugin and the shell text
+surface. Use it with `docs/walkthrough.md` for the release acceptance path; the
+deployed manifests are
+`https://mode777.github.io/exo-editor/code-plugin/exo-manifest.json` and
+`https://mode777.github.io/exo-editor/plugin-template/exo-manifest.json`.
+
 The deployed verification surface is
 `https://mode777.github.io/exo-editor/`. Every push to `main` runs the gate below
 and deploys on success; behaviour and exit criteria are demonstrated there, never
@@ -202,6 +219,7 @@ npm run build:template
 npm run deploy:copy-template
 npm run build:code
 npm run deploy:copy-code
+npm run check:dist-secrets
 ```
 
 The budget, CSP and custom-element checks run before the plugin copies, so the
@@ -217,9 +235,17 @@ docs/vision.md          product intent and non-goals
 docs/architecture.md    runtime model, trust boundaries, decisions
 docs/contracts/         normative contracts, one file per surface
 docs/providers/         provider-specific analysis, upstream status, blockers
+docs/guide/             plugin author guide
+docs/security-review.md trust-boundary controls, mutation evidence, findings
+docs/accessibility.md   accessibility scope, evidence and manual script
+docs/browser-support.md supported, unsupported and unverified combinations
+docs/performance.md     runtime budgets and measured results
+docs/walkthrough.md     recorded release acceptance path
+docs/releases.md        version axes, release checklist and communication
 schema/exo.schema.json  shared JSON Schema for exo.json and exo-manifest.json
+CHANGELOG.md            release history
 apps/code-plugin/       Monaco reference plugin, child-path deploy
-examples/               example workspaces (code plugin)
+examples/               example workspaces (code plugin and release demo)
 packages/plugin-sdk/    typed client for plugin authors
 packages/plugin-template/ starter plugin built only on the SDK
 ROADMAP.md              layered OpenSpec change plan

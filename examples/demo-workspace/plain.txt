@@ -1,0 +1,2 @@
+A plain text file. The shell's own text surface handles this one because no
+declared plugin editor matches it.

@@ -678,21 +678,31 @@ gate passed with 675 tests and a 150,607/152,000 js gzip budget.
 
 ## Layer 10 - `release-readiness`
 
+**Status:** implemented; deployed verification and archive are tracked in the
+`release-readiness` change. Evidence lands in the linked documents and this row
+is updated at task 8.5.
+
 **Goal:** a v1 that can be handed to someone who did not build it.
 
 **Deliverables**
 
 - Security review: origin/source validation, path containment, reserved paths,
-  CSP, sandbox attributes, payload limits, consent fingerprint, no secrets.
-- Accessibility pass on explorer, tabs, dialogs, settings and palette.
+  CSP, sandbox attributes, payload limits, consent fingerprint, no secrets. See
+  [`docs/security-review.md`](./docs/security-review.md).
+- Accessibility pass on explorer, tabs, dialogs, settings and palette. See
+  [`docs/accessibility.md`](./docs/accessibility.md).
 - Browser matrix documented; Chromium supported for folder workspaces, others
-  explicit.
+  explicit. See [`docs/browser-support.md`](./docs/browser-support.md).
 - Performance budgets: shell bundle, plugin frame startup, 10k-entry folder
-  listing, 1 MiB file open/save.
+  listing, 1 MiB file open/save. See [`docs/performance.md`](./docs/performance.md).
 - Plugin author guide: manifest reference, protocol reference, SDK usage,
-  hosting/CORS checklist, consent expectations, examples.
-- Demo workspace and a recorded walkthrough.
-- Versioning/communication plan for breaking protocol changes.
+  hosting/CORS checklist, consent expectations, examples. See
+  [`docs/guide/`](./docs/guide/README.md).
+- Demo workspace and a recorded walkthrough:
+  [`examples/demo-workspace/`](./examples/demo-workspace/README.md) and
+  [`docs/walkthrough.md`](./docs/walkthrough.md).
+- Versioning/communication plan for breaking protocol changes. See
+  [`docs/releases.md`](./docs/releases.md) and [`CHANGELOG.md`](./CHANGELOG.md).
 
 **Exit criteria**
 

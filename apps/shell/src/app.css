@@ -91,8 +91,10 @@
 }
 
 .exo-tree-row:focus-visible {
-  outline: 1px solid var(--vscode-focusBorder);
-  outline-offset: -1px;
+  /* The selected row background is close to the focus border in the dark theme;
+     use the selection foreground so the ring clears 3:1 in both themes. */
+  outline: 2px solid var(--vscode-list-activeSelectionForeground);
+  outline-offset: -2px;
 }
 
 .exo-tree-twisty {

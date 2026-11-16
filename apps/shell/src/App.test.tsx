@@ -68,6 +68,7 @@ describe('empty shell composition', () => {
     expect(container.textContent).toContain('No workspace is open.')
     expect(container.textContent).toContain('Chromium')
     expect(container.textContent).toContain('No workspace · Unsupported browser')
+    expect(container.textContent).toContain('Connect Remote…')
     expect(container.querySelector('.exo-tree-row')).toBeNull()
   })
 

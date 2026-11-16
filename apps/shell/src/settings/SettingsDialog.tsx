@@ -1,5 +1,6 @@
-import { useEffect, useRef } from 'react'
+import { useRef } from 'react'
 import { useWorkbenchStore } from 'vscode-workbench'
+import { useModalDialog } from '../components/useModalDialog'
 import { PluginSettings } from './PluginSettings'
 import { WorkspaceSettings } from './WorkspaceSettings'
 
@@ -29,34 +30,23 @@ export function SettingsDialog({
   const theme = useWorkbenchStore((state) => state.theme)
   const setTheme = useWorkbenchStore((state) => state.setTheme)
   const closeButton = useRef<HTMLButtonElement>(null)
-
-  useEffect(() => {
-    if (!open) return
-    if (section === 'plugins') {
-      document.getElementById('exo-settings-plugins')?.focus()
-      return
-    }
-    if (section === 'workspace') {
-      document.getElementById('exo-settings-workspace')?.focus()
-      return
-    }
-    closeButton.current?.focus()
-  }, [open, section])
-
-  useEffect(() => {
-    if (!open) return
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [open, onClose])
+  const dialogRef = useModalDialog({
+    open,
+    onClose,
+    focusKey: section,
+    initialFocus: () => {
+      if (section === 'plugins') return document.getElementById('exo-settings-plugins')
+      if (section === 'workspace') return document.getElementById('exo-settings-workspace')
+      return closeButton.current
+    },
+  })
 
   if (!open) return null
 
   return (
     <div className="exo-settings-backdrop" onMouseDown={onClose}>
       <div
+        ref={dialogRef}
         className="exo-settings"
         role="dialog"
         aria-modal="true"

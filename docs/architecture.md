@@ -261,6 +261,10 @@ client are documented in
 path out of D10's folder-only browser limitation, but it does not weaken D10 for
 folder-backed workspaces.
 
+The controls in this section are enumerated with their enforcement points,
+regression tests, mutation checks and findings in
+[`security-review.md`](./security-review.md).
+
 ## 6. Hosting topology
 
 ```text
@@ -375,3 +379,21 @@ layer named in the last column.
 | D17 | Remote providers are opt-in workspace providers implementing the same session contract; credentials are shell-owned and never exposed to plugins or URLs; they are not a sync or cloud-storage feature | decided | P1 |
 | D18 | Handler frames are hidden by default; a manifest contribution with `rendering: "frame"` may be displayed in the active document area, with the same sandbox, no shell DOM access and shell chrome outside the frame | decided | layer 9 |
 | D19 | A plugin may ask the shell to save with an id-less intent; content and version still come only through the shell-initiated save round trip | decided | post-layer 9 |
+
+## 9. Release evidence
+
+The release evidence lives outside the runtime model but is part of the
+contract this architecture is verified against:
+
+| Evidence | Document |
+| --- | --- |
+| Trust-boundary controls, mutation checks and findings | [`security-review.md`](./security-review.md) |
+| Accessibility scope, automated checks, manual script and upstream exceptions | [`accessibility.md`](./accessibility.md) |
+| Supported, unsupported and unverified browser/provider combinations | [`browser-support.md`](./browser-support.md) |
+| Runtime budgets, reference environment and measured results | [`performance.md`](./performance.md) |
+| Author guide, demo workspace and recorded acceptance path | [`guide/`](./guide/README.md), [`../examples/demo-workspace/`](../examples/demo-workspace/README.md), [`walkthrough.md`](./walkthrough.md) |
+| Version axes, release checklist and communication | [`releases.md`](./releases.md), [`../CHANGELOG.md`](../CHANGELOG.md) |
+
+These documents describe the shipped system and the checks that keep it honest;
+they do not add a second behavioural contract. The contracts in
+`docs/contracts/` and `openspec/specs/` remain normative.

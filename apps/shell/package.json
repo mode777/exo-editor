@@ -34,6 +34,7 @@
     "@types/semver": "^7.8.0",
     "@vitejs/plugin-react": "^6.3.0",
     "@vscode/codicons": "~0.0.44",
+    "axe-core": "^4.14.1",
     "eslint": "^10.15.0",
     "eslint-config-prettier": "^10.1.8",
     "fake-indexeddb": "^6.2.8",

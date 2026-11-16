@@ -26,6 +26,7 @@
     "check:dist-elements": "npm run check:dist-elements --workspace @exo/shell",
     "check:dist-no-sdk": "node apps/shell/scripts/check-dist-no-sdk.mjs apps/shell/dist",
     "check:dist-no-monaco": "node apps/shell/scripts/check-dist-no-monaco.mjs apps/shell/dist",
+    "check:dist-secrets": "node apps/shell/scripts/check-dist-secrets.mjs apps/shell/dist",
     "build": "npm run build --workspace @exo/shell",
     "build:template": "npm run build --workspace @exo/plugin-template",
     "deploy:copy-template": "node apps/shell/scripts/copy-template.mjs",

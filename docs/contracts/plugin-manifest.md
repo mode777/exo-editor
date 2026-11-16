@@ -140,7 +140,7 @@ settings view fails with `conflict` rather than overwriting an external edit.
   "homepage": "https://example.com/monaco",
   "license": "MIT",
   "icon": "icon.png",
-  "engines": { "exo": "^0.1.0" },
+  "engines": { "exo": ">=0.1.0" },
   "runtime": {
     "entry": "plugin.html"
   },
@@ -434,6 +434,8 @@ interface ConsentRecord {
 - The SDK does not parse, validate or rewrite a manifest, and it does not infer
   capabilities from `engines.exo` or the shell version. Its compatibility policy
   is in [`plugin-sdk.md`](./plugin-sdk.md#9-compatibility-and-deprecation-policy).
+- The release communication plan and the breaking-change upgrade-note rule are
+  in [`releases.md`](../releases.md).
 
 ## 8. Out of scope for v1
 

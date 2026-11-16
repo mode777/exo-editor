@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { FakeFrameTransport, type FakeFrame } from './frame-test-support'
 import type { PluginManifest } from './manifest'
+import { MAX_MESSAGE_BYTES } from './protocol'
 import {
   ACK_CLOSE_DELAY_MS,
   READY_TIMEOUT_MS,
@@ -396,6 +397,26 @@ describe('registration session', () => {
     const error = postedType(context.frame, 'shell/error')
     expect(error?.replyTo).toBe('request-1')
     expect(error?.payload).toMatchObject({ code: 'unsupported-message' })
+    expect(context.outcomes).toEqual([])
+  })
+
+  it('rejects an envelope over the message byte cap before reading it', () => {
+    const context = start()
+    context.frame.emit(
+      {
+        exo: 1,
+        type: 'plugin/ready',
+        payload: {
+          protocolVersion: '1',
+          sessionId: 'session-1',
+          extra: new Uint8Array(MAX_MESSAGE_BYTES + 1),
+        },
+      },
+      context.manifest.manifestOrigin,
+    )
+    const error = postedType(context.frame, 'shell/error')
+    expect(error?.payload).toMatchObject({ code: 'too-large' })
+    expect(postedType(context.frame, 'shell/init')).toBeUndefined()
     expect(context.outcomes).toEqual([])
   })
 
