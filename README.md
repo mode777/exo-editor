@@ -18,9 +18,12 @@ the GitHub Pages workflow, and the workspace, plugin-host, file-editor, event,
 settings, SDK/template and Monaco reference-plugin layers are verified against
 it. Layer 9 (`monaco-code-plugin`) adds the opt-in visible handler surface and
 the child-path code plugin, verified in same-origin and cross-origin sandboxes.
-The parallel Stratofold provider track (P1) is documented and blocked on its
-client's npm publication; it does not gate the numbered layers. Verification is
-always against the deployed URL, never a local dev server.
+A post-layer-9 change (`plugin-initiated-save`, archived as
+`2026-11-16-plugin-initiated-save`) adds the id-less `plugin/request-save` intent
+and Ctrl/Cmd+S in the reference editor, still additive within protocol major `1`. The parallel Stratofold provider track (P1)
+is documented and blocked on its client's npm publication; it does not gate the
+numbered layers. Verification is always against the deployed URL, never a local
+dev server.
 
 ## How it fits together
 

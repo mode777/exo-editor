@@ -665,6 +665,15 @@ no local build or dev server was used.
   13,006/14,000 css gzip bytes, CSP, custom elements, no-SDK and no-Monaco
   checks, template and code-plugin builds, and `openspec validate --all`.
 
+**Follow-up (2026-11-16):** the post-layer-9 change `plugin-initiated-save` adds
+the id-less `plugin/request-save` intent and wires Ctrl/Cmd+S in the reference
+editor. It is additive within protocol major `1`; content and `ifVersion` still
+come only through the shell-initiated save round trip. Verified against the
+deployed shell: Ctrl+S wrote once and cleared dirty, was a no-op when clean or
+read-only, surfaced a conflict without writing or losing the buffer, the shell
+Save button still worked, and the cross-origin sandbox round-tripped. The local
+gate passed with 675 tests and a 150,607/152,000 js gzip budget.
+
 ---
 
 ## Layer 10 - `release-readiness`

@@ -173,12 +173,31 @@ The shell SHALL save a plugin-backed document by sending at most one live
 text or bytes with the version it last delivered as `ifVersion` and no
 transformation, SHALL answer within the protocol's save timeout with
 `shell/save-result`, and SHALL leave the document dirty when the write conflicts,
-times out or is denied.
+times out or is denied. The shell SHALL also let an active handler trigger the
+same save through an id-less `plugin/request-save`, SHALL coalesce the trigger
+with a pending save, and SHALL NOT let the trigger supply content or a version.
 
 #### Scenario: Save writes exact bytes
 
 - **WHEN** a handler answers `shell/request-save` with bytes
 - **THEN** the provider receives those bytes unchanged and the result carries the new version
+
+#### Scenario: Plugin-initiated save writes the same way
+
+- **WHEN** an active writable handler sends `plugin/request-save`
+- **THEN** the shell sends `shell/request-save`, writes the returned content with
+  the last delivered version and returns the same `shell/save-result`
+
+#### Scenario: Plugin-initiated save coalesces
+
+- **WHEN** the handler requests a save while one is already pending
+- **THEN** the shell performs one write and the handler receives one result
+
+#### Scenario: Plugin-initiated save respects state
+
+- **WHEN** a clean, read-only or inactive document receives a save trigger
+- **THEN** the shell writes nothing and offers no bypass around the Save action's
+  permission and dirty checks
 
 #### Scenario: Conflict preserves disk content
 

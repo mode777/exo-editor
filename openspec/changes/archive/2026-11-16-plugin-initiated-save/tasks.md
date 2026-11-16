@@ -21,10 +21,10 @@
 ## 4. Integration and deployed verification
 
 - [x] 4.1 Run the full local gate: `npm ci`, lint, format check, typecheck, tests, shell build, budget, CSP, custom elements, no-SDK, no-Monaco, template build/copy, code-plugin build/copy and `openspec validate --all`; verify every command passes
-- [ ] 4.2 Push `main`, confirm the CI `verify` and Pages deploy jobs pass, and confirm the deployed code-plugin manifest and assets are current
-- [ ] 4.3 Against the deployed shell in a same-origin workspace, edit a file, press Ctrl+S inside Monaco, and confirm exactly one shell save, one `shell/save-result`, exact text on disk and a clean dirty state
-- [ ] 4.4 Against the deployed shell, confirm Ctrl+S is a no-op when clean or read-only, a conflicting external write still leaves the tab dirty and the plugin keeps the buffer, and the shell Save button still works
-- [ ] 4.5 Run the cross-origin plugin and confirm Ctrl+S round-trips under `sandbox="allow-scripts allow-same-origin"`; record the evidence and update the roadmap status if the project tracks this follow-up
+- [x] 4.2 Push `main`, confirm the CI `verify` and Pages deploy jobs pass, and confirm the deployed code-plugin manifest and assets are current
+- [x] 4.3 Against the deployed shell in a same-origin workspace, edit a file, press Ctrl+S inside Monaco, and confirm exactly one shell save, one `shell/save-result`, exact text on disk and a clean dirty state
+- [x] 4.4 Against the deployed shell, confirm Ctrl+S is a no-op when clean or read-only, a conflicting external write still leaves the tab dirty and the plugin keeps the buffer, and the shell Save button still works
+- [x] 4.5 Run the cross-origin plugin and confirm Ctrl+S round-trips under `sandbox="allow-scripts allow-same-origin"`; record the evidence and update the roadmap status if the project tracks this follow-up
 
 ## Workflow follow-up
 

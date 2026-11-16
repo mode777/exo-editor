@@ -161,9 +161,10 @@ per-contribution rejection reasons from `shell/register-ack`.
 ### Requirement: Editor client
 
 The SDK SHALL expose the initialized file metadata, read files by path and
-encoding with correlated replies, report dirty state, answer save requests with
-text or bytes, expose external-change and disposal notifications, and reject
-outstanding requests when the frame is disposed.
+encoding with correlated replies, report dirty state, request a shell save for the
+bound document, answer save requests with text or bytes, expose external-change
+and disposal notifications, and reject outstanding requests when the frame is
+disposed.
 
 #### Scenario: Metadata before content
 
@@ -187,6 +188,12 @@ outstanding requests when the frame is disposed.
 
 - **WHEN** the plugin reports a dirty or clean state
 - **THEN** the SDK sends one `plugin/dirty` with the boolean value
+
+#### Scenario: Request a save
+
+- **WHEN** the plugin calls `requestSave()`
+- **THEN** the SDK sends one id-less `plugin/request-save` notification with no
+  content and does not create a correlated pending request
 
 #### Scenario: Save request and result
 

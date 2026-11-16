@@ -7,12 +7,15 @@ shell owns the workbench, workspace access and consent.
 **Current state:** layers 0-9 are complete and archived. Layer 9
 (`monaco-code-plugin`) adds the Monaco reference plugin, the opt-in visible
 handler surface and its child-path deployment, verified against the deployed
-shell in both sandbox modes. The parallel Stratofold provider track (P1) is
-documented and blocked on its client's npm publication; it does not gate the
-numbered layers. The contracts are ratified, and the shell app (`apps/shell`)
-builds, tests and deploys to GitHub Pages through CI. Do not scaffold code ahead
-of the [roadmap](./ROADMAP.md) layer you were asked to work on, and do not invent
-commands or scripts that do not exist yet.
+shell in both sandbox modes. A post-layer-9 change (`plugin-initiated-save`,
+archived as `2026-11-16-plugin-initiated-save`) adds the id-less
+`plugin/request-save` intent and Ctrl/Cmd+S in the reference editor.
+The parallel Stratofold provider track (P1) is documented and blocked on its
+client's npm publication; it does not gate the numbered layers. The contracts are
+ratified, and the shell app (`apps/shell`) builds, tests and deploys to GitHub
+Pages through CI. Do not scaffold code ahead of the [roadmap](./ROADMAP.md) layer
+you were asked to work on, and do not invent commands or scripts that do not
+exist yet.
 
 ## Read this first
 
