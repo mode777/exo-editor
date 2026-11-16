@@ -66,4 +66,10 @@ describe('template protocol code', () => {
     }
     expect(existsSync(join(root, mismatch.runtime.entry))).toBe(true)
   })
+
+  it('never registers from the protocol-mismatch diagnostic', () => {
+    const source = read('src/mismatch.ts')
+    expect(source).not.toContain('plugin/register')
+    expect(source).not.toContain('.registration')
+  })
 })
