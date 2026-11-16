@@ -6,7 +6,7 @@ the deployed URL below, not a local dev server or local build.
 ## Provenance
 
 - Deployed URL: `https://mode777.github.io/exo-editor/`
-- Deployed commit: `677b44d`
+- Deployed commit: `90172af`
 - Capture date: 2026-11-16
 - Browser: Chrome for Testing 131.0.6778.264, 1280x800
 - Workspace: `examples/demo-workspace/` mounted through a `showDirectoryPicker`

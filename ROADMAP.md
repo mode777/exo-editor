@@ -680,7 +680,7 @@ gate passed with 675 tests and a 150,607/152,000 js gzip budget.
 ## Layer 10 - `release-readiness`
 
 **Status:** complete - deployed verification recorded on 2026-11-16 against
-commit `677b44d`; archive the `release-readiness` change after review.
+commit `90172af`; archive the `release-readiness` change after review.
 
 **Goal:** a v1 that can be handed to someone who did not build it.
 
@@ -717,7 +717,7 @@ commit `677b44d`; archive the `release-readiness` change after review.
   change is archived after this row.
 
 **Deployed verification (2026-11-16):** Chrome for Testing 131.0.6778.264 drove
-`https://mode777.github.io/exo-editor/` at commit `677b44d` with the demo
+`https://mode777.github.io/exo-editor/` at commit `90172af` with the demo
 workspace on an OPFS handle through a `showDirectoryPicker` stub.
 
 - Security: all ten controls failed a named test when mutated; the downloaded
@@ -734,10 +734,10 @@ workspace on an OPFS handle through a `showDirectoryPicker` stub.
   Remote; Firefox and Safari remain as classified in
   [`docs/browser-support.md`](./docs/browser-support.md), with plugin hosting on
   Firefox unverified.
-- Performance (median / max, five runs after warm-up): plugin startup 706 / 793
-  ms; 10k listing 1,183 / 1,249 ms with a 570 / 581 ms longest task; 1 MiB shell
-  open 208 / 268 ms and save 32 / 92 ms; 1 MiB code-plugin open 769 / 935 ms and
-  save 54 / 70 ms. Every ceiling is met and no miss is accepted.
+- Performance (median / max, five runs after warm-up): plugin startup 706 / 815
+  ms; 10k listing 1,094 / 1,176 ms with a 442 / 551 ms longest task; 1 MiB shell
+  open 207 / 275 ms and save 33 / 35 ms; 1 MiB code-plugin open 798 / 942 ms and
+  save 49 / 90 ms. Every ceiling is met and no miss is accepted.
 - Guide and demo: the guide suggested `npm run dev:template` and the deployed
   demo manifests; the template's observation recorded one read, `saves: [1]`,
   `lastSave.ok` and a rotated version, and its frame was removed on close. The

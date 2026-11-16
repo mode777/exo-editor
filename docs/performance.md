@@ -57,7 +57,7 @@ measurement does not.
 
 ## Results
 
-Measured on 2026-11-16 against deployed commit `677b44d`
+Measured on 2026-11-16 against deployed commit `90172af`
 (`https://mode777.github.io/exo-editor/`) on the reference environment above,
 five runs after one warm-up. The workspace was the demo files plus a 1 MiB
 `big.txt`, a 1 MiB `big.ts` and a 10,000-entry fake directory mounted through
@@ -65,13 +65,13 @@ the same `showDirectoryPicker` stub used for the layer 5-9 verification.
 
 | Budget | Median | Maximum | Ceiling | Result |
 | --- | --- | --- | --- | --- |
-| Plugin frame startup | 706 ms | 793 ms | 2,000 ms | Met |
-| 10k listing total | 1,183 ms | 1,249 ms | 3,000 ms | Met |
-| 10k listing longest task | 570 ms | 581 ms | 1,000 ms | Met |
-| 1 MiB open - shell text | 208 ms | 268 ms | 1,000 ms | Met |
-| 1 MiB save - shell text | 32 ms | 92 ms | 1,000 ms | Met |
-| 1 MiB open - code plugin | 769 ms | 935 ms | 1,000 ms | Met |
-| 1 MiB save - code plugin | 54 ms | 70 ms | 1,000 ms | Met |
+| Plugin frame startup | 706 ms | 815 ms | 2,000 ms | Met |
+| 10k listing total | 1,094 ms | 1,176 ms | 3,000 ms | Met |
+| 10k listing longest task | 442 ms | 551 ms | 1,000 ms | Met |
+| 1 MiB open - shell text | 207 ms | 275 ms | 1,000 ms | Met |
+| 1 MiB save - shell text | 33 ms | 35 ms | 1,000 ms | Met |
+| 1 MiB open - code plugin | 798 ms | 942 ms | 1,000 ms | Met |
+| 1 MiB save - code plugin | 49 ms | 90 ms | 1,000 ms | Met |
 
 No miss was accepted. The first cold listing run before the warm-up was 3,681
 ms; the procedure's warm-up removes that one-time cost, and the five recorded

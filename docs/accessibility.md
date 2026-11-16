@@ -102,7 +102,7 @@ Run against the deployed URL with the demo workspace from
 
 ## Deployed verification
 
-Run on 2026-11-16 against deployed commit `677b44d`
+Run on 2026-11-16 against deployed commit `90172af`
 (`https://mode777.github.io/exo-editor/`) with Chrome for Testing
 131.0.6778.264 at 1280x800, using the demo workspace on an OPFS handle and the
 same `showDirectoryPicker` stub as the layer 5-9 verification.

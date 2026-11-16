@@ -222,16 +222,17 @@ finding is tracked instead of pretending the artifact is clean.
 ## Release evidence
 
 - Review date: 2026-11-16.
-- Deployed commit: `677b44d`
-  (`Track the walkthrough media directory`), deployed by the CI `verify` and
-  Pages jobs at 2026-11-16.
+- Deployed commit: `90172af` (`Add Connect Remote Workspace to the File menu`),
+  which contains the release-readiness commits and was deployed by the CI
+  `verify` and Pages jobs at 2026-11-16.
 - Mutation checks: all ten controls fail at least one named test or the scan when
   weakened; results are in each control section.
 - Artifact scan: `npm run check:dist-secrets` on the built `apps/shell/dist`
   (including the template and code-plugin child paths) reports no credential
   pattern or secret environment value. The CI `shell-dist` artifact downloaded
   for the same run also passes, and an injected `ghp_` fixture exits 1.
-- CSP: `check-dist-csp` passes on the downloaded deployed artifact.
+- CSP: `check-dist-csp` passes on the downloaded deployed artifact from the
+  `90172af` run.
 - Dependency audit: `npm audit --omit=dev` reports the Monaco/DOMPurify
   advisories in F4 and no other runtime advisory; the dev-only minimatch
   advisory is F5. Both are accepted with follow-up owners.
