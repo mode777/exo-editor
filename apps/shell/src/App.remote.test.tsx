@@ -114,6 +114,47 @@ describe('remote workspace ui', () => {
     vi.unstubAllGlobals()
   })
 
+  it('opens the connect dialog from the File menu', async () => {
+    const mounted = await mount()
+    try {
+      await vi.waitFor(() => expect(button(mounted.container, 'File')).not.toBeNull())
+      expect(mounted.container.querySelector('#exo-connect-server')).toBeNull()
+
+      await act(async () => {
+        click(button(mounted.container, 'File'))
+      })
+
+      const menu = document.querySelector('vscode-context-menu') as
+        (Element & { data?: Array<{ label?: string; value?: string }> }) | null
+      expect(menu).not.toBeNull()
+      expect(menu?.data).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            label: 'Connect Remote Workspace…',
+            value: 'exo.workspace.connectRemote',
+          }),
+        ]),
+      )
+
+      await act(async () => {
+        menu?.dispatchEvent(
+          new CustomEvent('vsc-context-menu-select', {
+            detail: { value: 'exo.workspace.connectRemote' },
+          }),
+        )
+      })
+
+      await vi.waitFor(() =>
+        expect(mounted.container.querySelector('#exo-connect-server')).not.toBeNull(),
+      )
+      expect(mounted.container.querySelectorAll('#exo-connect-title')).toHaveLength(1)
+    } finally {
+      await act(async () => mounted.root.unmount())
+      mounted.container.remove()
+      await mounted.runtime.dispose()
+    }
+  })
+
   it('connects through the dialog without rendering the token', async () => {
     const mounted = await mount()
     try {

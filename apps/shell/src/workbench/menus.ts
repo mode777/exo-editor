@@ -8,6 +8,7 @@ export const workbenchMenus: MenuDefinition[] = [
     label: 'File',
     entries: [
       { label: 'Open Folder…', commandId: 'exo.workspace.open' },
+      { label: 'Connect Remote Workspace…', commandId: 'exo.workspace.connectRemote' },
       { separator: true },
       { label: 'New File…', commandId: 'exo.explorer.newFile' },
       { label: 'New Folder…', commandId: 'exo.explorer.newFolder' },
