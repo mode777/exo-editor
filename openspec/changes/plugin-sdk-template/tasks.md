@@ -64,14 +64,14 @@
 
 ## 9. Integration and deployed verification
 
-- [ ] 9.1 Run the full local gate: `npm ci`, `npm run lint`, `npm run format:check`, `npm run typecheck`, `npm test`, `npm run build`, the bundle budget, `check:dist-csp`, `check:dist-elements`, `check:dist-no-sdk`, `npm run build:template` and the copy script; verify every command passes
-- [ ] 9.2 Deploy by pushing `main`; verify the `verify` job is green and the Pages deployment contains `plugin-template/exo-manifest.json` at the documented URL
-- [ ] 9.3 Against `https://mode777.github.io/exo-editor/`, add the deployed template manifest to `exo.json`, approve consent and confirm the same-origin warning, then open a `*.template.txt` file and confirm the SDK-based controller registered and the editor frame mounted
-- [ ] 9.4 Against the deployed shell, confirm the editor reads the file, reports dirty, saves the marker, reloads with the saved content and disposes without a protocol violation; confirm the template's hidden frame reports no storage access
-- [ ] 9.5 Against the deployed shell, add `exo-manifest-mismatch.json` and confirm the shell log reports `unsupported-version` and the diagnostic page's console surfaces the expected/received protocol versions; confirm no editor registers
-- [ ] 9.6 Confirm the deployed shell bundle contains no SDK or template code and that the shell budget, CSP and custom-element results are unchanged apart from the separate template child path
-- [ ] 9.7 Update `ROADMAP.md` with the layer 8 status, deployed evidence and the real SDK/template commands, and confirm the status and commands match `AGENTS.md`
-- [ ] 9.8 Run `openspec validate --all` and confirm the new capability, the change artifacts and the untouched existing specs all validate
+- [x] 9.1 Run the full local gate: `npm ci`, `npm run lint`, `npm run format:check`, `npm run typecheck`, `npm test`, `npm run build`, the bundle budget, `check:dist-csp`, `check:dist-elements`, `check:dist-no-sdk`, `npm run build:template` and the copy script; verify every command passes
+- [x] 9.2 Deploy by pushing `main`; verify the `verify` job is green and the Pages deployment contains `plugin-template/exo-manifest.json` at the documented URL
+- [x] 9.3 Against `https://mode777.github.io/exo-editor/`, add the deployed template manifest to `exo.json`, approve consent and confirm the same-origin warning, then open a `*.template.txt` file and confirm the SDK-based controller registered and the editor frame mounted
+- [x] 9.4 Against the deployed shell, confirm the editor reads the file, reports dirty, saves the marker, reloads with the saved content and disposes without a protocol violation; confirm the template's hidden frame reports no storage access
+- [x] 9.5 Against the deployed shell, add `exo-manifest-mismatch.json` and confirm the shell log reports `unsupported-version` and the diagnostic page's console surfaces the expected/received protocol versions; confirm no editor registers
+- [x] 9.6 Confirm the deployed shell bundle contains no SDK or template code and that the shell budget, CSP and custom-element results are unchanged apart from the separate template child path
+- [x] 9.7 Update `ROADMAP.md` with the layer 8 status, deployed evidence and the real SDK/template commands, and confirm the status and commands match `AGENTS.md`
+- [x] 9.8 Run `openspec validate --all` and confirm the new capability, the change artifacts and the untouched existing specs all validate
 
 ## Workflow follow-up
 

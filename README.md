@@ -16,10 +16,11 @@ Layers 0-7 are complete and archived: the contracts are ratified OpenSpec
 specs, the shell is deployed at `https://mode777.github.io/exo-editor/` through
 the GitHub Pages workflow, and the workspace, plugin-host, file-editor, event
 and settings layers are verified against it. Layer 8 (`plugin-sdk-template`) is
-implemented and awaiting deployed verification. The parallel Stratofold provider
-track (P1) is documented and blocked on its client's npm publication; it does not
-gate the numbered layers. Verification is always against the deployed URL, never
-a local dev server.
+implemented and verified against the deployed shell; its change is ready to
+archive. Layer 9 (the Monaco reference plugin) is next. The parallel Stratofold
+provider track (P1) is documented and blocked on its client's npm publication; it
+does not gate the numbered layers. Verification is always against the deployed
+URL, never a local dev server.
 
 ## How it fits together
 

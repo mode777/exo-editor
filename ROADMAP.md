@@ -1,13 +1,15 @@
 # Exo Editor - Roadmap
 
 Status: layers 0-7 are complete and archived. Layer 8 (`plugin-sdk-template`) is
-next. The parallel Stratofold provider track (P1) is archived as
-`2026-11-15-add-stratofold-provider` and does not gate the numbered layers. Its
-0.12.0 follow-on, P2 `adopt-stratofold-0-12`, is implemented, verified against
-the deployed shell and archived. P3 `add-remote-recents` is implemented,
-verified against the deployed shell and archived. Each layer is one OpenSpec change. A layer is done
-when its change is archived and its exit criteria are demonstrated against the
-deployed shell - never from a local dev server or local build.
+implemented and verified against the deployed shell; its change is ready to
+archive. Layer 9 (`monaco-code-plugin`) is next. The parallel Stratofold provider
+track (P1) is archived as `2026-11-15-add-stratofold-provider` and does not gate
+the numbered layers. Its 0.12.0 follow-on, P2 `adopt-stratofold-0-12`, is
+implemented, verified against the deployed shell and archived. P3
+`add-remote-recents` is implemented, verified against the deployed shell and
+archived. Each layer is one OpenSpec change. A layer is done when its change is
+archived and its exit criteria are demonstrated against the deployed shell -
+never from a local dev server or local build.
 
 ## Sequencing rationale
 
@@ -528,6 +530,9 @@ No local build or dev server was used.
 
 ## Layer 8 - `plugin-sdk-template`
 
+**Status:** complete - implemented 2026-11-16 and verified against the deployed
+shell; the change awaits archive.
+
 **Goal:** remove the protocol hand-rolling cost and freeze a compatibility story.
 
 **Deliverables**
@@ -545,12 +550,49 @@ No local build or dev server was used.
   origin or CSP model, and never by loading shell code into the plugin frame
   without a versioned contract.
 
-**Exit criteria**
+**Exit criteria (met)**
 
-- A plugin built from the template registers, edits and saves with no protocol
-  code in its own repository.
-- The SDK's conformance test runs against the shell's protocol fixtures.
-- Version mismatch produces an actionable error, not a blank frame.
+- Met: the template registers, edits and saves with no hand-written envelope,
+  handshake, registration or handler code; its source scan rejects those markers.
+- Met: the SDK conformance suite drives the real `RegistrationSession` and
+  `HandlerSession`, including wrong origin, source, mode and session cases.
+- Met (2026-11-16): against the deployed shell, the template manifest shows the
+  same-origin warning, the controller registers one editor, and the editor
+  handler reads, reports dirty, saves `[template save 1]`, reopens with the saved
+  content and disposes without a protocol violation.
+- Met (2026-11-16): the protocol-mismatch diagnostic produces
+  `{ code: 'unsupported-version', expected: '1', received: '2' }` in its console,
+  the shell plugin log records `register unsupported-version`, and no editor or
+  frame remains.
+- Met: the deployed shell asset contains no `ExoProtocolError`,
+  `@exo/plugin-sdk` or `EXO_TEMPLATE_` marker; the template is served only from
+  its child path.
+- Met: the local gate passes (lint, format, typecheck, 637 tests, shell build,
+  bundle budget 149,603/152,000 js and 12,991/14,000 css, CSP, custom elements,
+  no-SDK check, template build and deploy copy).
+
+**Commands:** `npm run dev:template`, `npm run build:template`,
+`npm run deploy:copy-template`, `npm run check:dist-no-sdk`.
+
+**Deployed verification (2026-11-16):** Chrome for Testing 131.0.6778.264 drove
+`https://mode777.github.io/exo-editor/` with a folder workspace served from an
+OPFS handle through a `showDirectoryPicker` stub, as in layers 5-7. The deployed
+shell, template manifest, controller and editor code were the real artifacts; no
+local build or dev server was used.
+
+- The consent dialog showed the exact same-origin warning, the controller logged
+  `EXO_TEMPLATE_REGISTER`, and the hidden editor frame used
+  `sandbox="allow-scripts"`.
+- The editor's `#observation` showed metadata with one read, `dirty: true` and no
+  storage; saving wrote `hello from the deployed template\n\n[template save 1]`
+  and rotated the version.
+- A page reload/reopen read the saved 36-byte content; an external write produced
+  the targeted change, a re-read and the external-change banner; discarding the
+  dirty tab removed the frame.
+- The protocol-mismatch manifest surfaced
+  `{ code: 'unsupported-version', expected: '1', received: '2' }` before the
+  shell unmounted the frame and the plugin log recorded
+  `com.example.exo.template-mismatch register unsupported-version`.
 
 ---
 
