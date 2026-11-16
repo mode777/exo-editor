@@ -174,7 +174,10 @@ shell                                   plugin iframe (cross-origin)
 
 File contents are never pushed proactively. The shell answers read requests and
 asks for content only at save time. A handler that never saves never sends the
-file back, which keeps large files out of the message channel until needed.
+file back, which keeps large files out of the message channel until needed. A
+plugin may ask for a save with an id-less `plugin/request-save`; the shell starts
+the same save flow, so the plugin still supplies content only in reply to
+`shell/request-save` and never chooses the version.
 
 Timeouts are contract values, not implementation details: 10 s to `plugin/ready`,
 10 s from `shell/init` to `plugin/register-complete`, 5 s for a save response,
@@ -371,3 +374,4 @@ layer named in the last column.
 | D16 | Enabled entries initialize in `exo.json` declaration order, and that order is the editor-selection tie-break, independent of fetch or handshake completion | decided | layer 4 |
 | D17 | Remote providers are opt-in workspace providers implementing the same session contract; credentials are shell-owned and never exposed to plugins or URLs; they are not a sync or cloud-storage feature | decided | P1 |
 | D18 | Handler frames are hidden by default; a manifest contribution with `rendering: "frame"` may be displayed in the active document area, with the same sandbox, no shell DOM access and shell chrome outside the frame | decided | layer 9 |
+| D19 | A plugin may ask the shell to save with an id-less intent; content and version still come only through the shell-initiated save round trip | decided | post-layer 9 |

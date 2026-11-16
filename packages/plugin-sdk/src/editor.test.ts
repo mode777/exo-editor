@@ -134,6 +134,18 @@ describe('editor client', () => {
     expect(transport.last('plugin/dirty')?.payload).toEqual({ dirty: false })
   })
 
+  it('sends one id-less save intent and nothing after close', async () => {
+    const { transport, editor } = await connect()
+    editor.requestSave()
+    expect(transport.last('plugin/request-save')).toEqual({ exo: 1, type: 'plugin/request-save' })
+    expect(transport.posted.filter((message) => message.type === 'plugin/save-content')).toEqual([])
+
+    editor.close()
+    const posted = transport.posted.length
+    editor.requestSave()
+    expect(transport.posted).toHaveLength(posted)
+  })
+
   it('answers a save request and exposes the result', async () => {
     const { transport, editor } = await connect()
     editor.onSaveRequest(() => ({ text: 'saved text' }))

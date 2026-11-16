@@ -105,6 +105,11 @@ async function main(): Promise<void> {
     renderStatus(currentPath, language, dirty, formatBytes(client.file.size))
   }
 
+  editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
+    if (!dirty || !client.capabilities.write) return
+    client.requestSave()
+  })
+
   const applyContent = (text: string, nextPath: string): void => {
     applying = true
     model.setValue(text)

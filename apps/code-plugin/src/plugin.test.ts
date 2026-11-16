@@ -81,9 +81,17 @@ describe('code plugin protocol code', () => {
     expect(violations).toEqual([])
   })
 
-  it('uses no plugin-initiated save message', () => {
+  it('binds Ctrl/Cmd+S to the SDK save intent', () => {
+    const source = read('src/editor.ts')
+    expect(source).toContain('monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS')
+    expect(source).toContain('client.requestSave()')
+    expect(source).toContain('!dirty || !client.capabilities.write')
+  })
+
+  it('never constructs save content outside the shell request', () => {
     const source = read('src/editor.ts')
     expect(source).not.toContain('plugin/save-content')
     expect(source).not.toContain('plugin/request-save')
+    expect(source).not.toContain('ifVersion')
   })
 })

@@ -11,7 +11,7 @@ import { Session } from '../workspace/session'
 import type { WorkspaceSession } from '../workspace/contract'
 import { EventBus } from './events'
 import { FakeFrameTransport, type FakeFrame } from './frame-test-support'
-import { HandlerSession } from './handler'
+import { HandlerSession, type HandlerSaveRequest } from './handler'
 import { validateManifest, type PluginManifest } from './manifest'
 import { RegistrationSession, type RegistrationOutcome } from './registration'
 import type { EditorCandidate } from './registry'
@@ -156,6 +156,7 @@ describe('SDK conformance against the shell', () => {
     const events = new EventBus()
     const dirty: boolean[] = []
     const failures: string[] = []
+    const triggered: Array<Promise<HandlerSaveRequest>> = []
     const handler = new HandlerSession({
       candidate: candidate(),
       file: {
@@ -180,6 +181,9 @@ describe('SDK conformance against the shell', () => {
       settings: { 'template.greeting': 'hello' },
       createSessionId: () => SESSION_ID,
       onDirty: (value) => dirty.push(value),
+      onSaveRequested: () => {
+        triggered.push(handler.requestSave())
+      },
       onFailure: (failure) => failures.push(failure.code),
     })
     handler.start()
@@ -207,6 +211,13 @@ describe('SDK conformance against the shell', () => {
     expect(save).toMatchObject({ ok: true, content: { text: 'hello\n[template save 1]' } })
     handler.completeSave({ ok: true, version: 'v2' })
     await vi.waitFor(() => expect(saveResults).toEqual([{ ok: true, version: 'v2' }]))
+
+    editor.requestSave()
+    await vi.waitFor(() => expect(triggered).toHaveLength(1))
+    const triggeredSave = await triggered[0]
+    expect(triggeredSave).toMatchObject({ ok: true, content: { text: 'hello\n[template save 1]' } })
+    handler.completeSave({ ok: true, version: 'v3' })
+    await vi.waitFor(() => expect(saveResults.at(-1)).toEqual({ ok: true, version: 'v3' }))
 
     const changes: FileChangedPayload[] = []
     editor.onFileChanged((change) => changes.push(change))

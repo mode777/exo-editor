@@ -36,6 +36,7 @@ interface Harness {
   pool: HandlerPool
   transport: FakeFrameTransport
   session: WorkspaceSession
+  saveRequests: WorkspacePath[]
   host: HandlerPoolHost & { entries: Array<{ identity: string; phase: string; code?: string }> }
 }
 
@@ -45,6 +46,7 @@ async function harness(files: Record<string, string> = { '/src/a.ts': 'a' }): Pr
   const session = new Session(handle)
   const transport = new FakeFrameTransport()
   const entries: Array<{ identity: string; phase: string; code?: string }> = []
+  const saveRequests: WorkspacePath[] = []
   const candidates = new Map<WorkspacePath, EditorCandidate[]>()
   const host: Harness['host'] = {
     entries,
@@ -58,9 +60,10 @@ async function harness(files: Record<string, string> = { '/src/a.ts': 'a' }): Pr
     theme: () => 'dark',
     locale: 'en',
     createSessionId: () => 'session-1',
+    onSaveRequested: (path) => saveRequests.push(path),
   })
   pool.attach({ session, host, workspaceName: 'demo' })
-  return { pool, transport, session, host }
+  return { pool, transport, session, saveRequests, host }
 }
 
 async function open(harness: Harness, path: WorkspacePath) {
@@ -144,6 +147,20 @@ describe('handler pool', () => {
     readyFrame(frame, PLUGIN_ORIGIN)
     expect(frame.surfaceShown).toBe(false)
     expect(frame.surface).toBeUndefined()
+  })
+
+  it('passes an id-less save intent to the owning document path', async () => {
+    const context = await harness({ '/src/a.ts': 'a' })
+    await open(context, '/src/a.ts')
+    const frame = context.transport.frames[0]
+    readyFrame(frame, PLUGIN_ORIGIN)
+    frame.emit({ exo: 1, type: 'plugin/request-save' }, PLUGIN_ORIGIN)
+    expect(context.saveRequests).toEqual(['/src/a.ts'])
+    expect(
+      frame.posted.some(
+        (posted) => (posted.message as { type?: string }).type === 'shell/request-save',
+      ),
+    ).toBe(false)
   })
 
   it('delivers config changes only to the target plugin frame', async () => {

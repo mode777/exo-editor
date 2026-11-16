@@ -93,6 +93,8 @@ export interface HandlerSessionOptions {
   setTimeoutImpl?: typeof setTimeout
   clearTimeoutImpl?: typeof clearTimeout
   onActive?: () => void
+  /** The plugin asked the shell to save this document (id-less intent). */
+  onSaveRequested?: () => void
   onDirty: (dirty: boolean) => void
   onFailure: (failure: HandlerFailure) => void
   onVersion?: (version: string) => void
@@ -534,6 +536,9 @@ export class HandlerSession {
       case 'plugin/dirty':
         this.handleDirty(envelope)
         return
+      case 'plugin/request-save':
+        this.handleSaveRequested(envelope)
+        return
       case 'plugin/save-content':
         this.handleSaveContent(envelope)
         return
@@ -672,6 +677,19 @@ export class HandlerSession {
     }
     this.dirtySeq += 1
     this.options.onDirty(payload.dirty)
+  }
+
+  private handleSaveRequested(envelope: Envelope): void {
+    if (envelope.id !== undefined) {
+      this.violation(envelope)
+      return
+    }
+    const payload = envelope.payload
+    if (payload !== undefined && (!isPlainObject(payload) || Object.keys(payload).length !== 0)) {
+      this.violation(envelope)
+      return
+    }
+    this.options.onSaveRequested?.()
   }
 
   private handleSaveContent(envelope: Envelope): void {

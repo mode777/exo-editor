@@ -155,6 +155,7 @@ export class WorkspaceRuntime {
       options.handlerPool ??
       new HandlerPool({
         onHandlerClosed: (path) => this.documents.handleHandlerClosed(path),
+        onSaveRequested: (path) => this.documents.saveFromPlugin(path),
       })
     this.pluginSettings = new PluginSettingsStore({
       storage: options.pluginSettingsStorage,

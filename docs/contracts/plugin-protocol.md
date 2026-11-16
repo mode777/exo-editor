@@ -165,7 +165,7 @@ reinterpret a frame that starts in one mode as the other.
 | Phase | Allowed plugin messages |
 | --- | --- |
 | `register` | `plugin/ready`, `plugin/register`, `plugin/register-complete` |
-| `editor` | `plugin/ready`, `plugin/request-file`, `plugin/dirty`, `plugin/save-content`, `plugin/subscribe`, `plugin/unsubscribe`, `plugin/dispose-ack` |
+| `editor` | `plugin/ready`, `plugin/request-file`, `plugin/dirty`, `plugin/request-save`, `plugin/save-content`, `plugin/subscribe`, `plugin/unsubscribe`, `plugin/dispose-ack` |
 
 - `plugin/ready` is accepted once per frame. A second `ready`, a
   `plugin/register-complete` before `ready`, or a registration message after
@@ -178,6 +178,11 @@ reinterpret a frame that starts in one mode as the other.
   single live `shell/request-save`. Content with no live request, or for a
   request that already timed out, is ignored, never written, and counted as a
   protocol violation.
+- `plugin/request-save` is an id-less intent notification. It asks the shell to
+  run the normal Save action for the handler's document; it carries no content
+  and must not have an `id` or a non-empty payload. The shell may coalesce it
+  with an in-flight save and ignores it for a clean, read-only or inactive
+  document. An `id` or non-empty payload is a protocol violation.
 - `shell/save-result` echoes the save request's `id` in `replyTo`; a plugin must
   correlate it rather than assuming completion order.
 
@@ -287,6 +292,7 @@ shell/file-content    { path, version, text } | { path, version, bytes: ArrayBuf
 
 ```text
 plugin/dirty          { dirty: boolean }
+plugin/request-save   { }                      // plugin-initiated, id-less
 shell/request-save    { }                      // shell-initiated, has id
 plugin/save-content   { text } | { bytes: ArrayBuffer }
 shell/save-result     { ok: true, version } | { ok: false, code, message? }
@@ -295,6 +301,12 @@ shell/save-result     { ok: true, version } | { ok: false, code, message? }
 - `plugin/dirty` is advisory but required for the tab dot and the close prompt.
   The shell tracks the last reported value; a handler that never reports is
   treated as clean.
+- The plugin may ask the shell to save with `plugin/request-save`. It is an
+  intent, not a request: no `id`, no content and no version. The shell starts the
+  same save as its Save action, so the content still arrives only as the answer
+  to `shell/request-save`. A trigger during an in-flight save is coalesced; a
+  trigger for a clean, read-only or inactive document is ignored. Pressing Save
+  twice must not produce two writes.
 - The shell may request a save at any time while the session is alive. It sends
   one `shell/request-save` at a time and queues at most one additional request.
 - The plugin answers within 5 s or the save fails with `timeout`. `save-content`
@@ -397,8 +409,10 @@ for repeated violations, tears down the frame.
 - `protocolVersion` is a string major (`"1"`). The shell accepts exactly one
   major per release. A plugin that reports a different major receives
   `shell/error` `unsupported-version` and is unloaded before any registration.
-- Additive optional fields are allowed within a major. Removed or reinterpreted
-  fields require a new major and a new OpenSpec change.
+- Additive optional fields and additive message types are allowed within a major.
+  Removed or reinterpreted fields require a new major and a new OpenSpec change.
+  A shell that predates an additive notification ignores it; the plugin must keep
+  a working fallback (for `plugin/request-save`, the shell Save action).
 - The SDK exposes the protocol version as a constant so plugins do not hard-code
   it. The SDK major tracks the protocol major; its compatibility and deprecation
   policy is in [`plugin-sdk.md`](./plugin-sdk.md#9-compatibility-and-deprecation-policy).

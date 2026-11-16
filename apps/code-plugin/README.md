@@ -51,9 +51,11 @@ storage and its workers are bundled inline, so the surface still works.
 - Applies the initial shell theme and subscribes to `theme/changed`.
 - Refuses files above 5 MiB (or a lower shell limit) without reading them.
 
-The shell's **Save** action initiates saves. Keyboard events inside the plugin
-iframe do not reach the shell and v1 has no plugin-initiated save message, so
-`Ctrl+S` inside Monaco is deliberately not wired to the shell.
+Ctrl/Cmd+S inside Monaco sends an id-less `plugin/request-save` intent when the
+document is dirty and writable. The shell then runs the normal save round trip:
+it sends `shell/request-save`, the plugin returns the model text, and
+`shell/save-result` updates the state. The shell's **Save** action remains
+available and is the fallback for a shell that predates the notification.
 
 The editor exposes `window.__exoCode` inside its own sandboxed document for
 diagnostics (`value()`, `setValue(text)`, `state()`). It carries no shell state
@@ -66,8 +68,9 @@ model after keyboard and save checks.
    the same-origin warning and the frame-rendering disclosure.
 2. Open a `.ts`, a `.json` and a `.md` file. Each should show a visible Monaco
    editor; the tab, header and Save button remain shell chrome outside it.
-3. Edit and save each file; reload and confirm the text survives. The tab's
-   dirty dot clears on a successful save and stays set after a conflict.
+3. Edit and save each file with the shell Save button and with Ctrl/Cmd+S;
+   reload and confirm the text survives. The tab's dirty dot clears on a
+   successful save and stays set after a conflict.
 4. Change the shell theme and confirm Monaco follows without reopening the file.
 5. Switch tabs and return. The editor keeps its session and content; it is not
    remounted by the tab switch.

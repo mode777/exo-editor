@@ -5,7 +5,7 @@
  */
 
 export const PROTOCOL_VERSION = '1'
-export const SDK_VERSION = '1.0.0'
+export const SDK_VERSION = '1.1.0'
 
 export const READY_TIMEOUT_MS = 10_000
 export const REGISTRATION_TIMEOUT_MS = 10_000

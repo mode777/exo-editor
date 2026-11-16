@@ -187,6 +187,16 @@ export class EditorClient {
     this.gate.send('plugin/dirty', { dirty })
   }
 
+  /**
+   * Ask the shell to run its normal save action for the bound document. This is
+   * an id-less intent: content still arrives only in reply to the shell's
+   * `shell/request-save`, and the outcome arrives through `onSaveResult`.
+   */
+  requestSave(): void {
+    if (this.isClosed) return
+    this.gate.send('plugin/request-save')
+  }
+
   onSaveRequest(handler: SaveHandler): () => void {
     this.saveHandlers.push(handler)
     return () => {

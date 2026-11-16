@@ -19,7 +19,7 @@ commands or scripts that do not exist yet.
 | Document | Why |
 | --- | --- |
 | [`docs/vision.md`](./docs/vision.md) | Product intent, principles, non-goals |
-| [`docs/architecture.md`](./docs/architecture.md) | Runtime model, lifecycle, trust boundaries, decisions D1-D18 |
+| [`docs/architecture.md`](./docs/architecture.md) | Runtime model, lifecycle, trust boundaries, decisions D1-D19 |
 | [`docs/contracts/`](./docs/contracts/) | Normative contracts; ratified by `define-core-contracts` and mirrored in `openspec/specs/` |
 | [`docs/contracts/plugin-sdk.md`](./docs/contracts/plugin-sdk.md) | Typed plugin client, origin rules, compatibility policy and template |
 | [`docs/providers/stratofold.md`](./docs/providers/stratofold.md) | Remote-provider track, upstream status and npm blocker |
@@ -67,6 +67,9 @@ These are decisions, not suggestions. Changing one requires an OpenSpec change.
   Reject backslashes, `..`, NUL and empty segments; never percent-decode.
 - **The shell never parses editor content.** File bytes move only on request and
   on save; dirty state is reported by the plugin, not inferred.
+- **A plugin may request a save, but never authors the write.** `plugin/request-save`
+  is an id-less intent; content and `ifVersion` still come only through the
+  shell-initiated `shell/request-save` round trip.
 - **Reuse, do not fork.** `vscode-workbench` is an npm dependency composed through
   props (`views`, `renderDocument`, `commands`, `menus`, `quickOpen`,
   `fileIcons`, `statusBar`, `initialSession`). Never copy its demo layer or patch

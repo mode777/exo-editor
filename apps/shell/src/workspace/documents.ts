@@ -226,6 +226,24 @@ export class DocumentStore {
     }
   }
 
+  /**
+   * An id-less `plugin/request-save` intent. It may only start the normal save
+   * for an active, dirty, writable plugin document; otherwise it is a no-op.
+   */
+  saveFromPlugin(path: WorkspacePath): void {
+    const document = this.documents.get(path)
+    if (
+      !document ||
+      document.surface !== 'plugin' ||
+      document.pluginPhase !== 'active' ||
+      document.readOnly ||
+      !document.dirty
+    ) {
+      return
+    }
+    void this.save(path)
+  }
+
   async save(path: WorkspacePath): Promise<boolean> {
     const existingSave = this.pendingSaves.get(path)
     if (existingSave) return existingSave

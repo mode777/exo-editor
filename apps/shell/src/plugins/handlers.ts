@@ -65,6 +65,8 @@ export interface HandlerPoolOptions {
   events?: EventBus
   /** A handler closed for a reason other than tab close, e.g. plugin removal. */
   onHandlerClosed?: (path: WorkspacePath, reason: HandlerDisposeReason) => void
+  /** An active handler asked the shell to save its document. */
+  onSaveRequested?: (path: WorkspacePath) => void
 }
 
 interface HandlerRecord {
@@ -116,6 +118,7 @@ export class HandlerPool {
   private readonly maxRequestBytes: number
   private readonly onHandlerClosed:
     ((path: WorkspacePath, reason: HandlerDisposeReason) => void) | undefined
+  private readonly onSaveRequested: ((path: WorkspacePath) => void) | undefined
   private readonly records = new Map<WorkspacePath, HandlerRecord>()
   private readonly surfaces = new Map<WorkspacePath, HTMLElement>()
   private readonly surfaceObservers = new Map<WorkspacePath, ResizeObserver>()
@@ -142,6 +145,7 @@ export class HandlerPool {
     this.clearTimeoutImpl = options.clearTimeoutImpl
     this.maxRequestBytes = options.maxRequestBytes ?? DEFAULT_MAX_REQUEST_BYTES
     this.onHandlerClosed = options.onHandlerClosed
+    this.onSaveRequested = options.onSaveRequested
     if (typeof window !== 'undefined') {
       window.addEventListener('resize', this.handleViewportResize)
     }
@@ -240,6 +244,7 @@ export class HandlerPool {
         callbacks.onActive()
         this.updateSurface(input.path)
       },
+      onSaveRequested: () => this.onSaveRequested?.(input.path),
       onDirty: (dirty) => callbacks.onDirty(dirty),
       onVersion: (version) => callbacks.onVersion(version),
       onFailure: (failure) => {

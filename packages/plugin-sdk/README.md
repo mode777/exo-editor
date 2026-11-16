@@ -51,6 +51,7 @@ const editor = connection.editor
 let buffer = ''
 
 editor.onSaveRequest(() => ({ text: buffer }))
+editor.requestSave() // id-less intent; outcome arrives through onSaveResult
 editor.onFileChanged((change) => console.log(change.kind, change.path))
 editor.onDispose((reason) => console.log('disposed', reason))
 

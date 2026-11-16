@@ -61,6 +61,7 @@ interface Started {
   failures: HandlerFailure[]
   logs: Array<{ phase: string; code?: string }>
   versions: string[]
+  saveRequests: number[]
   session: WorkspaceSession
   stat: FileStat
   events: EventBus
@@ -77,6 +78,7 @@ async function start(
   const failures: HandlerFailure[] = []
   const logs: Array<{ phase: string; code?: string }> = []
   const versions: string[] = []
+  const saveRequests: number[] = []
   const events = new EventBus()
   const options: HandlerSessionOptions = {
     candidate: candidate(),
@@ -101,6 +103,7 @@ async function start(
     events,
     createSessionId: () => 'session-1',
     onDirty: (value) => dirty.push(value),
+    onSaveRequested: () => saveRequests.push(1),
     onFailure: (failure) => failures.push(failure),
     onVersion: (version) => versions.push(version),
     onLog: (event) => logs.push(event),
@@ -109,7 +112,19 @@ async function start(
   const handler = new HandlerSession(options)
   handler.start()
   const frame = transport.frames[0] as FakeFrame
-  return { transport, frame, handler, dirty, failures, logs, versions, session, stat, events }
+  return {
+    transport,
+    frame,
+    handler,
+    dirty,
+    failures,
+    logs,
+    versions,
+    saveRequests,
+    session,
+    stat,
+    events,
+  }
 }
 
 function ready(context: Started, origin = PLUGIN_ORIGIN) {
@@ -365,6 +380,51 @@ describe('handler session', () => {
     context.frame.emit({ exo: 1, type: 'plugin/dirty', payload: { dirty: true } }, PLUGIN_ORIGIN)
     expect(context.dirty).toEqual([true])
     expect(context.handler.dirtySequence()).toBe(1)
+  })
+
+  it('accepts an id-less save intent without sending content', async () => {
+    const context = await start()
+    ready(context)
+    context.frame.emit({ exo: 1, type: 'plugin/request-save' }, PLUGIN_ORIGIN)
+    expect(context.saveRequests).toHaveLength(1)
+    expect(postedType(context.frame, 'shell/request-save')).toBeUndefined()
+    expect(postedType(context.frame, 'shell/save-result')).toBeUndefined()
+    expect(postedType(context.frame, 'shell/error')).toBeUndefined()
+
+    context.frame.emit({ exo: 1, type: 'plugin/request-save', payload: {} }, PLUGIN_ORIGIN)
+    expect(context.saveRequests).toHaveLength(2)
+  })
+
+  it('rejects a correlated or content-bearing save intent', async () => {
+    const context = await start()
+    ready(context)
+    context.frame.emit({ exo: 1, type: 'plugin/request-save', id: 'save-me' }, PLUGIN_ORIGIN)
+    context.frame.emit(
+      { exo: 1, type: 'plugin/request-save', payload: { text: 'sneaky' } },
+      PLUGIN_ORIGIN,
+    )
+    expect(context.saveRequests).toEqual([])
+    expect(postedType(context.frame, 'shell/request-save')).toBeUndefined()
+    expect(postedType(context.frame, 'shell/error')).toMatchObject({
+      payload: { code: 'protocol-violation' },
+    })
+  })
+
+  it('ignores a save intent before ready and after disposal', async () => {
+    const early = await start()
+    early.frame.emit({ exo: 1, type: 'plugin/request-save' }, PLUGIN_ORIGIN)
+    expect(early.saveRequests).toEqual([])
+    expect(postedType(early.frame, 'shell/error')).toMatchObject({
+      payload: { code: 'protocol-violation' },
+    })
+
+    const context = await start()
+    ready(context)
+    const disposing = context.handler.dispose('closed')
+    context.frame.emit({ exo: 1, type: 'plugin/dispose-ack' }, PLUGIN_ORIGIN)
+    await disposing
+    context.frame.emit({ exo: 1, type: 'plugin/request-save' }, PLUGIN_ORIGIN)
+    expect(context.saveRequests).toEqual([])
   })
 
   it('round-trips a save and answers with the request id', async () => {

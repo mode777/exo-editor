@@ -18,12 +18,13 @@ enough to ship a plugin.
 
 | Artifact                                            | Version | Packaging                                        |
 | --------------------------------------------------- | ------- | ------------------------------------------------ |
-| `packages/plugin-sdk` (`@exo/plugin-sdk`)           | `1.0.0` | Private workspace package; no runtime dependency |
+| `packages/plugin-sdk` (`@exo/plugin-sdk`)           | `1.1.0` | Private workspace package; no runtime dependency |
 | `packages/plugin-template` (`@exo/plugin-template`) | `0.1.0` | Private workspace package; built static assets   |
 
 - The SDK MAJOR equals the protocol major it speaks. `PROTOCOL_VERSION` and
   `SDK_VERSION` are exported constants; a plugin must not hard-code the protocol
-  number.
+  number. `1.1.0` adds the additive `requestSave()` helper without changing the
+  protocol major.
 - The packages are not published in v1 (D12). Consumers in this repository use
   the workspace copy. A future publication adds a built `dist` and does not
   change the message protocol.
@@ -122,6 +123,7 @@ editor.limits // maxFileSize, maxRequestBytes
 editor.settings // resolved shell settings
 editor.readFile(path, 'utf8' | 'binary')
 editor.setDirty(dirty)
+editor.requestSave()
 editor.onSaveRequest(handler)
 editor.onSaveResult(listener)
 editor.onFileChanged(listener)
@@ -139,6 +141,10 @@ editor.onEvent(topic, listener)
   rejects locally with `rate-limited`.
 - `setDirty` sends one `plugin/dirty` with the boolean value. The SDK never
   infers dirty state from a DOM event.
+- `requestSave()` sends one id-less `plugin/request-save` and returns immediately.
+  It starts no pending request; the normal `onSaveResult` listener is the
+  outcome. The plugin checks dirty and write capability first, and keeps the Shell
+  Save action as the fallback when an older shell ignores the notification.
 - A `shell/request-save` invokes the most recently registered save handler. The
   handler returns `{ text }` or `{ bytes }`; the SDK sends `plugin/save-content`
   with the request id as `replyTo` and reports the matching `shell/save-result`

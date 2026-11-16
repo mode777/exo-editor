@@ -38,6 +38,7 @@ class FakeEditors implements DocumentEditorHost {
   }
   seq = 0
   bumpOnSave = false
+  saveCalls = 0
   deferSave: {
     promise: Promise<HandlerSaveRequest>
     resolve: (value: HandlerSaveRequest) => void
@@ -68,6 +69,7 @@ class FakeEditors implements DocumentEditorHost {
   }
 
   async save(): Promise<HandlerSaveRequest> {
+    this.saveCalls += 1
     if (this.bumpOnSave) this.seq += 1
     if (this.deferSave) return this.deferSave.promise
     return this.saveRequest
@@ -145,6 +147,63 @@ describe('plugin-backed documents', () => {
     editors.list = [candidate({ rendering: 'frame' })]
     const document = await store.open('/a.txt')
     expect(document?.editor).toMatchObject({ rendering: 'frame' })
+  })
+
+  it('starts the normal save from an active dirty plugin intent', async () => {
+    const { store, editors } = await setup()
+    await store.open('/a.txt')
+    await activate(editors)
+    editors.callbacks?.onDirty(true)
+
+    store.saveFromPlugin('/a.txt')
+    await vi.waitFor(() => expect(editors.saveCalls).toBe(1))
+    await vi.waitFor(() => expect(editors.completed.at(-1)).toMatchObject({ result: { ok: true } }))
+    expect(store.get('/a.txt')).toMatchObject({ dirty: false })
+  })
+
+  it('ignores a plugin save intent when clean, read-only or inactive', async () => {
+    const clean = await setup()
+    await clean.store.open('/a.txt')
+    await activate(clean.editors)
+    clean.store.saveFromPlugin('/a.txt')
+    expect(clean.editors.saveCalls).toBe(0)
+
+    const readOnly = await setup()
+    readOnly.editors.list = [candidate({ permissions: ['workspace:read'] })]
+    await readOnly.store.open('/a.txt')
+    await activate(readOnly.editors)
+    readOnly.editors.callbacks?.onDirty(true)
+    readOnly.store.saveFromPlugin('/a.txt')
+    expect(readOnly.editors.saveCalls).toBe(0)
+
+    const inactive = await setup()
+    await inactive.store.open('/a.txt')
+    inactive.editors.callbacks?.onDirty(true)
+    inactive.store.saveFromPlugin('/a.txt')
+    expect(inactive.editors.saveCalls).toBe(0)
+  })
+
+  it('coalesces a plugin save intent with an in-flight save', async () => {
+    const { store, editors } = await setup()
+    const document = await store.open('/a.txt')
+    await activate(editors)
+    editors.callbacks?.onDirty(true)
+    let resolveSave!: (value: HandlerSaveRequest) => void
+    const promise = new Promise<HandlerSaveRequest>((resolve) => {
+      resolveSave = resolve
+    })
+    editors.deferSave = { promise, resolve: (value) => resolveSave(value) }
+
+    store.saveFromPlugin('/a.txt')
+    store.saveFromPlugin('/a.txt')
+    expect(editors.saveCalls).toBe(1)
+    resolveSave({
+      ok: true,
+      requestId: 'save-1',
+      content: { text: 'edited' },
+      baseVersion: document?.version ?? '',
+    })
+    await vi.waitFor(() => expect(editors.completed.at(-1)).toMatchObject({ result: { ok: true } }))
   })
 
   it('keeps the text surface when no editor matches', async () => {
