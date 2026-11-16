@@ -82,6 +82,22 @@ async function main(): Promise<void> {
   })
   applying = false
 
+  // Diagnostic hook for the deployed verification and manual debugging. It
+  // lives only inside this sandboxed document and exposes no shell state.
+  ;(
+    window as unknown as {
+      __exoCode: {
+        value: () => string
+        setValue: (text: string) => void
+        state: () => { path: string; dirty: boolean; language: string }
+      }
+    }
+  ).__exoCode = {
+    value: () => model.getValue(),
+    setValue: (text: string) => model.setValue(text),
+    state: () => ({ path: currentPath, dirty, language }),
+  }
+
   const markDirty = (next: boolean): void => {
     if (dirty === next) return
     dirty = next
