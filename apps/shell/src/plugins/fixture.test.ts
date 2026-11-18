@@ -19,7 +19,7 @@ describe('deployed plugin fixture', () => {
     )
     expect(result.ok).toBe(true)
     if (!result.ok) return
-    expect(result.manifest.fileEditors).toHaveLength(6)
+    expect(result.manifest.fileEditors).toHaveLength(7)
     expect(result.manifest.configuration?.properties).toMatchObject({
       'fixture.greeting': { type: 'string', default: 'hello from fixture' },
       'fixture.repeat': { type: 'boolean', default: false },
@@ -38,6 +38,8 @@ describe('deployed plugin fixture', () => {
       contributes: { fileEditors: Array<{ glob: string; entry: string; priority: number }> }
     }
     const byGlob = new Map(manifest.contributes.fileEditors.map((entry) => [entry.glob, entry]))
+    expect(byGlob.get('**/*.picker.txt')?.entry).toBe('editor-picker.html')
+    expect(byGlob.get('**/*.picker.txt')?.priority).toBeGreaterThan(30)
     expect(byGlob.get('**/*.events.txt')?.entry).toBe('editor-events.html')
     expect(byGlob.get('**/*.events.txt')?.priority).toBe(30)
     expect(byGlob.get('**/*.repeat.txt')?.priority).toBeGreaterThan(0)

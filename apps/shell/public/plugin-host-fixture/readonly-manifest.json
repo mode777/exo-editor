@@ -37,6 +37,13 @@
     },
     "fileEditors": [
       {
+        "glob": "**/*.picker.txt",
+        "entry": "editor-picker.html",
+        "label": "Fixture Picker",
+        "priority": 40,
+        "rendering": "frame"
+      },
+      {
         "glob": "**/*.events.txt",
         "entry": "editor-events.html",
         "label": "Fixture Events",

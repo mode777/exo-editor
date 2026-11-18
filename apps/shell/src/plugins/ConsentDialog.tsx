@@ -16,7 +16,8 @@ interface ConsentDialogProps {
 }
 
 const PERMISSION_TEXT: Record<PluginPermission, string> = {
-  'workspace:read': 'Read workspace files when you open one with this plugin.',
+  'workspace:read':
+    'Read workspace files it opens or requests, including files you select in its picker.',
   'workspace:write': 'Write changes to workspace files when you save.',
   'events:subscribe': 'Receive shell notifications such as theme and file changes.',
 }

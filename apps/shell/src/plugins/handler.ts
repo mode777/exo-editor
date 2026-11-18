@@ -7,12 +7,14 @@ import {
 } from '../workspace/contract'
 import { basename, dirname, isReservedPath, normalizePath } from '../workspace/paths'
 import type { FrameHandle, FrameSurface, FrameTransport, PluginMessage } from './frame'
+import type { FilePickerOpenRequest, FilePickerOutcome } from './file-picker'
 import { hasEventsSubscribe, hasWorkspaceRead, hasWorkspaceWrite } from './manifest'
 import type { EventBus, EventSubscriber } from './events'
 import type { EditorCandidate } from './registry'
 import type { SettingValues } from './settings'
 import {
   DISPOSE_TIMEOUT_MS,
+  MAX_FILE_PICKER_PATHS,
   MAX_IN_FLIGHT_REQUESTS,
   PROTOCOL_VERSION,
   READY_TIMEOUT_MS,
@@ -95,6 +97,8 @@ export interface HandlerSessionOptions {
   onActive?: () => void
   /** The plugin asked the shell to save this document (id-less intent). */
   onSaveRequested?: () => void
+  /** Open the shell-owned file picker; absent means the support bit is false. */
+  onRequestFiles?: (request: FilePickerOpenRequest) => Promise<FilePickerOutcome>
   onDirty: (dirty: boolean) => void
   onFailure: (failure: HandlerFailure) => void
   onVersion?: (version: string) => void
@@ -231,6 +235,8 @@ export class HandlerSession {
   private liveSave: LiveSave | null = null
   private queuedSave: ((request: HandlerSaveRequest) => void) | null = null
   private failureSent = false
+  private pickerId: string | null = null
+  private pickerAbort: AbortController | null = null
   private readonly readIds = new Set<string>()
 
   constructor(options: HandlerSessionOptions) {
@@ -280,6 +286,18 @@ export class HandlerSession {
     return this.frame?.surface
   }
 
+  hasFocus(): boolean {
+    return this.frame?.hasFocus?.() ?? false
+  }
+
+  /** Close a pending picker silently; the dialog is owned by the runtime. */
+  cancelFilePicker(): void {
+    const abort = this.pickerAbort
+    this.pickerAbort = null
+    this.pickerId = null
+    abort?.abort()
+  }
+
   dirtySequence(): number {
     return this.dirtySeq
   }
@@ -323,6 +341,7 @@ export class HandlerSession {
     if (this.phase === 'disposing') return this.disposePromise ?? Promise.resolve()
     this.subscription.close()
     this.clearTimers()
+    this.cancelFilePicker()
     this.failLiveSave('internal')
     if (!this.frame) {
       this.phase = 'closed'
@@ -345,6 +364,7 @@ export class HandlerSession {
     this.phase = 'closed'
     this.subscription.close()
     this.clearTimers()
+    this.cancelFilePicker()
     this.failLiveSave('internal')
     this.readings.clear()
     this.readIds.clear()
@@ -442,6 +462,7 @@ export class HandlerSession {
     this.phase = 'closed'
     this.subscription.close()
     this.clearTimers()
+    this.cancelFilePicker()
     this.failLiveSave('internal')
     this.frame?.close()
     this.frame = null
@@ -465,6 +486,7 @@ export class HandlerSession {
     this.phase = 'closed'
     this.subscription.close()
     this.clearTimers()
+    this.cancelFilePicker()
     this.failLiveSave('internal')
     this.readings.clear()
     this.readIds.clear()
@@ -532,6 +554,9 @@ export class HandlerSession {
         return
       case 'plugin/request-file':
         void this.handleRequestFile(envelope)
+        return
+      case 'plugin/request-files':
+        void this.handleRequestFiles(envelope)
         return
       case 'plugin/dirty':
         this.handleDirty(envelope)
@@ -605,6 +630,7 @@ export class HandlerSession {
         read: hasWorkspaceRead(candidate.permissions),
         write: this.options.canWrite && hasWorkspaceWrite(candidate.permissions),
         requestFiles: hasWorkspaceRead(candidate.permissions),
+        filePicker: this.options.onRequestFiles !== undefined,
       },
       limits: {
         maxFileSize: this.options.maxFileSize,
@@ -747,6 +773,120 @@ export class HandlerSession {
   }
 
   private saveSequence = 0
+
+  private async handleRequestFiles(envelope: Envelope): Promise<void> {
+    const id = envelope.id
+    if (!id) {
+      this.violation(envelope)
+      return
+    }
+    const payload = envelope.payload === undefined ? {} : envelope.payload
+    if (!isPlainObject(payload)) {
+      this.violation(envelope)
+      return
+    }
+    if (Object.keys(payload).some((key) => key !== 'multiple' && key !== 'directory')) {
+      this.violation(envelope)
+      return
+    }
+    if (payload.multiple !== undefined && typeof payload.multiple !== 'boolean') {
+      this.violation(envelope)
+      return
+    }
+    if (payload.directory !== undefined && typeof payload.directory !== 'string') {
+      this.violation(envelope)
+      return
+    }
+    if (!hasWorkspaceRead(this.options.candidate.permissions)) {
+      this.sendError('permission-denied', id)
+      this.log('handler-picker', 'permission-denied')
+      return
+    }
+    if (this.pickerId !== null) {
+      this.sendError('rate-limited', id)
+      this.log('handler-picker', 'rate-limited')
+      return
+    }
+    const onRequestFiles = this.options.onRequestFiles
+    if (!onRequestFiles) {
+      this.sendError('internal', id)
+      this.log('handler-picker', 'internal')
+      return
+    }
+
+    const abort = new AbortController()
+    this.pickerId = id
+    this.pickerAbort = abort
+    let outcome: FilePickerOutcome
+    try {
+      outcome = await onRequestFiles({
+        path: this.file.path,
+        pluginId: this.options.candidate.pluginId,
+        pluginName: this.options.candidate.pluginName,
+        multiple: payload.multiple === true,
+        ...(payload.directory === undefined ? {} : { directory: payload.directory }),
+        session: this.options.session,
+        signal: abort.signal,
+      })
+    } catch {
+      if (this.phase === 'active' && this.pickerId === id) {
+        this.sendError('internal', id)
+        this.log('handler-picker', 'internal')
+      }
+      return
+    } finally {
+      if (this.pickerId === id) {
+        this.pickerId = null
+        this.pickerAbort = null
+      }
+    }
+
+    if (this.phase !== 'active' || abort.signal.aborted) return
+    if ('silent' in outcome) return
+    if (!outcome.ok) {
+      this.sendError(outcome.code, id)
+      this.log('handler-picker', outcome.code)
+      return
+    }
+
+    const paths = outcome.paths
+    if (!Array.isArray(paths) || paths.some((path) => typeof path !== 'string')) {
+      this.sendError('internal', id)
+      this.log('handler-picker', 'internal')
+      return
+    }
+    if (paths.length > MAX_FILE_PICKER_PATHS || (payload.multiple !== true && paths.length > 1)) {
+      this.sendError('internal', id)
+      this.log('handler-picker', 'internal')
+      return
+    }
+    const caseSensitive = this.options.session.capabilities().caseSensitive
+    const selected: WorkspacePath[] = []
+    for (const raw of paths) {
+      let path: WorkspacePath
+      try {
+        path = normalizePath(raw)
+      } catch {
+        this.sendError('permission-denied', id)
+        this.log('handler-picker', 'permission-denied')
+        return
+      }
+      if (isReservedPath(path, caseSensitive)) {
+        this.sendError('permission-denied', id)
+        this.log('handler-picker', 'permission-denied')
+        return
+      }
+      selected.push(path)
+    }
+    postEnvelope(
+      this.frame,
+      this.boundary.targetOrigin,
+      'shell/files-selected',
+      { paths: selected },
+      id,
+    )
+    this.log('handler-picker', 'ok')
+  }
 
   private async handleRequestFile(envelope: Envelope): Promise<void> {
     const id = envelope.id

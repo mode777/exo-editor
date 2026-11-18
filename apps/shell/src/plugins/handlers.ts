@@ -7,6 +7,7 @@ import type {
 import { basename, dirname } from '../workspace/paths'
 import { SHELL_VERSION } from '../version'
 import { DomFrameTransport, type FrameTransport } from './frame'
+import type { FilePickerOpenRequest, FilePickerOutcome } from './file-picker'
 import {
   DEFAULT_MAX_REQUEST_BYTES,
   HandlerSession,
@@ -67,6 +68,10 @@ export interface HandlerPoolOptions {
   onHandlerClosed?: (path: WorkspacePath, reason: HandlerDisposeReason) => void
   /** An active handler asked the shell to save its document. */
   onSaveRequested?: (path: WorkspacePath) => void
+  /** Open the one shell-owned picker; the pool supplies the active/focus gate. */
+  onRequestFiles?: (request: FilePickerOpenRequest) => Promise<FilePickerOutcome>
+  /** Whether another frame's picker is already open. */
+  isPickerOpen?: () => boolean
 }
 
 interface HandlerRecord {
@@ -119,6 +124,9 @@ export class HandlerPool {
   private readonly onHandlerClosed:
     ((path: WorkspacePath, reason: HandlerDisposeReason) => void) | undefined
   private readonly onSaveRequested: ((path: WorkspacePath) => void) | undefined
+  private readonly onRequestFiles:
+    ((request: FilePickerOpenRequest) => Promise<FilePickerOutcome>) | undefined
+  private readonly isPickerOpen: (() => boolean) | undefined
   private readonly records = new Map<WorkspacePath, HandlerRecord>()
   private readonly surfaces = new Map<WorkspacePath, HTMLElement>()
   private readonly surfaceObservers = new Map<WorkspacePath, ResizeObserver>()
@@ -146,6 +154,8 @@ export class HandlerPool {
     this.maxRequestBytes = options.maxRequestBytes ?? DEFAULT_MAX_REQUEST_BYTES
     this.onHandlerClosed = options.onHandlerClosed
     this.onSaveRequested = options.onSaveRequested
+    this.onRequestFiles = options.onRequestFiles
+    this.isPickerOpen = options.isPickerOpen
     if (typeof window !== 'undefined') {
       window.addEventListener('resize', this.handleViewportResize)
     }
@@ -190,7 +200,9 @@ export class HandlerPool {
     this.surfaceObservers.delete(path)
     if (!element) {
       this.surfaces.delete(path)
-      this.records.get(path)?.session.surface?.hide()
+      const record = this.records.get(path)
+      record?.session.cancelFilePicker()
+      record?.session.surface?.hide()
       return
     }
     this.surfaces.set(path, element)
@@ -245,6 +257,21 @@ export class HandlerPool {
         this.updateSurface(input.path)
       },
       onSaveRequested: () => this.onSaveRequested?.(input.path),
+      onRequestFiles: (request) => {
+        if (this.isPickerOpen?.()) {
+          return Promise.resolve({ ok: false as const, code: 'rate-limited' as const })
+        }
+        if (input.candidate.rendering !== 'frame') {
+          return Promise.resolve({ ok: false as const, code: 'permission-denied' as const })
+        }
+        if (!this.surfaces.has(input.path) || !session.active || !session.hasFocus()) {
+          return Promise.resolve({ ok: false as const, code: 'permission-denied' as const })
+        }
+        return (
+          this.onRequestFiles?.(request) ??
+          Promise.resolve({ ok: false as const, code: 'internal' as const })
+        )
+      },
       onDirty: (dirty) => callbacks.onDirty(dirty),
       onVersion: (version) => callbacks.onVersion(version),
       onFailure: (failure) => {

@@ -43,6 +43,8 @@ export interface FrameOpenOptions {
 export interface FrameHandle {
   readonly window: Window | null
   readonly surface?: FrameSurface
+  /** Whether the frame currently owns DOM focus. Absent means unknown/false. */
+  hasFocus?(): boolean
   close(): void
 }
 
@@ -146,6 +148,7 @@ export class DomFrameTransport implements FrameTransport {
     return {
       window: contentWindow,
       ...(surface === undefined ? {} : { surface }),
+      hasFocus: () => this.document.activeElement === iframe,
       close: () => {
         if (closed) return
         closed = true

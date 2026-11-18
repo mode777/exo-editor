@@ -13,7 +13,7 @@ checklist item performed manually against the deployed site.
 | 10k-entry directory listing | 3,000 ms total, 1,000 ms longest task | Expand a directory with 10,000 entries and measure until every row is painted |
 | 1 MiB file open | 1,000 ms | Shell text surface and reference code plugin, from activating the file to the editable surface |
 | 1 MiB file save | 1,000 ms | Shell text surface and reference code plugin, from Save to the shell's success state |
-| Shell bundle (JS) | 152,000 gzip bytes | `npm run budget` / CI `Bundle budget` |
+| Shell bundle (JS) | 154,000 gzip bytes | `npm run budget` / CI `Bundle budget` |
 | Shell bundle (CSS) | 14,000 gzip bytes | `npm run budget` / CI `Bundle budget` |
 
 These are release ceilings, not product SLOs. They are intentionally generous
@@ -86,3 +86,10 @@ CI steps are `node apps/shell/scripts/check-bundle-budget.mjs apps/shell/dist
 apps/shell/budget.json` in the `verify` job. A change that needs a larger budget
 must update the file and explain why in the change; the runtime budgets above are
 independent of it.
+
+The `plugin-file-picker` change raises the JS ceiling from 152,000 to 154,000
+gzip bytes. The shell-owned picker dialog, its controller and the handler
+message path add 1,541 gzip bytes over the previous ceiling (measured build:
+153,541 JS, 13,235 CSS). The 2,000-byte allowance keeps roughly 450 bytes of
+headroom for the next change; no dependency, font or vendored asset is added.
+The picker lists lazily and does not change any runtime budget.

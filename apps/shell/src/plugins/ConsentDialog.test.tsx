@@ -100,6 +100,7 @@ describe('consent dialog', () => {
     expect(text).toContain('Code')
     expect(text).toContain('**/*.ts')
     expect(text).toContain('workspace:read')
+    expect(text).toContain('including files you select in its picker')
     expect(text).toContain('workspace:write')
     expect(text).toContain('can write to your workspace')
     expect(text).not.toContain('same origin as the shell')

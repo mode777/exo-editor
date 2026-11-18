@@ -19,6 +19,7 @@ import { isReservedPath, normalizePath } from './paths'
 import { PluginConfigStore } from '../plugins/store'
 import { PluginHost } from '../plugins/host'
 import { HandlerPool } from '../plugins/handlers'
+import { FilePickerController } from '../plugins/file-picker'
 import { PluginSettingsStore, type PluginSettingsStorage } from '../plugins/settings'
 import { FileChangeCoalescer, SelfWriteEcho, type ThemeName } from '../plugins/events'
 import { FolderWorkspaceProvider } from './providers/folder/provider'
@@ -115,6 +116,7 @@ export class WorkspaceRuntime {
   readonly pluginConfig: PluginConfigStore
   readonly pluginHost: PluginHost
   readonly handlers: HandlerPool
+  readonly filePicker: FilePickerController
   readonly pluginSettings: PluginSettingsStore
 
   private readonly fileChanges: FileChangeCoalescer
@@ -151,11 +153,14 @@ export class WorkspaceRuntime {
       isVisible: options.isVisible,
     })
     this.pluginHost = options.pluginHost ?? new PluginHost()
+    this.filePicker = new FilePickerController()
     this.handlers =
       options.handlerPool ??
       new HandlerPool({
         onHandlerClosed: (path) => this.documents.handleHandlerClosed(path),
         onSaveRequested: (path) => this.documents.saveFromPlugin(path),
+        onRequestFiles: (request) => this.filePicker.request(request),
+        isPickerOpen: () => this.filePicker.getSnapshot() !== null,
       })
     this.pluginSettings = new PluginSettingsStore({
       storage: options.pluginSettingsStorage,
@@ -599,6 +604,7 @@ export class WorkspaceRuntime {
   }
 
   private async deactivate(reason: 'switch' | 'close' = 'switch'): Promise<void> {
+    this.filePicker.reset()
     this.handlers.publishWorkspaceClosed(reason)
     await this.handlers.detach()
     this.fileChanges.reset()

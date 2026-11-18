@@ -134,8 +134,16 @@ interface ShellInit {
   settings: Record<string, boolean | string | number>
   /** Present only when mode is 'editor'. Never contains file content. */
   file?: FileMetadata
-  /** Present only when mode is 'editor'. */
-  capabilities?: { read: boolean; write: boolean; requestFiles: boolean }
+  /**
+   * Present only when mode is 'editor'. `requestFiles` is the permission bit;
+   * `filePicker` is the shell support bit and is absent on older shells.
+   */
+  capabilities?: {
+    read: boolean
+    write: boolean
+    requestFiles: boolean
+    filePicker?: boolean
+  }
   /** Present only when mode is 'editor'. */
   limits?: { maxFileSize: number; maxRequestBytes: number }
 }
@@ -165,7 +173,7 @@ reinterpret a frame that starts in one mode as the other.
 | Phase | Allowed plugin messages |
 | --- | --- |
 | `register` | `plugin/ready`, `plugin/register`, `plugin/register-complete` |
-| `editor` | `plugin/ready`, `plugin/request-file`, `plugin/dirty`, `plugin/request-save`, `plugin/save-content`, `plugin/subscribe`, `plugin/unsubscribe`, `plugin/dispose-ack` |
+| `editor` | `plugin/ready`, `plugin/request-file`, `plugin/request-files`, `plugin/dirty`, `plugin/request-save`, `plugin/save-content`, `plugin/subscribe`, `plugin/unsubscribe`, `plugin/dispose-ack` |
 
 - `plugin/ready` is accepted once per frame. A second `ready`, a
   `plugin/register-complete` before `ready`, or a registration message after
@@ -288,6 +296,36 @@ shell/file-content    { path, version, text } | { path, version, bytes: ArrayBuf
 - Errors: `shell/error { replyTo, code: 'not-found' | 'permission-denied' |
   'too-large' | 'not-a-file' | 'internal' }`.
 
+### 5.2.1 User-mediated file selection
+
+```text
+plugin/request-files   { multiple?: boolean, directory?: WorkspacePath }
+shell/files-selected   { paths: WorkspacePath[] }      // [] means cancelled
+```
+
+- `plugin/request-files` is an editor-phase, correlated request. It requires
+  `workspace:read` and `capabilities.filePicker`. The shell SHALL reject it with
+  `permission-denied` unless the handler is active, visible, focused and not
+  disposing, and SHALL reply `rate-limited` when a picker is already open or the
+  frame already has one pending.
+- `multiple` defaults to `false`; a multiple selection returns at most 32 paths
+  in selection order. `directory` is an optional start hint, not a grant. The
+  shell normalizes and contains it and falls back silently to the handler file's
+  directory when it is absent, invalid, reserved or missing.
+- The picker is shell-owned. It lists directories lazily through the
+  plugin-scoped workspace facade, so `/exo.json` and `/.exo/**` are neither
+  shown nor returned. It re-checks the reserved set before replying. The plugin
+  may not supply a title, message, description or preselected path; unknown
+  request fields are a protocol violation.
+- The reply carries `/`-rooted workspace paths only. It carries no content,
+  stat, version, `FileSystemHandle`, `File` or `Blob`; the plugin reads a chosen
+  path through `plugin/request-file` and the normal permission and size checks
+  apply.
+- A user cancellation is a successful `shell/files-selected` with `paths: []`.
+  Disposal, tab close, tab switch, plugin removal and workspace switch close the
+  picker without a reply; a late answer is dropped.
+- The shell logs the plugin id, outcome and error code, not the selected paths.
+
 ### 5.3 Dirty state and save
 
 ```text
@@ -395,6 +433,9 @@ are cleared on workspace switch.
 | Dispose acknowledgement | 1 s |
 | Protocol violations before teardown | 3 |
 | Frames per plugin per workspace | 1 registration + 1 per open document, max 20 |
+| Pending file pickers per frame | 1 |
+| Open file pickers per shell | 1 |
+| Paths per file selection | 32 |
 
 When a plugin already has 20 handler frames open, the shell refrains from mounting
 another one: the new document opens in the shell's fallback renderer with a
@@ -425,6 +466,10 @@ for repeated violations, tears down the frame.
 
 - Validate `event.origin` and `event.source` before parsing the payload.
 - Never send `file-content` for a path the frame did not request with a live id.
+- Never return a picker path the user did not select, and never return a reserved
+  path; re-check the reserved set immediately before the reply.
+- Close a picker without a reply when its handler is disposed, hidden, inactive
+  or belongs to a released workspace.
 - Never pass `FileSystemHandle`, `File`, or `Blob` objects to a frame.
 - Never include another document's path in an error message.
 - Re-check `workspace:read` and `workspace:write` at the handler boundary; a

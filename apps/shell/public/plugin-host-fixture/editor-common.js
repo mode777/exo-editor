@@ -18,6 +18,9 @@
     subscriptions: [],
     events: [],
     reads: [],
+    picks: [],
+    pickReads: [],
+    pendingPickRead: null,
     dirty: false,
     disposed: 'pending',
     external: null,
@@ -29,7 +32,7 @@
   function render() {
     state.origin = location.origin
     observation.textContent = JSON.stringify(state)
-    document.title = `Exo fixture ${fixtureMode} ${state.phase} events:${state.events.length}`
+    document.title = `Exo fixture ${fixtureMode} ${state.phase} events:${state.events.length} picks:${state.picks.length}`
   }
 
   function post(type, payload, replyTo, id) {
@@ -42,6 +45,26 @@
 
   function requestFile(requestId) {
     post('plugin/request-file', { path: state.file.path, encoding: 'utf8' }, undefined, requestId)
+  }
+
+  function pickFiles() {
+    if (fixtureMode !== 'picker') return
+    post('plugin/request-files', { multiple: false }, undefined, `pick-${state.picks.length + 1}`)
+  }
+
+  function onFileSelected(payload) {
+    const paths = payload && Array.isArray(payload.paths) ? payload.paths : []
+    state.picks.push({ paths })
+    render()
+    if (paths.length > 0) {
+      state.pendingPickRead = paths[0]
+      post(
+        'plugin/request-file',
+        { path: paths[0], encoding: 'utf8' },
+        undefined,
+        `pick-read-${state.picks.length}`,
+      )
+    }
   }
 
   function onInit(payload) {
@@ -107,7 +130,20 @@
       version: payload.version,
       length: typeof payload.text === 'string' ? payload.text.length : -1,
     })
-    if (typeof payload.text === 'string') {
+    if (fixtureMode === 'picker' && state.pendingPickRead === payload.path) {
+      state.pickReads.push({
+        path: payload.path,
+        version: payload.version,
+        length: typeof payload.text === 'string' ? payload.text.length : -1,
+      })
+      state.pendingPickRead = null
+      if (typeof payload.text === 'string') {
+        state.buffer = `${state.buffer || ''}\n[fixture picked ${payload.path}]`
+      }
+      markDirty()
+      return
+    }
+    if (typeof payload.text === 'string' && !state.dirty) {
       state.buffer = payload.text
     }
     render()
@@ -185,6 +221,9 @@
       case 'shell/file-content':
         onContent(data.payload || {})
         break
+      case 'shell/files-selected':
+        onFileSelected(data.payload || {})
+        break
       case 'shell/request-save':
         onSave(data.id)
         break
@@ -223,6 +262,11 @@
         break
     }
   })
+
+  if (fixtureMode === 'picker') {
+    const pick = document.getElementById('pick')
+    if (pick) pick.addEventListener('click', pickFiles)
+  }
 
   render()
   post('plugin/ready', { protocolVersion: '1', sessionId }, undefined, undefined)

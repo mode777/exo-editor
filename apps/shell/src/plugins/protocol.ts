@@ -18,6 +18,7 @@ export const MAX_MESSAGE_BYTES = 16 * 1024 * 1024
 export const MAX_HANDLER_FRAMES = 20
 export const MAX_IN_FLIGHT_REQUESTS = 64
 export const MAX_FRAME_ID_LENGTH = 64
+export const MAX_FILE_PICKER_PATHS = 32
 
 export type ShellErrorCode =
   | 'unsupported-message'

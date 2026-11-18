@@ -4,6 +4,11 @@ import { Session } from '../workspace/session'
 import type { WorkspacePath, WorkspaceSession } from '../workspace/contract'
 import { FakeFrameTransport } from './frame-test-support'
 import { HandlerPool, type HandlerPoolHost } from './handlers'
+import {
+  FilePickerController,
+  type FilePickerOpenRequest,
+  type FilePickerOutcome,
+} from './file-picker'
 import type { EditorCandidate } from './registry'
 import { MAX_HANDLER_FRAMES } from './protocol'
 
@@ -37,16 +42,24 @@ interface Harness {
   transport: FakeFrameTransport
   session: WorkspaceSession
   saveRequests: WorkspacePath[]
+  pickerRequests: FilePickerOpenRequest[]
   host: HandlerPoolHost & { entries: Array<{ identity: string; phase: string; code?: string }> }
 }
 
-async function harness(files: Record<string, string> = { '/src/a.ts': 'a' }): Promise<Harness> {
+async function harness(
+  files: Record<string, string> = { '/src/a.ts': 'a' },
+  options: {
+    onRequestFiles?: (request: FilePickerOpenRequest) => Promise<FilePickerOutcome>
+    isPickerOpen?: () => boolean
+  } = {},
+): Promise<Harness> {
   const provider = new MemoryWorkspaceProvider({ now: () => 1000, initialFiles: files })
   const handle = await provider.open()
   const session = new Session(handle)
   const transport = new FakeFrameTransport()
   const entries: Array<{ identity: string; phase: string; code?: string }> = []
   const saveRequests: WorkspacePath[] = []
+  const pickerRequests: FilePickerOpenRequest[] = []
   const candidates = new Map<WorkspacePath, EditorCandidate[]>()
   const host: Harness['host'] = {
     entries,
@@ -61,9 +74,14 @@ async function harness(files: Record<string, string> = { '/src/a.ts': 'a' }): Pr
     locale: 'en',
     createSessionId: () => 'session-1',
     onSaveRequested: (path) => saveRequests.push(path),
+    onRequestFiles: (request) => {
+      pickerRequests.push(request)
+      return options.onRequestFiles?.(request) ?? Promise.resolve({ ok: true, paths: [] })
+    },
+    isPickerOpen: options.isPickerOpen,
   })
   pool.attach({ session, host, workspaceName: 'demo' })
-  return { pool, transport, session, saveRequests, host }
+  return { pool, transport, session, saveRequests, pickerRequests, host }
 }
 
 async function open(harness: Harness, path: WorkspacePath) {
@@ -100,6 +118,21 @@ function readyFrame(
   sessionId = 'session-1',
 ) {
   frame.emit({ exo: 1, type: 'plugin/ready', payload: { protocolVersion: '1', sessionId } }, origin)
+}
+
+function requestFiles(
+  frame: ReturnType<FakeFrameTransport['open']>,
+  origin: string,
+  id: string,
+  payload: Record<string, unknown> = {},
+) {
+  frame.emit({ exo: 1, type: 'plugin/request-files', id, payload }, origin)
+}
+
+function selection(frame: ReturnType<FakeFrameTransport['open']>, id: string) {
+  return frame.posted
+    .map((posted) => posted.message as { type?: string; replyTo?: string; payload?: unknown })
+    .find((message) => message.type === 'shell/files-selected' && message.replyTo === id)
 }
 
 function subscribe(frame: ReturnType<FakeFrameTransport['open']>, origin: string, topic: string) {
@@ -147,6 +180,177 @@ describe('handler pool', () => {
     readyFrame(frame, PLUGIN_ORIGIN)
     expect(frame.surfaceShown).toBe(false)
     expect(frame.surface).toBeUndefined()
+  })
+
+  it('opens a picker only for an active visible focused handler', async () => {
+    const context = await harness({ '/src/a.ts': 'a' })
+    const frameCandidate = candidate(undefined, { rendering: 'frame' })
+    await openWith(context, '/src/a.ts', frameCandidate)
+    const frame = context.transport.frames[0]
+    const slot = document.createElement('div')
+    slot.getBoundingClientRect = () => ({ left: 10, top: 20, width: 800, height: 600 }) as DOMRect
+    context.pool.attachSurface('/src/a.ts', slot)
+    readyFrame(frame, PLUGIN_ORIGIN)
+
+    frame.focused = false
+    requestFiles(frame, PLUGIN_ORIGIN, 'pick-unfocused')
+    await vi.waitFor(() =>
+      expect(
+        frame.posted
+          .map((posted) => posted.message as { type?: string; payload?: { code?: string } })
+          .find(
+            (message) =>
+              message.type === 'shell/error' && message.payload?.code === 'permission-denied',
+          ),
+      ).toBeDefined(),
+    )
+    expect(context.pickerRequests).toHaveLength(0)
+
+    frame.focused = true
+    requestFiles(frame, PLUGIN_ORIGIN, 'pick-visible')
+    await vi.waitFor(() => expect(context.pickerRequests).toHaveLength(1))
+    await vi.waitFor(() => expect(selection(frame, 'pick-visible')).toBeDefined())
+    expect(selection(frame, 'pick-visible')?.payload).toEqual({ paths: [] })
+  })
+
+  it('allows one picker across frames and rate-limits the second', async () => {
+    const controller = new FilePickerController()
+    const context = await harness(
+      { '/src/a.ts': 'a', '/src/b.ts': 'b' },
+      {
+        onRequestFiles: (request) => controller.request(request),
+        isPickerOpen: () => controller.getSnapshot() !== null,
+      },
+    )
+    const frameCandidate = candidate(undefined, { rendering: 'frame' })
+    await openWith(context, '/src/a.ts', frameCandidate)
+    await openWith(context, '/src/b.ts', frameCandidate)
+    const first = context.transport.frames[0]
+    const second = context.transport.frames[1]
+    for (const frame of [first, second]) {
+      const slot = document.createElement('div')
+      slot.getBoundingClientRect = () => ({ left: 10, top: 20, width: 800, height: 600 }) as DOMRect
+      const path = frame === first ? '/src/a.ts' : '/src/b.ts'
+      context.pool.attachSurface(path, slot)
+      readyFrame(frame, PLUGIN_ORIGIN)
+    }
+
+    requestFiles(first, PLUGIN_ORIGIN, 'pick-a')
+    await vi.waitFor(() => expect(controller.getSnapshot()).not.toBeNull())
+    requestFiles(second, PLUGIN_ORIGIN, 'pick-b')
+    await vi.waitFor(() =>
+      expect(
+        second.posted
+          .map((posted) => posted.message as { type?: string; payload?: { code?: string } })
+          .find(
+            (message) => message.type === 'shell/error' && message.payload?.code === 'rate-limited',
+          ),
+      ).toBeDefined(),
+    )
+    controller.cancel()
+    await vi.waitFor(() => expect(selection(first, 'pick-a')).toBeDefined())
+    expect(selection(first, 'pick-a')?.payload).toEqual({ paths: [] })
+  })
+
+  it('denies a picker from a hidden handler', async () => {
+    const context = await harness({ '/src/a.ts': 'a' })
+    await open(context, '/src/a.ts')
+    const frame = context.transport.frames[0]
+    readyFrame(frame, PLUGIN_ORIGIN)
+    requestFiles(frame, PLUGIN_ORIGIN, 'pick-hidden')
+    await vi.waitFor(() =>
+      expect(
+        frame.posted
+          .map((posted) => posted.message as { type?: string; payload?: { code?: string } })
+          .find(
+            (message) =>
+              message.type === 'shell/error' && message.payload?.code === 'permission-denied',
+          ),
+      ).toBeDefined(),
+    )
+    expect(context.pickerRequests).toHaveLength(0)
+    expect(selection(frame, 'pick-hidden')).toBeUndefined()
+  })
+
+  it('closes a picker silently when the document surface detaches', async () => {
+    let release: ((value: FilePickerOutcome) => void) | undefined
+    const context = await harness(
+      { '/src/a.ts': 'a' },
+      {
+        onRequestFiles: () =>
+          new Promise<FilePickerOutcome>((resolve) => {
+            release = resolve
+          }),
+      },
+    )
+    const frameCandidate = candidate(undefined, { rendering: 'frame' })
+    await openWith(context, '/src/a.ts', frameCandidate)
+    const frame = context.transport.frames[0]
+    const slot = document.createElement('div')
+    slot.getBoundingClientRect = () => ({ left: 10, top: 20, width: 800, height: 600 }) as DOMRect
+    context.pool.attachSurface('/src/a.ts', slot)
+    readyFrame(frame, PLUGIN_ORIGIN)
+    requestFiles(frame, PLUGIN_ORIGIN, 'pick-detach')
+    await vi.waitFor(() => expect(context.pickerRequests).toHaveLength(1))
+    expect(context.pickerRequests[0].signal.aborted).toBe(false)
+
+    context.pool.attachSurface('/src/a.ts', null)
+    expect(context.pickerRequests[0].signal.aborted).toBe(true)
+    release?.({ ok: true, paths: ['/src/a.ts'] })
+    await Promise.resolve()
+    expect(selection(frame, 'pick-detach')).toBeUndefined()
+  })
+
+  it('closes a picker silently on tab close and plugin removal', async () => {
+    let release: ((value: FilePickerOutcome) => void) | undefined
+    const context = await harness(
+      { '/src/a.ts': 'a' },
+      {
+        onRequestFiles: () =>
+          new Promise<FilePickerOutcome>((resolve) => {
+            release = resolve
+          }),
+      },
+    )
+    const frameCandidate = candidate(undefined, { rendering: 'frame' })
+    await openWith(context, '/src/a.ts', frameCandidate)
+    const frame = context.transport.frames[0]
+    const slot = document.createElement('div')
+    slot.getBoundingClientRect = () => ({ left: 10, top: 20, width: 800, height: 600 }) as DOMRect
+    context.pool.attachSurface('/src/a.ts', slot)
+    readyFrame(frame, PLUGIN_ORIGIN)
+    requestFiles(frame, PLUGIN_ORIGIN, 'pick-close')
+    await vi.waitFor(() => expect(context.pickerRequests).toHaveLength(1))
+    context.pool.close('/src/a.ts')
+    expect(context.pickerRequests[0].signal.aborted).toBe(true)
+    release?.({ ok: true, paths: ['/src/a.ts'] })
+    await Promise.resolve()
+    expect(selection(frame, 'pick-close')).toBeUndefined()
+
+    let releaseRemoval: ((value: FilePickerOutcome) => void) | undefined
+    const removal = await harness(
+      { '/src/a.ts': 'a' },
+      {
+        onRequestFiles: () =>
+          new Promise<FilePickerOutcome>((resolve) => {
+            releaseRemoval = resolve
+          }),
+      },
+    )
+    await openWith(removal, '/src/a.ts', frameCandidate)
+    const removalFrame = removal.transport.frames[0]
+    const removalSlot = document.createElement('div')
+    removalSlot.getBoundingClientRect = () =>
+      ({ left: 10, top: 20, width: 800, height: 600 }) as DOMRect
+    removal.pool.attachSurface('/src/a.ts', removalSlot)
+    readyFrame(removalFrame, PLUGIN_ORIGIN)
+    requestFiles(removalFrame, PLUGIN_ORIGIN, 'pick-remove')
+    await vi.waitFor(() => expect(removal.pickerRequests).toHaveLength(1))
+    removal.pool.closeFor(frameCandidate.identity, 'plugin-removed')
+    expect(removal.pickerRequests[0].signal.aborted).toBe(true)
+    releaseRemoval?.({ ok: true, paths: ['/src/a.ts'] })
+    await Promise.resolve()
+    expect(selection(removalFrame, 'pick-remove')).toBeUndefined()
   })
 
   it('passes an id-less save intent to the owning document path', async () => {

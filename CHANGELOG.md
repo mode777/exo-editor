@@ -3,6 +3,28 @@
 All notable changes to Exo Editor are recorded here. The version axes and the
 release process are in [`docs/releases.md`](./docs/releases.md).
 
+## [0.1.0] - 2026-11-18
+
+Additive post-release update: the plugin file picker.
+
+### Added
+
+- `plugin/request-files` / `shell/files-selected` and the shell-owned workspace
+  picker for active visible plugin handlers; paths only, no content or handles.
+- `@exo/plugin-sdk` `1.2.0` with `EditorClient.requestFiles()` and the
+  `capabilities.filePicker` support bit.
+
+### Compatibility
+
+- Shell: `0.1.0`
+- Protocol: `1`
+- Manifest schema: `1`
+- SDK: `1.2.0`
+
+### Breaking
+
+- None. The message and capability are additive within protocol major `1`.
+
 ## [0.1.0] - 2026-11-16
 
 First public v1 release. The shell is deployed at

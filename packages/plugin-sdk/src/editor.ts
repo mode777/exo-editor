@@ -14,6 +14,7 @@ import {
   type FileChangedPayload,
   type FileContent,
   type FileMetadata,
+  type FilePickerOptions,
   type SaveContent,
   type SaveResult,
   type SettingValues,
@@ -81,6 +82,12 @@ function parseSaveResult(payload: unknown): SaveResult | null {
   }
 }
 
+function parseFileSelection(payload: unknown): string[] | null {
+  if (!isPlainObject(payload) || !Array.isArray(payload.paths)) return null
+  if (payload.paths.some((path) => typeof path !== 'string')) return null
+  return payload.paths as string[]
+}
+
 function parseFileChanged(payload: unknown): FileChangedPayload | null {
   if (!isPlainObject(payload)) return null
   if (typeof payload.path !== 'string') return null
@@ -118,6 +125,7 @@ export class EditorClient {
   private readonly saveHandlers: SaveHandler[] = []
   private metadata: FileMetadata
   private liveSaveId: string | null = null
+  private pendingPickerId: string | null = null
   private nextRequestId = 0
   private isClosed = false
   private disposed = false
@@ -135,6 +143,9 @@ export class EditorClient {
 
     gate.on('shell/file-content', (envelope) =>
       this.handleContent(envelope.replyTo, envelope.payload),
+    )
+    gate.on('shell/files-selected', (envelope) =>
+      this.handleFileSelection(envelope.replyTo, envelope.payload),
     )
     gate.on('shell/error', (envelope) => this.handleError(envelope.replyTo, envelope.payload))
     gate.on('shell/request-save', (envelope) => {
@@ -180,6 +191,43 @@ export class EditorClient {
   readFile(path: string, encoding: 'utf8' | 'binary' = 'utf8'): Promise<FileContent> {
     const id = this.nextId()
     return this.request<FileContent>(id, 'plugin/request-file', { path, encoding })
+  }
+
+  /**
+   * Ask the shell to open its workspace file picker. Resolves with the selected
+   * `/`-rooted paths, or `[]` when the user cancels. The shell returns no
+   * content; read a selected path with `readFile`.
+   */
+  requestFiles(options: FilePickerOptions = {}): Promise<string[]> {
+    if (!this.init.capabilities.filePicker) {
+      return Promise.reject(
+        new ExoProtocolError(
+          'unsupported-message',
+          'This shell does not support the workspace file picker.',
+        ),
+      )
+    }
+    if (!this.init.capabilities.requestFiles) {
+      return Promise.reject(
+        new ExoProtocolError(
+          'permission-denied',
+          'The plugin does not have workspace read permission for the picker.',
+        ),
+      )
+    }
+    if (this.pendingPickerId !== null) {
+      return Promise.reject(
+        new ExoProtocolError('rate-limited', 'A file picker request is already pending.'),
+      )
+    }
+    const id = this.nextId()
+    this.pendingPickerId = id
+    return this.request<string[]>(id, 'plugin/request-files', {
+      multiple: options.multiple === true,
+      ...(options.directory === undefined ? {} : { directory: options.directory }),
+    }).finally(() => {
+      if (this.pendingPickerId === id) this.pendingPickerId = null
+    })
   }
 
   setDirty(dirty: boolean): void {
@@ -326,6 +374,18 @@ export class EditorClient {
       return
     }
     this.settle(replyTo, undefined, content)
+  }
+
+  private handleFileSelection(replyTo: string | undefined, payload: unknown): void {
+    const paths = parseFileSelection(payload)
+    if (!paths) {
+      this.settle(
+        replyTo,
+        new ExoProtocolError('protocol-violation', 'The shell sent an invalid file selection.'),
+      )
+      return
+    }
+    this.settle(replyTo, undefined, paths)
   }
 
   private handleError(replyTo: string | undefined, payload: unknown): void {

@@ -52,6 +52,7 @@ document title so a hidden frame remains inspectable in devtools.
 
 | File glob           | Page                    | Behaviour                                                                      |
 | ------------------- | ----------------------- | ------------------------------------------------------------------------------ |
+| `**/*.picker.txt`   | `editor-picker.html`    | Visible frame with a Pick button; exercises `plugin/request-files`             |
 | `**/*.events.txt`   | `editor-events.html`    | Subscribes to the four v1 topics and records sequences and events              |
 | `**/*.txt`          | `editor.html`           | Read, report dirty, save with a `[fixture save N]` marker, acknowledge dispose |
 | `**/*.append.txt`   | `editor-append.html`    | Same, with an `[fixture append N]` marker and a second visible edit signal     |
@@ -133,6 +134,19 @@ carries the full new map to subscribed frames of this plugin only.
     editable, and the "does not subscribe to configuration changes" hint appears
     because that manifest lacks `events:subscribe`. The events editor's
     subscriptions remain `permission-denied`.
+18. Open `picker.picker.txt`. The fixture renders a visible frame with a **Pick
+    workspace file** button. Click it: the shell picker opens at the fixture
+    file's directory, `exo.json` and `.exo` are absent, and selecting a text file
+    appends `[fixture picked <path>]` to the fixture buffer in `#observation`,
+    reports dirty and saves through the normal Save action.
+19. Cancel the picker: `#observation.picks` records one entry with `paths: []`,
+    the tab stays clean and no read follows. Press Escape or use only the
+    keyboard to select a row; focus returns to the plugin frame when the picker
+    closes.
+20. Open `picker.picker.txt` with `readonly-manifest.json`: the picker still
+    returns paths and the fixture reads them, but the shell offers no Save. A
+    hidden `.txt` editor has no Pick button and a picker request from it is
+    denied.
 
 Changes are only observed for open documents plus the shell's own writes; both
 providers are non-watchable, so an unopened file is not reported.

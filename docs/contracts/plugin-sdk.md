@@ -18,13 +18,13 @@ enough to ship a plugin.
 
 | Artifact                                            | Version | Packaging                                        |
 | --------------------------------------------------- | ------- | ------------------------------------------------ |
-| `packages/plugin-sdk` (`@exo/plugin-sdk`)           | `1.1.0` | Private workspace package; no runtime dependency |
+| `packages/plugin-sdk` (`@exo/plugin-sdk`)           | `1.2.0` | Private workspace package; no runtime dependency |
 | `packages/plugin-template` (`@exo/plugin-template`) | `0.1.0` | Private workspace package; built static assets   |
 
 - The SDK MAJOR equals the protocol major it speaks. `PROTOCOL_VERSION` and
   `SDK_VERSION` are exported constants; a plugin must not hard-code the protocol
-  number. `1.1.0` adds the additive `requestSave()` helper without changing the
-  protocol major.
+  number. `1.1.0` adds the additive `requestSave()` helper and `1.2.0` adds the
+  additive `requestFiles()` helper, both without changing the protocol major.
 - The packages are not published in v1 (D12). Consumers in this repository use
   the workspace copy. A future publication adds a built `dist` and does not
   change the message protocol.
@@ -118,10 +118,11 @@ complete()                          -> one plugin/register-complete, then shell/
 
 ```ts
 editor.file // FileMetadata from shell/init, no content
-editor.capabilities // read, write, requestFiles
+editor.capabilities // read, write, requestFiles, filePicker
 editor.limits // maxFileSize, maxRequestBytes
 editor.settings // resolved shell settings
 editor.readFile(path, 'utf8' | 'binary')
+editor.requestFiles({ multiple?, directory? })
 editor.setDirty(dirty)
 editor.requestSave()
 editor.onSaveRequest(handler)
@@ -137,6 +138,13 @@ editor.onEvent(topic, listener)
 - Reads send `plugin/request-file` with a per-frame monotonic id and resolve from
   the matching `shell/file-content`. A matching `shell/error` rejects that read
   with its stable code and leaves other requests pending.
+- `requestFiles()` sends one `plugin/request-files` and resolves with a
+  `string[]` of selected `/`-rooted paths; `[]` means the user cancelled. It
+  rejects locally with `unsupported-message` when the shell omits
+  `capabilities.filePicker`, with `permission-denied` when `requestFiles` is
+  false, and with `rate-limited` when the client already has one pending picker.
+  The shell returns no content, so a selected path is read with `readFile()`.
+  Manual path entry remains the fallback on a shell that predates the message.
 - The SDK allows at most 64 in-flight requests per frame. The next request
   rejects locally with `rate-limited`.
 - `setDirty` sends one `plugin/dirty` with the boolean value. The SDK never

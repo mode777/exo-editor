@@ -33,6 +33,13 @@ instance plus the session echo, not the origin string.
   resolves relative paths against the open file, enforces the workspace root,
   reserved paths and the advertised size caps, and answers with
   `shell/file-content` or `shell/error`.
+- Select files: `plugin/request-files` asks the shell to open its workspace file
+  picker. Check `capabilities.filePicker` first; `capabilities.requestFiles`
+  alone is the older read permission bit and does not prove support. The reply
+  is `shell/files-selected` with selected paths or `[]` on cancel; it contains no
+  content. Read each path with `plugin/request-file`. The picker is available
+  only to an active, visible, focused handler; an older shell answers
+  `unsupported-message`, so keep a manual path-entry fallback.
 - Dirty: the plugin reports `plugin/dirty`. The shell never infers it from
   content.
 - Save: the shell sends `shell/request-save`; the handler replies with

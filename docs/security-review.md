@@ -196,6 +196,35 @@ reverting. Findings are recorded in [Findings](#findings).
   `check-dist-secrets.mjs` exits 1 and reports the file and `github-token`
   pattern; the clean build exits 0.
 
+### 11. User-mediated file picker
+
+- Requirements: `plugin-protocol` "File picker request", "File picker selection
+  constraints" and "File picker concurrency and lifecycle"; `plugin-file-editors`
+  "User-mediated file selection".
+- Enforcement: the picker is a shell modal, not plugin HTML; it lists through
+  `forPlugin(pluginId).list` so reserved entries stay hidden; it accepts only an
+  active, visible, focused handler; it returns only `/`-rooted paths, with no
+  content or handles; the handler re-checks reserved paths and caps a selection
+  at 32; disposal, tab switch or close, plugin removal and workspace switch abort
+  the pending dialog without a reply.
+- Tests: `handler.test.ts` "answers a file picker request with paths only",
+  "rejects reserved, traversal and oversized picker results before replying",
+  "denies the picker without workspace read", "rejects malformed picker payloads
+  and unknown fields", "rate-limits a second picker request in the same frame"
+  and "drops a picker continuation after disposal"; `handlers.test.ts` "opens a
+  picker only for an active visible focused handler", "denies a picker from a
+  hidden handler", "closes a picker silently on tab close and plugin removal"
+  and "closes a picker silently when the document surface detaches";
+  `file-picker.test.ts` abort and reset cases; `FilePickerDialog.test.tsx`
+  reserved filtering, disclosure, focus and Escape; `sdk-conformance.test.ts`
+  exercises the message through the real `HandlerSession` and SDK.
+- Mutation: remove the final `isReservedPath` check in
+  `HandlerSession.handleRequestFiles`. Result: `handler.test.ts` "rejects
+  reserved, traversal and oversized picker results before replying" fails.
+  Remove the `surfaces`/`hasFocus` gate in `HandlerPool`. Result:
+  `handlers.test.ts` "opens a picker only for an active visible focused handler"
+  and "denies a picker from a hidden handler" fail.
+
 ## Findings
 
 | ID | Severity | Finding | Disposition |
@@ -225,8 +254,8 @@ finding is tracked instead of pretending the artifact is clean.
 - Deployed commit: `90172af` (`Add Connect Remote Workspace to the File menu`),
   which contains the release-readiness commits and was deployed by the CI
   `verify` and Pages jobs at 2026-11-16.
-- Mutation checks: all ten controls fail at least one named test or the scan when
-  weakened; results are in each control section.
+- Mutation checks: all controls listed above fail at least one named test or the
+  scan when weakened; results are in each control section.
 - Artifact scan: `npm run check:dist-secrets` on the built `apps/shell/dist`
   (including the template and code-plugin child paths) reports no credential
   pattern or secret environment value. The CI `shell-dist` artifact downloaded

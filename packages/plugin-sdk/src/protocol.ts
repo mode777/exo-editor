@@ -5,7 +5,7 @@
  */
 
 export const PROTOCOL_VERSION = '1'
-export const SDK_VERSION = '1.1.0'
+export const SDK_VERSION = '1.2.0'
 
 export const READY_TIMEOUT_MS = 10_000
 export const REGISTRATION_TIMEOUT_MS = 10_000
@@ -86,6 +86,14 @@ export interface EditorCapabilities {
   read: boolean
   write: boolean
   requestFiles: boolean
+  /** Shell support bit for `plugin/request-files`; false on older shells. */
+  filePicker: boolean
+}
+
+export interface FilePickerOptions {
+  multiple?: boolean
+  /** Optional workspace-relative or `/`-rooted start hint. */
+  directory?: string
 }
 
 export interface EditorLimits {

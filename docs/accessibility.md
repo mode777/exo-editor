@@ -12,6 +12,7 @@ Exo owns these surfaces and checks them:
 - document area (text editor, plugin frame surface, banners, actions)
 - settings dialog, including plugin settings, raw `exo.json` and the plugin log
 - consent dialog
+- workspace file picker (shell-owned plugin selection dialog)
 - unsaved-changes dialog
 - remote-connect dialog and the reconnect banner
 
@@ -41,7 +42,10 @@ npm test --workspace @exo/shell -- --run \
   fails the suite.
 - `src/components/useModalDialog.test.tsx` covers initial focus, Tab and
   Shift+Tab wrap, Escape and focus restoration for the shared modal hook used by
-  the consent, settings, close-prompt and remote-connect dialogs.
+  the consent, settings, close-prompt, remote-connect and file-picker dialogs.
+- `src/document/FilePickerDialog.test.tsx` covers the picker's initial focus,
+  arrow-key row navigation, Escape cancellation, bidi-isolated paths and
+  reserved-entry filtering.
 
 `axe-core` cannot evaluate `color-contrast` in jsdom (no layout or canvas), so
 that rule is disabled in the test helper and covered by the token test instead.
@@ -77,7 +81,10 @@ Run against the deployed URL with the demo workspace from
    cycle inside it, Escape closes it and focus returns to the status-bar control
    or palette entry that opened it.
 5. Repeat the focus trap and Escape check for the consent dialog, the
-   unsaved-changes prompt and the remote-connect dialog.
+   unsaved-changes prompt, the remote-connect dialog and the plugin file picker.
+   In the picker, use Arrow Up/Down and Home/End between rows, Enter to open a
+   folder or select a file, and Escape to cancel; focus returns to the plugin
+   frame.
 6. Deny a plugin consent. The plugin entry reports the decision and no second
    alert repeats it.
 7. Open a read-only workspace. The read-only banner is announced once; Retry and

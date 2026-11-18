@@ -35,6 +35,9 @@ plus the shell text surface. The recorded acceptance path is
   afterwards.
 - Opening a matching file mounts one handler and content is not sent until the
   plugin asks.
+- The file picker opens only from an active visible handler, returns only the
+  paths the user selected, hides `exo.json`/`.exo`, and leaves reads to
+  `plugin/request-file`. Cancelling returns an empty path list.
 - Dirty state reaches the tab, Save writes exact text or bytes, a conflict
   leaves the buffer and disk intact.
 - An external change is visible and does not silently replace a dirty buffer.
@@ -54,6 +57,7 @@ plus the shell text surface. The recorded acceptance path is
 | `not-found` / `not-a-file` | Wrong path or a directory | Resolve relative to the open file or use an absolute workspace path |
 | `too-large` | File or payload exceeds the advertised limit | Ask for a smaller file/range or show a no-editor state |
 | `timeout` in the plugin log | Controller never sent `ready`, or registration never completed | Check the SDK boot path and the frame's console |
+| `unsupported-message` on a picker | Shell predates `plugin/request-files` or omits `filePicker` | Hide the picker action and fall back to manual path entry |
 | `protocol-violation` | Unknown message, wrong session, wrong mode or content outside save | Remove hand-written protocol code; use the SDK |
 | Manifest rejected with no frame | Unknown field or invalid page | Validate against the schema and the contract's field table |
 

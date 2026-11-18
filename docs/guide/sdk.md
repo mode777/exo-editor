@@ -66,11 +66,30 @@ async function reload() {
 await reload()
 ```
 
+To let the user pick a workspace file instead of typing a path:
+
+```ts
+if (editor.capabilities.filePicker && editor.capabilities.requestFiles) {
+  const paths = await editor.requestFiles({ multiple: false })
+  if (paths.length > 0) {
+    const content = await editor.readFile(paths[0], 'utf8')
+    // Use the picked path and its content.
+  }
+}
+```
+
+The helper resolves `[]` when the user cancels. It sends no content; read a
+selected path with `readFile`. If `filePicker` is missing (an older shell), it
+rejects locally with `unsupported-message`, so keep manual path entry as the
+fallback. `directory` is an optional start hint, not a permission.
+
 Rules the SDK enforces for you:
 
 - `shell/init` must echo the fragment's session and mode before any payload is
   exposed.
 - `readFile` correlates replies and rejects pending reads on disposal.
+- `requestFiles` preflights the support and permission bits and rejects a second
+  pending picker locally; the shell still serializes pickers globally.
 - The save handler is the only way content leaves the editor; return
   `{ text }` or `{ bytes }` from `onSaveRequest`.
 - `plugin/dispose-ack` is sent automatically; after dispose, later messages are

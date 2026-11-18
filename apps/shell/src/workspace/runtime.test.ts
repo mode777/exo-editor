@@ -160,6 +160,31 @@ describe('workspace runtime', () => {
     await runtime.dispose()
   })
 
+  it('closes a pending file picker before a workspace switch', async () => {
+    const first = memoryProvider({ '/a.txt': 'one' })
+    const second = memoryProvider({ '/b.txt': 'two' })
+    const runtime = runtimeWith([first, second])
+    await runtime.start()
+    await runtime.openFolder()
+    const session = runtime.getSession()
+    if (!session) throw new Error('No workspace session')
+
+    const pending = runtime.filePicker.request({
+      path: '/a.txt',
+      pluginId: 'com.example.code',
+      pluginName: 'Code Plugin',
+      multiple: false,
+      session,
+      signal: new AbortController().signal,
+    })
+    expect(runtime.filePicker.getSnapshot()).not.toBeNull()
+
+    await runtime.openFolder()
+    await expect(pending).resolves.toEqual({ ok: false, silent: true })
+    expect(runtime.filePicker.getSnapshot()).toBeNull()
+    await runtime.dispose()
+  })
+
   it('delivers settings changes to subscribed handlers and initializes later handlers', async () => {
     const provider = memoryProvider({ '/a.txt': 'a', '/b.txt': 'b' })
     const transport = new FakeFrameTransport()

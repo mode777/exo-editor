@@ -324,6 +324,101 @@
   font-size: 11px;
 }
 
+.exo-file-picker {
+  width: min(640px, calc(100vw - 48px));
+}
+
+.exo-file-picker p {
+  margin: 0 0 10px;
+}
+
+.exo-file-picker-crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  margin: 0 0 8px;
+  font-size: 12px;
+}
+
+.exo-file-picker-crumbs button {
+  border: 0;
+  padding: 2px 4px;
+  background: transparent;
+  color: var(--vscode-textLink-foreground);
+  font: inherit;
+  cursor: pointer;
+}
+
+.exo-file-picker-crumbs button[aria-current='location'] {
+  color: var(--vscode-foreground);
+  font-weight: 600;
+}
+
+.exo-file-picker-crumbs button:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 1px;
+}
+
+.exo-file-picker-body {
+  min-height: 220px;
+  max-height: 360px;
+  overflow: auto;
+  border: 1px solid var(--vscode-widget-border);
+  background: var(--vscode-editor-background);
+}
+
+.exo-file-picker-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.exo-file-picker-list li {
+  content-visibility: auto;
+  contain-intrinsic-size: 28px;
+}
+
+.exo-file-picker-row {
+  display: flex;
+  width: 100%;
+  gap: 4px;
+  border: 0;
+  padding: 4px 6px;
+  background: transparent;
+  color: var(--vscode-foreground);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.exo-file-picker-row:hover,
+.exo-file-picker-row:focus-visible {
+  background: var(--vscode-list-hoverBackground);
+}
+
+.exo-file-picker-row:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+.exo-file-picker-row.is-selected {
+  background: var(--vscode-list-activeSelectionBackground);
+  color: var(--vscode-list-activeSelectionForeground);
+}
+
+.exo-file-picker-row bdi,
+.exo-file-picker-crumbs bdi,
+.exo-file-picker code bdi {
+  unicode-bidi: isolate;
+}
+
+.exo-file-picker-status {
+  margin: 8px 0 0;
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
+}
+
 .exo-close-list {
   max-height: 140px;
   overflow: auto;

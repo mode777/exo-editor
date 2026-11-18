@@ -11,6 +11,7 @@ export interface FakeFrame extends FrameHandle {
   readonly posted: PostedMessage[]
   readonly surfaceShown: boolean
   readonly surfaceBounds: { left: number; top: number; width: number; height: number } | null
+  focused: boolean
   closed: boolean
   close(): void
   emit(data: unknown, origin: string, source?: Window | null): void
@@ -38,8 +39,10 @@ export class FakeFrameTransport implements FrameTransport {
       window,
       posted,
       closed: false,
+      focused: true,
       surfaceShown: false,
       surfaceBounds: null,
+      hasFocus: () => frame.focused,
       ...(options.visible
         ? {
             surface: {

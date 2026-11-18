@@ -3,6 +3,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { useWorkbenchStore } from 'vscode-workbench'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from './App'
+import { FilePickerDialog } from './document/FilePickerDialog'
 import { ClosePromptDialog } from './components/ClosePromptDialog'
 import { ConsentDialog, type ConsentRequestView } from './plugins/ConsentDialog'
 import type { PluginManifest } from './plugins/manifest'
@@ -218,6 +219,27 @@ describe('Exo-owned surface accessibility', () => {
     await vi.waitFor(() => expect(dialog).not.toBeNull())
     await expectNoViolations(dialog)
     expect(container.querySelector('.exo-explorer')).not.toBeNull()
+  })
+
+  it('file picker has no WCAG A/AA violations', async () => {
+    const { runtime } = await mountWorkspace({ '/a.txt': 'one', '/dir/b.txt': 'two' })
+    const session = runtime.getSession()
+    if (!session) throw new Error('No workspace session')
+    const container = await renderNode(
+      <FilePickerDialog
+        request={{
+          path: '/a.txt',
+          pluginId: 'com.example.code',
+          pluginName: 'Code Plugin',
+          multiple: false,
+          session,
+        }}
+        onCancel={() => undefined}
+        onSelect={() => undefined}
+      />,
+    )
+    await vi.waitFor(() => expect(container.querySelector('[data-picker-row]')).not.toBeNull())
+    await expectNoViolations(container.querySelector('[role="dialog"]'))
   })
 
   it('consent dialog has no WCAG A/AA violations', async () => {

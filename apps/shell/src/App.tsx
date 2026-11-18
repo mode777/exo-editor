@@ -6,6 +6,7 @@ import {
   type WorkbenchTab,
 } from 'vscode-workbench'
 import { DocumentArea } from './document/DocumentArea'
+import { FilePickerDialog } from './document/FilePickerDialog'
 import { OpenWithDialog } from './document/OpenWithDialog'
 import { ClosePromptDialog } from './components/ClosePromptDialog'
 import { requestExplorerCommand } from './explorer/bus'
@@ -29,6 +30,7 @@ import { workbenchViews } from './workbench/views'
 import { workspaceErrorMessage, type WorkspacePath } from './workspace/contract'
 import {
   useDirtyDocuments,
+  useFilePicker,
   usePluginHost,
   useWorkspaceSnapshot,
   WorkspaceRuntimeProvider,
@@ -69,6 +71,7 @@ function Shell({ runtime }: { runtime: WorkspaceRuntime }) {
   const snapshot = useWorkspaceSnapshot()
   const dirty = useDirtyDocuments()
   const host = usePluginHost()
+  const filePicker = useFilePicker()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [settingsSection, setSettingsSection] = useState<SettingsSection>('general')
   const [connectOpen, setConnectOpen] = useState(false)
@@ -313,6 +316,14 @@ function Shell({ runtime }: { runtime: WorkspaceRuntime }) {
           currentIdentity={openWith.currentIdentity}
           onChoose={chooseEditor}
           onCancel={() => setOpenWith(null)}
+        />
+      )}
+      {filePicker && (
+        <FilePickerDialog
+          key={`${filePicker.pluginId}:${filePicker.path}:${filePicker.directory ?? ''}:${filePicker.multiple}`}
+          request={filePicker}
+          onCancel={() => runtime.filePicker.cancel()}
+          onSelect={(paths) => runtime.filePicker.select(paths)}
         />
       )}
       {snapshot.remote?.rejected && (

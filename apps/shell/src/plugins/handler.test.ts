@@ -104,6 +104,7 @@ async function start(
     createSessionId: () => 'session-1',
     onDirty: (value) => dirty.push(value),
     onSaveRequested: () => saveRequests.push(1),
+    onRequestFiles: async () => ({ ok: true, paths: [] }),
     onFailure: (failure) => failures.push(failure),
     onVersion: (version) => versions.push(version),
     onLog: (event) => logs.push(event),
@@ -141,6 +142,16 @@ function ready(context: Started, origin = PLUGIN_ORIGIN) {
 function postedType(frame: FakeFrame, type: string) {
   return frame.posted.find((entry) => (entry.message as { type?: string }).type === type)
     ?.message as { type: string; id?: string; payload?: unknown; replyTo?: string } | undefined
+}
+
+function requestFiles(context: Started, id: string, payload: Record<string, unknown> = {}) {
+  context.frame.emit({ exo: 1, type: 'plugin/request-files', id, payload }, PLUGIN_ORIGIN)
+}
+
+function selection(context: Started, id: string) {
+  return context.frame.posted
+    .map((entry) => entry.message as { type?: string; replyTo?: string; payload?: unknown })
+    .find((message) => message.type === 'shell/files-selected' && message.replyTo === id)
 }
 
 async function requestFile(
@@ -185,7 +196,7 @@ describe('handler session', () => {
       mode: 'editor',
       plugin: { id: 'com.example.code', version: '1.2.0' },
       file: { path: '/src/a.ts', name: 'a.ts', dir: '/src', version: context.stat.version },
-      capabilities: { read: true, write: true, requestFiles: true },
+      capabilities: { read: true, write: true, requestFiles: true, filePicker: true },
       settings: { 'editor.size': 2 },
     })
     const serialized = JSON.stringify(init?.payload)
@@ -380,6 +391,181 @@ describe('handler session', () => {
     context.frame.emit({ exo: 1, type: 'plugin/dirty', payload: { dirty: true } }, PLUGIN_ORIGIN)
     expect(context.dirty).toEqual([true])
     expect(context.handler.dirtySequence()).toBe(1)
+  })
+
+  it('answers a file picker request with paths only', async () => {
+    const requests: Array<Record<string, unknown>> = []
+    const context = await start({
+      onRequestFiles: async (request) => {
+        requests.push(request as unknown as Record<string, unknown>)
+        return { ok: true, paths: ['/notes.txt'] }
+      },
+    })
+    ready(context)
+    requestFiles(context, 'pick-1')
+    await vi.waitFor(() => expect(selection(context, 'pick-1')).toBeDefined())
+    const reply = selection(context, 'pick-1')
+    expect(reply?.payload).toEqual({ paths: ['/notes.txt'] })
+    expect(Object.keys(reply?.payload as object)).toEqual(['paths'])
+    expect(requests[0]).toMatchObject({
+      path: '/src/a.ts',
+      pluginId: 'com.example.code',
+      pluginName: 'Code Plugin',
+      multiple: false,
+    })
+    expect(requests[0].signal).toBeInstanceOf(AbortSignal)
+    expect(requests[0].session).toBe(context.session)
+
+    const read = await requestFile(context, 'read-after-pick', '/notes.txt')
+    expect(read).toMatchObject({ payload: { path: '/notes.txt', text: 'hello' } })
+  })
+
+  it('passes multiple and directory and returns several paths', async () => {
+    const context = await start({
+      onRequestFiles: async (request) => {
+        expect(request.multiple).toBe(true)
+        expect(request.directory).toBe('/notes')
+        return { ok: true, paths: ['/notes.txt', '/src/types.ts'] }
+      },
+    })
+    ready(context)
+    requestFiles(context, 'pick-2', { multiple: true, directory: '/notes' })
+    await vi.waitFor(() => expect(selection(context, 'pick-2')).toBeDefined())
+    expect(selection(context, 'pick-2')?.payload).toEqual({
+      paths: ['/notes.txt', '/src/types.ts'],
+    })
+  })
+
+  it('returns an empty path list when the picker is cancelled', async () => {
+    const context = await start({ onRequestFiles: async () => ({ ok: true, paths: [] }) })
+    ready(context)
+    requestFiles(context, 'pick-3')
+    await vi.waitFor(() => expect(selection(context, 'pick-3')).toBeDefined())
+    expect(selection(context, 'pick-3')?.payload).toEqual({ paths: [] })
+  })
+
+  it('rejects reserved, traversal and oversized picker results before replying', async () => {
+    const context = await start({
+      onRequestFiles: async () => ({ ok: true, paths: ['/.exo/state.json'] }),
+    })
+    ready(context)
+    requestFiles(context, 'pick-reserved')
+    await vi.waitFor(() =>
+      expect(postedType(context.frame, 'shell/error')).toMatchObject({
+        payload: { code: 'permission-denied' },
+        replyTo: 'pick-reserved',
+      }),
+    )
+    expect(selection(context, 'pick-reserved')).toBeUndefined()
+
+    const traversal = await start({
+      onRequestFiles: async () => ({ ok: true, paths: ['/../outside'] }),
+    })
+    ready(traversal)
+    requestFiles(traversal, 'pick-traversal')
+    await vi.waitFor(() =>
+      expect(postedType(traversal.frame, 'shell/error')).toMatchObject({
+        payload: { code: 'permission-denied' },
+        replyTo: 'pick-traversal',
+      }),
+    )
+
+    const many = await start({
+      onRequestFiles: async () => ({
+        ok: true,
+        paths: Array.from({ length: 33 }, (_, index) => `/file-${index}.txt`),
+      }),
+    })
+    ready(many)
+    requestFiles(many, 'pick-many', { multiple: true })
+    await vi.waitFor(() =>
+      expect(postedType(many.frame, 'shell/error')).toMatchObject({
+        payload: { code: 'internal' },
+        replyTo: 'pick-many',
+      }),
+    )
+  })
+
+  it('denies the picker without workspace read', async () => {
+    const onRequestFiles = vi.fn(async () => ({ ok: true as const, paths: ['/notes.txt'] }))
+    const context = await start({
+      candidate: candidate({ permissions: ['events:subscribe'] }),
+      onRequestFiles,
+    })
+    ready(context)
+    requestFiles(context, 'pick-4')
+    await vi.waitFor(() =>
+      expect(postedType(context.frame, 'shell/error')).toMatchObject({
+        payload: { code: 'permission-denied' },
+        replyTo: 'pick-4',
+      }),
+    )
+    expect(onRequestFiles).not.toHaveBeenCalled()
+  })
+
+  it('rejects malformed picker payloads and unknown fields', async () => {
+    const onRequestFiles = vi.fn(async () => ({ ok: true as const, paths: [] }))
+    const context = await start({ onRequestFiles })
+    ready(context)
+    requestFiles(context, 'pick-5', { multiple: 'yes' })
+    requestFiles(context, 'pick-6', { directory: 1 })
+    requestFiles(context, 'pick-7', { title: 'not allowed' })
+    context.frame.emit({ exo: 1, type: 'plugin/request-files', payload: {} }, PLUGIN_ORIGIN)
+    await vi.waitFor(() => {
+      expect(
+        context.frame.posted.filter(
+          (entry) =>
+            (entry.message as { type?: string }).type === 'shell/error' &&
+            (entry.message as { payload?: { code?: string } }).payload?.code ===
+              'protocol-violation',
+        ),
+      ).toHaveLength(3)
+    })
+    expect(onRequestFiles).not.toHaveBeenCalled()
+    expect(selection(context, 'pick-5')).toBeUndefined()
+    expect(selection(context, 'pick-7')).toBeUndefined()
+  })
+
+  it('rate-limits a second picker request in the same frame', async () => {
+    let release: ((value: { ok: true; paths: string[] }) => void) | undefined
+    const context = await start({
+      onRequestFiles: () =>
+        new Promise((resolve) => {
+          release = resolve
+        }),
+    })
+    ready(context)
+    requestFiles(context, 'pick-8')
+    await vi.waitFor(() => expect(release).toBeDefined())
+    requestFiles(context, 'pick-9')
+    await vi.waitFor(() =>
+      expect(postedType(context.frame, 'shell/error')).toMatchObject({
+        payload: { code: 'rate-limited' },
+        replyTo: 'pick-9',
+      }),
+    )
+    release?.({ ok: true, paths: ['/notes.txt'] })
+    await vi.waitFor(() => expect(selection(context, 'pick-8')).toBeDefined())
+    expect(selection(context, 'pick-8')?.payload).toEqual({ paths: ['/notes.txt'] })
+  })
+
+  it('drops a picker continuation after disposal', async () => {
+    let release: ((value: { ok: true; paths: string[] }) => void) | undefined
+    const context = await start({
+      onRequestFiles: () =>
+        new Promise((resolve) => {
+          release = resolve
+        }),
+    })
+    ready(context)
+    requestFiles(context, 'pick-10')
+    await vi.waitFor(() => expect(release).toBeDefined())
+    const disposing = context.handler.dispose('closed')
+    context.frame.emit({ exo: 1, type: 'plugin/dispose-ack' }, PLUGIN_ORIGIN)
+    await disposing
+    release?.({ ok: true, paths: ['/notes.txt'] })
+    await Promise.resolve()
+    expect(selection(context, 'pick-10')).toBeUndefined()
   })
 
   it('accepts an id-less save intent without sending content', async () => {

@@ -184,6 +184,7 @@ describe('SDK conformance against the shell', () => {
       onSaveRequested: () => {
         triggered.push(handler.requestSave())
       },
+      onRequestFiles: async () => ({ ok: true, paths: [workspace.path] }),
       onFailure: (failure) => failures.push(failure.code),
     })
     handler.start()
@@ -200,6 +201,8 @@ describe('SDK conformance against the shell', () => {
       path: workspace.path,
       text: 'hello',
     })
+    expect(editor.capabilities.filePicker).toBe(true)
+    await expect(editor.requestFiles()).resolves.toEqual([workspace.path])
 
     editor.setDirty(true)
     expect(dirty).toEqual([true])

@@ -6,7 +6,7 @@ import { FakePluginTransport } from './testing'
 const SHELL_ORIGIN = 'https://editor.example.com'
 const SESSION_ID = 'session-1'
 
-function init(): EditorInit {
+function init(overrides: Partial<EditorInit> = {}): EditorInit {
   return {
     protocolVersion: '1',
     mode: 'editor',
@@ -26,19 +26,20 @@ function init(): EditorInit {
       mtime: 1000,
       version: 'v1',
     },
-    capabilities: { read: true, write: true, requestFiles: true },
+    capabilities: { read: true, write: true, requestFiles: true, filePicker: true },
     limits: { maxFileSize: 10 * 1024 * 1024, maxRequestBytes: 16 * 1024 * 1024 },
+    ...overrides,
   }
 }
 
-async function connect() {
+async function connect(overrides: Partial<EditorInit> = {}) {
   const transport = new FakePluginTransport({
     hostOrigin: SHELL_ORIGIN,
     sessionId: SESSION_ID,
     mode: 'editor',
   })
   const promise = connectPlugin({ transport })
-  transport.emit({ exo: 1, type: 'shell/init', payload: init() })
+  transport.emit({ exo: 1, type: 'shell/init', payload: init(overrides) })
   const connection = await promise
   if (connection.mode !== 'editor') throw new Error('expected editor mode')
   return { transport, editor: connection.editor }
@@ -54,7 +55,12 @@ describe('editor client', () => {
   it('exposes metadata without reading content', async () => {
     const { transport, editor } = await connect()
     expect(editor.file).toMatchObject({ path: '/notes.template.txt', version: 'v1' })
-    expect(editor.capabilities).toEqual({ read: true, write: true, requestFiles: true })
+    expect(editor.capabilities).toEqual({
+      read: true,
+      write: true,
+      requestFiles: true,
+      filePicker: true,
+    })
     expect(editor.settings).toEqual({ 'template.greeting': 'hello' })
     expect(transport.posted.filter((item) => item.type === 'plugin/request-file')).toHaveLength(0)
   })
@@ -344,5 +350,102 @@ describe('editor client', () => {
       payload: { ok: true, version: 'v2' },
     })
     expect(later).toHaveBeenCalledWith({ ok: true, version: 'v2' })
+  })
+
+  it('requests workspace files and resolves the selected paths', async () => {
+    const { transport, editor } = await connect()
+    const pending = editor.requestFiles({ multiple: true, directory: '/assets' })
+    const id = postedId(transport, 'plugin/request-files')
+    expect(transport.last('plugin/request-files')?.payload).toEqual({
+      multiple: true,
+      directory: '/assets',
+    })
+    transport.emit({
+      exo: 1,
+      type: 'shell/files-selected',
+      replyTo: id,
+      payload: { paths: ['/assets/a.png', '/assets/b.png'] },
+    })
+    await expect(pending).resolves.toEqual(['/assets/a.png', '/assets/b.png'])
+  })
+
+  it('resolves a cancelled picker with an empty array', async () => {
+    const { transport, editor } = await connect()
+    const pending = editor.requestFiles()
+    const id = postedId(transport, 'plugin/request-files')
+    transport.emit({
+      exo: 1,
+      type: 'shell/files-selected',
+      replyTo: id,
+      payload: { paths: [] },
+    })
+    await expect(pending).resolves.toEqual([])
+  })
+
+  it('rejects a second pending picker locally', async () => {
+    const { transport, editor } = await connect()
+    const first = editor.requestFiles()
+    const id = postedId(transport, 'plugin/request-files')
+    await expect(editor.requestFiles()).rejects.toMatchObject({ code: 'rate-limited' })
+    expect(transport.posted.filter((item) => item.type === 'plugin/request-files')).toHaveLength(1)
+    transport.emit({
+      exo: 1,
+      type: 'shell/files-selected',
+      replyTo: id,
+      payload: { paths: [] },
+    })
+    await expect(first).resolves.toEqual([])
+  })
+
+  it('preflights old shells and missing read permission without sending', async () => {
+    const oldCapabilities = {
+      read: true,
+      write: true,
+      requestFiles: true,
+    } as unknown as EditorInit['capabilities']
+    const old = await connect({ capabilities: oldCapabilities })
+    expect(old.editor.capabilities.filePicker).toBe(false)
+    await expect(old.editor.requestFiles()).rejects.toMatchObject({ code: 'unsupported-message' })
+    expect(
+      old.transport.posted.filter((item) => item.type === 'plugin/request-files'),
+    ).toHaveLength(0)
+
+    const denied = await connect({
+      capabilities: { read: true, write: false, requestFiles: false, filePicker: true },
+    })
+    await expect(denied.editor.requestFiles()).rejects.toMatchObject({ code: 'permission-denied' })
+    expect(
+      denied.transport.posted.filter((item) => item.type === 'plugin/request-files'),
+    ).toHaveLength(0)
+  })
+
+  it('rejects correlated errors and malformed selection replies', async () => {
+    const { transport, editor } = await connect()
+    const denied = editor.requestFiles()
+    const deniedId = postedId(transport, 'plugin/request-files')
+    transport.emit({
+      exo: 1,
+      type: 'shell/error',
+      replyTo: deniedId,
+      payload: { code: 'permission-denied' },
+    })
+    await expect(denied).rejects.toMatchObject({ code: 'permission-denied' })
+
+    const malformed = editor.requestFiles()
+    const malformedId = postedId(transport, 'plugin/request-files')
+    transport.emit({
+      exo: 1,
+      type: 'shell/files-selected',
+      replyTo: malformedId,
+      payload: { paths: [1] },
+    })
+    await expect(malformed).rejects.toMatchObject({ code: 'protocol-violation' })
+  })
+
+  it('rejects a pending picker on disposal', async () => {
+    const { transport, editor } = await connect()
+    const pending = editor.requestFiles()
+    transport.emit({ exo: 1, type: 'shell/dispose', payload: { reason: 'closed' } })
+    await expect(pending).rejects.toMatchObject({ code: 'closed' })
   })
 })
