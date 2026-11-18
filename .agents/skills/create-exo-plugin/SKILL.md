@@ -82,7 +82,7 @@ Ask before scaffolding:
   used - extra permissions re-prompt every user's consent).
 - Hidden handler (default, headless transform) or a visible editor surface
   (`rendering: "frame"` - the iframe is displayed in the document area, while
-  tabs, headers, Save and notices stay shell-owned).
+  tabs, breadcrumbs, Save and notices stay shell-owned).
 - GitHub repository name (it becomes the Pages child path) and whether the site
   is a project page (`https://<owner>.github.io/<repo>/`) or a user-site root
   (`https://<owner>.github.io/`).

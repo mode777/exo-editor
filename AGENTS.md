@@ -66,7 +66,7 @@ These are decisions, not suggestions. Changing one requires an OpenSpec change.
   origin.
 - **Handler frames are hidden unless opted in.** Registration frames are always
   hidden. A contribution with `rendering: "frame"` may display its handler iframe
-  in the active document area; the tab, header, Save action and notices stay
+  in the active document area; the tab, breadcrumbs, Save action and notices stay
   outside the frame, a tab switch hides without disposal, and the plugin never
   receives a shell DOM node. The default remains `"hidden"`.
 - **Consent covers a page root, not individual pages.** The root is the directory

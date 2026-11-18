@@ -25,10 +25,10 @@ the deployed URL below, not a local dev server or local build.
    frame-rendering disclosure. Approve both. The plugin log records
    `active` for each and no iframe remains from registration.
 4. **Edit with the code plugin.** Open `hello.ts`. A visible Monaco surface
-   appears inside the document area; the tab, header and Save action stay shell
-   chrome. Type a change; the tab shows a dirty dot. Press Ctrl/Cmd+S or click
-   Save. The file writes and the dot clears. Reload and reopen `hello.ts`; the
-   change is still there.
+   appears inside the document area; the tab, breadcrumbs and Save action stay
+   shell chrome. Type a change; the tab shows a dirty dot. Press Ctrl/Cmd+S or run
+   File > Save. The file writes and the dot clears. Reload and reopen `hello.ts`;
+   the change is still there.
 5. **Check JSON and Markdown.** Open `data.json` and `notes.md`. Each opens in
    Monaco with the JSON and Markdown language selected. The same editor surface
    is reused across tabs.

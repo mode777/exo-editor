@@ -10,7 +10,7 @@ plugins and gives you one file for each editor path.
    **Exo Template**. Both are same-origin child paths, so each shows the
    same-origin warning; Exo Code also shows the frame-rendering disclosure.
 2. `hello.ts`, `data.json` and `notes.md` open in **Exo Code**, a visible Monaco
-   surface. Edit one, press Ctrl/Cmd+S or the shell Save button, and the file
+   surface. Edit one, press Ctrl/Cmd+S or run File > Save, and the file
    round-trips.
 3. `greeting.template.txt` opens in the hidden **Exo Template** editor. Editing
    and saving appends a `[template save N]` marker.

@@ -67,8 +67,8 @@ model after keyboard and save checks.
 1. Add the deployed manifest URL, approve consent, and confirm the dialog shows
    the same-origin warning and the frame-rendering disclosure.
 2. Open a `.ts`, a `.json` and a `.md` file. Each should show a visible Monaco
-   editor; the tab, header and Save button remain shell chrome outside it.
-3. Edit and save each file with the shell Save button and with Ctrl/Cmd+S;
+   editor; the tab, breadcrumbs and Save action remain shell chrome outside it.
+3. Edit and save each file with Ctrl/Cmd+S and with File > Save;
    reload and confirm the text survives. The tab's dirty dot clears on a
    successful save and stays set after a conflict.
 4. Change the shell theme and confirm Monaco follows without reopening the file.

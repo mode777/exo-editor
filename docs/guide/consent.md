@@ -16,7 +16,7 @@ The dialog shows:
 - every declared permission, in plain language;
 - every declared file-editor glob and label;
 - for `rendering: "frame"`, that the plugin may display an editor surface in the
-  document area, while tabs, headers and Save stay shell-owned;
+  document area, while tabs, breadcrumbs and Save stay shell-owned;
 - for a same-origin plugin, that it runs with an opaque origin and cannot be
   isolated by origin or use storage.
 

@@ -48,7 +48,7 @@ Verification is always against the deployed URL, never a local dev server.
   the SDK and deployed at
   `https://mode777.github.io/exo-editor/code-plugin/`. Its manifest opts into
   `rendering: "frame"`, so the shell displays the sandboxed handler in the
-  document area while the tab, header and Save action stay shell-owned. The shell
+  document area while the tab, breadcrumbs and Save action stay shell-owned. The shell
   bundle contains no Monaco. The dev server runs at `http://localhost:5176/`
   (`npm run dev:code`), and `examples/code-plugin-workspace/` is a ready workspace.
 - **Guide and demo** - [`docs/guide/`](./docs/guide/README.md) is the author

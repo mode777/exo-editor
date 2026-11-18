@@ -130,10 +130,11 @@ describe('plugin document surface', () => {
     useWorkbenchStore.setState({ tabs: [], activeTabId: null, closedTabs: [] })
   })
 
-  it('shows the plugin editor label and no text editor', async () => {
+  it('opens a plugin editor under the breadcrumbs without a second header', async () => {
     await act(async () => workspace.runtime.openDocument('/a.txt'))
     await activate(workspace)
-    expect(workspace.container.textContent).toContain('Code · Code Plugin')
+    expect(workspace.container.querySelector('.editor-breadcrumbs')?.textContent).toContain('a.txt')
+    expect(workspace.container.querySelector('.exo-document-header')).toBeNull()
     expect(workspace.container.querySelector('.exo-document-editor')).toBeNull()
     expect(workspace.container.querySelector('.exo-plugin-surface')).toBeNull()
     expect(workspace.container.textContent).toContain('Opened with Code')
@@ -219,6 +220,24 @@ describe('read-only plugin document', () => {
       await act(async () => readOnly.editors.callbacks?.onActive())
       await act(async () => readOnly.editors.callbacks?.onDirty(true))
       expect(readOnly.container.textContent).toContain('Read-only workspace')
+      expect(
+        Array.from(readOnly.container.querySelectorAll('button')).some(
+          (button) => button.textContent === 'Save',
+        ),
+      ).toBe(false)
+    } finally {
+      await unmount(readOnly)
+    }
+  })
+
+  it('shows a read-only editor notice without a second header', async () => {
+    const readOnly = await mount()
+    try {
+      readOnly.editors.list = [candidate({ permissions: ['workspace:read'] })]
+      await act(async () => readOnly.runtime.openDocument('/a.txt'))
+      await activate(readOnly)
+      expect(readOnly.container.textContent).toContain('Read-only editor')
+      expect(readOnly.container.querySelector('.exo-document-header')).toBeNull()
       expect(
         Array.from(readOnly.container.querySelectorAll('button')).some(
           (button) => button.textContent === 'Save',

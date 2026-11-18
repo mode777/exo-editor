@@ -436,29 +436,6 @@
   background: var(--vscode-editor-background);
 }
 
-.exo-document-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  border-bottom: 1px solid var(--vscode-editorWidget-border, var(--vscode-widget-border));
-  font-size: 12px;
-}
-
-.exo-document-title {
-  overflow: hidden;
-  color: var(--vscode-foreground);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.exo-document-meta,
-.exo-document-readonly {
-  margin-left: auto;
-  color: var(--vscode-descriptionForeground);
-}
-
-.exo-document-save,
 .exo-document-action {
   border: 1px solid var(--vscode-button-border, transparent);
   padding: 3px 8px;
@@ -467,18 +444,6 @@
   font: inherit;
   font-size: 11px;
   cursor: pointer;
-}
-
-.exo-document-save:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-.exo-document-editor-label {
-  overflow: hidden;
-  color: var(--vscode-descriptionForeground);
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .exo-document-actions {

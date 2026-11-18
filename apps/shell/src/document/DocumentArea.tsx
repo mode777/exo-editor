@@ -29,9 +29,6 @@ function DocumentSurface({ path }: { path: WorkspacePath }) {
   if (!document || document.status === 'loading') {
     return (
       <div className="exo-document">
-        <div className="exo-document-header">
-          <span className="exo-document-title">{path}</span>
-        </div>
         <p className="exo-document-state">Loading…</p>
       </div>
     )
@@ -44,43 +41,17 @@ function DocumentSurface({ path }: { path: WorkspacePath }) {
     document.readOnly ||
     document.external === 'deleted' ||
     (plugin && !pluginFailed && document.editor?.canWrite === false)
-  const canSave =
-    !readOnly && (document.status === 'ready' || (plugin && document.pluginPhase === 'active'))
 
   return (
     <div className="exo-document">
-      <div className="exo-document-header">
-        <span className="exo-document-title" title={path}>
-          {document.title}
-        </span>
-        <span className="exo-document-meta">
-          {document.status === 'ready' || plugin ? formatBytes(document.size) : ''}
-        </span>
-        {plugin && document.editor && (
-          <span className="exo-document-editor-label" title={document.editor.entryUrl}>
-            {document.editor.label} · {document.editor.pluginName}
-          </span>
+      {plugin &&
+        snapshot.writable !== false &&
+        document.editor?.canWrite === false &&
+        document.pluginPhase !== 'failed' && (
+          <div className="exo-document-banner" role="status">
+            Read-only editor
+          </div>
         )}
-        {canSave && (
-          <button
-            type="button"
-            className="exo-document-save"
-            disabled={!document.dirty}
-            onClick={() => void runtime.documents.save(path)}
-          >
-            Save
-          </button>
-        )}
-        {!plugin && snapshot.writable === false && (
-          <span className="exo-document-readonly">Read-only</span>
-        )}
-        {plugin && snapshot.writable === false && (
-          <span className="exo-document-readonly">Read-only workspace</span>
-        )}
-        {plugin && snapshot.writable !== false && document.editor?.canWrite === false && (
-          <span className="exo-document-readonly">Read-only editor</span>
-        )}
-      </div>
 
       {document.pluginNotice && (
         <div className="exo-document-banner" role="status">

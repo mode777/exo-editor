@@ -85,7 +85,7 @@ Each `contributes.fileEditors` entry maps a glob to a handler page:
   tie.
 - `rendering`: `"hidden"` (default) keeps the handler iframe invisible; `"frame"`
   asks the shell to display the sandboxed handler in the document area. The tab,
-  header and Save action stay shell-owned either way.
+  breadcrumbs and Save action stay shell-owned either way.
 
 A file editor contribution requires `workspace:read` or `workspace:write`.
 `workspace:write` implies read.

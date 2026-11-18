@@ -301,18 +301,17 @@ content or another document's path.
 
 When the selected contribution declares `rendering: "frame"`, the shell SHALL
 display its handler iframe in the measured document area for the active
-document, SHALL keep the tab strip, document header, Save action and shell
-notices outside the frame, and SHALL hide the frame when another tab is active
-without disposing the handler session. The shell SHALL NOT give the plugin a
-shell DOM node, reparent the live iframe or create a second handler for the same
-document.
+document, SHALL keep the tab strip, breadcrumbs, Save action and shell notices
+outside the frame, and SHALL hide the frame when another tab is active without
+disposing the handler session. The shell SHALL NOT give the plugin a shell DOM
+node, reparent the live iframe or create a second handler for the same document.
 
 #### Scenario: Frame appears for the active document
 
 - **WHEN** a document handled by a `rendering: "frame"` contribution becomes the
   active tab
 - **THEN** its handler iframe is visible inside the document area and the shell's
-  header and Save button remain outside it
+  breadcrumbs and Save action remain outside it
 
 #### Scenario: Tab switch hides without disposal
 

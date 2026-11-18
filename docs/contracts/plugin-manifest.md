@@ -242,9 +242,9 @@ capability and never changes the sandbox or origin rules.
 - `"hidden"` (the default) keeps the handler headless. The shell owns the visible
   document surface and the plugin reports content only through the protocol.
 - `"frame"` asks the shell to display the handler iframe in the measured document
-  area for the active tab. The tab strip, header, Save action and shell notices
-  stay outside the frame. The frame is hidden, not disposed, while another tab is
-  active.
+  area for the active tab. The tab strip, breadcrumbs, Save action and shell
+  notices stay outside the frame. The frame is hidden, not disposed, while another
+  tab is active.
 
 The value is manifest metadata: no `plugin/register` message carries it, and the
 shell ignores a registration that tries to change it. A hidden-to-frame change
