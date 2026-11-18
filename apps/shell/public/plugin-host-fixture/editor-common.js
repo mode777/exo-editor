@@ -101,6 +101,7 @@
     state.lists.push({
       id: replyTo,
       count: entries.length,
+      first: entries[0] || null,
       entries: entries
         .slice(0, 5)
         .map((entry) =>

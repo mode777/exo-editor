@@ -152,8 +152,9 @@ carries the full new map to subscribed frames of this plugin only.
     probes `plugin/request-list` in order: the workspace root (absolute), its own
     directory (relative `.`), `/listing/big`, its own file path, a missing path
     and `/exo.json`. `#observation.lists` records each page's entry count, the
-    first five entries with path/kind/size, `nextCursor` and the number of
-    reserved entries; `errors` records `not-a-directory` for the file,
+    first five entries with path/kind/size, the raw first entry, `nextCursor` and
+    the number of reserved entries; `errors` records `not-a-directory` for the
+    file,
     `not-found` for the missing path and `permission-denied` for `/exo.json`.
     `#observation.listReads` proves a listed path is read through
     `plugin/request-file`.
