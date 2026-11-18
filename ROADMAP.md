@@ -773,6 +773,21 @@ and denied a hidden handler. The local gate passed with 691 shell tests and a
 153,541/154,000 js gzip budget; the 2,000-byte increase is recorded in
 [`docs/performance.md`](./docs/performance.md).
 
+**Follow-up (2026-11-18):** the post-layer-10 change `plugin-workspace-listing`
+adds `plugin/request-list` / `shell/list-result`, the `workspace:list`
+permission, the `capabilities.directoryListing` support bit and SDK `1.3.0`.
+Verified against deployed commit `5aa1382`: the fixture listed the workspace
+root, its own directory and a 1,001-entry directory (1,000 entries plus a
+cursor, then the remaining entry), returned only path/kind/size entries, read
+`/notes.txt` through `plugin/request-file`, hid `exo.json` and `.exo`, mapped a
+file path to `not-a-directory`, a missing directory to `not-found` and
+`/exo.json` to `permission-denied`. A workspace switch disposed the old frame
+and the new workspace listed only `/switch-only.txt`; a read-only manifest got
+six `permission-denied` replies and no page, and disabling the plugin removed
+the handler. The local gate passed with 715 shell tests and a 155,716/157,000 js
+gzip budget; the 3,000-byte increase is recorded in
+[`docs/performance.md`](./docs/performance.md).
+
 ---
 
 ## Deferred beyond v1

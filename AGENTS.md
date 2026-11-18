@@ -16,7 +16,10 @@ change (`plugin-initiated-save`, archived as
 and Ctrl/Cmd+S in the reference editor. The post-layer-10 change
 `plugin-file-picker` adds the user-mediated workspace picker, the
 `capabilities.filePicker` support bit and SDK `1.2.0`; its deployed verification
-is recorded in the change design. The parallel Stratofold provider track
+is recorded in the change design. The post-layer-10 change
+`plugin-workspace-listing` adds permissioned one-level directory listing, the
+`capabilities.directoryListing` support bit and SDK `1.3.0`; its deployed
+verification is also recorded in the change design. The parallel Stratofold provider track
 (P1-P3) is archived and verified; it does not gate the numbered layers. The
 contracts are ratified, and the shell app (`apps/shell`) builds, tests and
 deploys to GitHub Pages through CI. Do not scaffold code ahead of the [roadmap](./ROADMAP.md) layer

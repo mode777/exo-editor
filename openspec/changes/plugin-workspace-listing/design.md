@@ -193,6 +193,44 @@ vocabulary, so an older shell reports `incompatible-engine` rather than
    plugins that did not adopt them, and a plugin that did adopt them degrades to
    exact-path reads on the older shell.
 
+## Verification
+
+Deployed on 2026-11-18 at commit `5aa1382`
+(`https://mode777.github.io/exo-editor/`, JS asset `index-CKaF31BW.js`) in Chrome
+Headless Shell 131.0.6778.264 on the verification server. The workspace was an
+OPFS directory exposed through a `showDirectoryPicker` stub, containing
+`exo.json`, `notes.txt`, `listing/one.list.txt` and a `listing/big/` directory
+with 1,001 files.
+
+- Consent for the fixture named `workspace:list` as permission to list folder
+  contents and file names, including files it has not opened. The frame received
+  `capabilities.directoryListing: true`.
+- `list-root` returned `/listing` (directory) and `/notes.txt` (file, 5 bytes),
+  with `reserved: 0`; the raw first entry was exactly `{ path, kind }`.
+  `list-dir` (relative `.`) returned `/listing/big` and
+  `/listing/one.list.txt` (file, 8 bytes).
+- `list-big` returned 1,000 entries and an opaque `nextCursor`; `list-big-2`
+  with that cursor returned the 1,001st file as exactly
+  `{ path, kind, size }` and no cursor.
+- A listed path read through the normal flow: `listReads` recorded
+  `/notes.txt` with length 5 after `plugin/request-file`.
+- `/listing/one.list.txt` returned `not-a-directory`, a missing directory
+  `not-found`, and `/exo.json` `permission-denied`.
+- A workspace switch disposed the old handler (`shell/dispose`) and the new
+  workspace's `list-root` returned only `/listing` and `/switch-only.txt`; no
+  `/notes.txt` or `/listing/big` from the released workspace appeared, and the
+  new frame started with empty `lists` before its own request.
+- With `readonly-manifest.json` (only `workspace:read`), all six probes returned
+  `permission-denied` and no page was recorded; consent showed no listing
+  permission.
+- Disabling the plugin and refreshing the declaration removed the handler; no
+  listing frame remained. The page had no uncaught errors.
+
+In-flight cancellation on disposal and workspace switch, the four-request and
+twenty-per-second limits, the five-second timeout, cursor eviction and the
+reserved-entry re-check are covered by the shell unit tests; the deployed checks
+cover the observable cross-workspace isolation.
+
 ## Open Questions
 
 None that change the specs or task breakdown. Recursive traversal or a bounded

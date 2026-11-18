@@ -30,11 +30,11 @@
 ## 5. Integration and deployed verification
 
 - [x] 5.1 Run the full local gate: `npm ci`, lint, format check, typecheck, tests, shell build, budget, CSP, custom elements, no-SDK, no-Monaco, template build/copy, code-plugin build/copy, `check:dist-secrets` and `openspec validate --all`; verify every command passes
-- [ ] 5.2 Push `main`, confirm the CI `verify` and Pages deploy jobs pass, and confirm the deployed fixture manifests and shell assets are current
-- [ ] 5.3 Against the deployed shell, open a `*.list.txt` document, list the workspace root and a subdirectory, verify entries carry path/kind/size only, a returned path reads through the normal read flow, and reserved paths are absent
-- [ ] 5.4 Against the deployed shell, verify a 1,001-entry directory paginates with `nextCursor`, a file path returns `not-a-directory`, a missing directory returns `not-found`, and a plugin without `workspace:list` gets `permission-denied`
-- [ ] 5.5 Against the deployed shell, verify a workspace switch during a listing clears snapshots and returns no old-workspace path, and that disabling the plugin or closing the handler stops further pages
-- [ ] 5.6 Record the deployed evidence in the change notes and update `ROADMAP.md`/`AGENTS.md` if the project tracks this post-v1 follow-up there
+- [x] 5.2 Push `main`, confirm the CI `verify` and Pages deploy jobs pass, and confirm the deployed fixture manifests and shell assets are current
+- [x] 5.3 Against the deployed shell, open a `*.list.txt` document, list the workspace root and a subdirectory, verify entries carry path/kind/size only, a returned path reads through the normal read flow, and reserved paths are absent
+- [x] 5.4 Against the deployed shell, verify a 1,001-entry directory paginates with `nextCursor`, a file path returns `not-a-directory`, a missing directory returns `not-found`, and a plugin without `workspace:list` gets `permission-denied`
+- [x] 5.5 Against the deployed shell, verify a workspace switch during a listing clears snapshots and returns no old-workspace path, and that disabling the plugin or closing the handler stops further pages
+- [x] 5.6 Record the deployed evidence in the change notes and update `ROADMAP.md`/`AGENTS.md` if the project tracks this post-v1 follow-up there
 
 ## Workflow follow-up
 
