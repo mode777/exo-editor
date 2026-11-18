@@ -8,7 +8,7 @@ recorded in [Deployed verification](#deployed-verification) after task 8.4.
 
 Exo owns these surfaces and checks them:
 
-- explorer (toolbar, tree, banners, context menu, inline rename)
+- explorer (workspace header and its actions, tree, banners, context menu, inline rename)
 - document area (text editor, plugin frame surface, banners, actions)
 - settings dialog, including plugin settings, raw `exo.json` and the plugin log
 - consent dialog
@@ -74,7 +74,10 @@ Run against the deployed URL with the demo workspace from
    no region traps focus.
 2. In the explorer, use Arrow Up/Down to move, Arrow Right/Left to expand and
    collapse, Home/End to jump, Enter to open, F2 to rename and Delete to prompt.
-   Focus stays on a valid row after each change.
+   A single click expands or collapses a folder and the workspace twisty hides or
+   shows the whole tree; the header actions are New File, New Folder, Refresh
+   Explorer and Collapse Folders in Explorer. Focus stays on a valid row after
+   each change.
 3. Open a file, press Tab into the editor, type, press Ctrl/Cmd+S. The tab dirty
    dot clears and focus does not jump out of the editor.
 4. Open Settings from the palette. Focus enters the dialog, Tab and Shift+Tab
@@ -88,7 +91,8 @@ Run against the deployed URL with the demo workspace from
 6. Deny a plugin consent. The plugin entry reports the decision and no second
    alert repeats it.
 7. Open a read-only workspace. The read-only banner is announced once; Retry and
-   Restore access remain reachable by keyboard.
+   Restore access remain reachable by keyboard, and the header's New File and New
+   Folder actions are disabled while Refresh Explorer stays available.
 8. Toggle the theme. Both themes keep text, hint text, disabled text and focus
    rings readable; the tree focus ring remains visible on a selected row.
 9. With a screen reader (VoiceOver on macOS, NVDA on Windows), repeat steps 2-4

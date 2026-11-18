@@ -47,6 +47,7 @@ export interface ExoCommandHandlers {
   rename: () => void
   delete: () => void
   refreshExplorer: () => void
+  collapseExplorer: () => void
 }
 
 export function createExoCommands(handlers: ExoCommandHandlers): WorkbenchCommand[] {
@@ -108,6 +109,12 @@ export function createExoCommands(handlers: ExoCommandHandlers): WorkbenchComman
       run: handlers.refreshExplorer,
     },
     {
+      id: 'exo.explorer.collapseAll',
+      title: 'Collapse Folders in Explorer',
+      category: 'Explorer',
+      run: handlers.collapseExplorer,
+    },
+    {
       id: 'exo.file.save',
       title: 'Save',
       category: 'File',
@@ -157,6 +164,7 @@ const AVAILABILITY: Record<string, (context: CommandContext) => boolean> = {
   'exo.explorer.delete': (context) =>
     context.hasWorkspace && context.writable && context.hasSelection,
   'exo.explorer.refresh': (context) => context.hasWorkspace,
+  'exo.explorer.collapseAll': (context) => context.hasWorkspace,
   'exo.file.save': (context) => context.hasActiveDocument,
   'exo.file.openWith': (context) => context.hasActiveDocument && context.hasEditorChoice,
 }

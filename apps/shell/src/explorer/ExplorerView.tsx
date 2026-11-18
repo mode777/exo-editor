@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { IconButton } from 'vscode-workbench/react'
 import {
   workspaceErrorMessage,
   WorkspaceError,
@@ -71,6 +72,7 @@ function Explorer() {
 
   const [children, setChildren] = useState<Map<string, FileStat[]>>(() => new Map([[ROOT, []]]))
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [rootExpanded, setRootExpanded] = useState(true)
   const [selected, setSelected] = useState<string | null>(null)
   const [loading, setLoading] = useState<Set<string>>(new Set())
   const [errors, setErrors] = useState<Map<string, WorkspaceErrorCode>>(new Map())
@@ -93,6 +95,7 @@ function Explorer() {
 
   const visible = useMemo(() => {
     const rows: Row[] = []
+    if (!rootExpanded) return rows
     const walk = (directory: string, depth: number) => {
       for (const entry of children.get(directory) ?? []) {
         rows.push({ entry, depth })
@@ -103,7 +106,7 @@ function Explorer() {
     }
     walk(ROOT, 0)
     return rows
-  }, [children, expanded])
+  }, [children, expanded, rootExpanded])
 
   const load = useMemo(() => {
     return async (path: string) => {
@@ -197,6 +200,11 @@ function Explorer() {
     }
     setExpanded((current) => new Set(current).add(entry.path))
     if (!children.has(entry.path)) void load(entry.path)
+  }
+
+  const collapseAll = () => {
+    setExpanded(new Set())
+    setRootExpanded(true)
   }
 
   const targetDirectory = useMemo(() => {
@@ -372,6 +380,7 @@ function Explorer() {
       if (command === 'new-folder') beginCreate('new-folder')
       if (command === 'rename') beginRename()
       if (command === 'delete') requestDelete()
+      if (command === 'collapse-all') collapseAll()
     })
   })
 
@@ -416,35 +425,52 @@ function Explorer() {
     )
   }
 
+  const workspaceName = snapshot.descriptor?.name || 'Workspace'
+
   return (
     <div className="exo-explorer" role="region" aria-label="Explorer">
-      <div className="exo-explorer-toolbar">
+      <div className="exo-explorer-header">
         <button
           type="button"
-          className="exo-explorer-action"
-          aria-label="New File"
-          disabled={!writable}
-          onClick={() => beginCreate('new-file')}
+          className="exo-explorer-twisty"
+          aria-label={rootExpanded ? 'Collapse workspace' : 'Expand workspace'}
+          aria-expanded={rootExpanded}
+          onClick={() => setRootExpanded((value) => !value)}
         >
-          New File
+          <span aria-hidden="true">{rootExpanded ? '▾' : '▸'}</span>
         </button>
-        <button
-          type="button"
-          className="exo-explorer-action"
-          aria-label="New Folder"
-          disabled={!writable}
-          onClick={() => beginCreate('new-folder')}
-        >
-          New Folder
-        </button>
-        <button
-          type="button"
-          className="exo-explorer-action"
-          aria-label="Refresh Explorer"
-          onClick={() => runtime.refreshExplorer()}
-        >
-          Refresh
-        </button>
+        <span className="exo-explorer-title" title={workspaceName}>
+          {workspaceName}
+        </span>
+        <div className="exo-explorer-actions">
+          <IconButton
+            icon="new-file"
+            label="New File"
+            variant="toolbar"
+            disabled={!writable}
+            onClick={() => beginCreate('new-file')}
+          />
+          <IconButton
+            icon="new-folder"
+            label="New Folder"
+            variant="toolbar"
+            disabled={!writable}
+            onClick={() => beginCreate('new-folder')}
+          />
+          <IconButton
+            icon="refresh"
+            label="Refresh Explorer"
+            variant="toolbar"
+            onClick={() => runtime.refreshExplorer()}
+          />
+          <IconButton
+            icon="collapse-all"
+            label="Collapse Folders in Explorer"
+            variant="toolbar"
+            disabled={expanded.size === 0}
+            onClick={collapseAll}
+          />
+        </div>
       </div>
 
       {!writable && (
@@ -496,9 +522,15 @@ function Explorer() {
                     ? 0
                     : -1
                 }
-                onClick={() => setSelected(entry.path)}
+                onClick={() => {
+                  if (rename?.path === entry.path) return
+                  setSelected(entry.path)
+                  if (entry.kind === 'directory') toggle(entry)
+                }}
                 onFocus={() => setSelected(entry.path)}
-                onDoubleClick={() => toggle(entry)}
+                onDoubleClick={() => {
+                  if (entry.kind !== 'directory') toggle(entry)
+                }}
                 onContextMenu={(event) => {
                   event.preventDefault()
                   setSelected(entry.path)
@@ -553,8 +585,10 @@ function Explorer() {
         })}
       </div>
 
-      {loading.has(ROOT) && visible.length === 0 && <p className="exo-explorer-hint">Loading…</p>}
-      {!loading.has(ROOT) && visible.length === 0 && (
+      {rootExpanded && loading.has(ROOT) && visible.length === 0 && (
+        <p className="exo-explorer-hint">Loading…</p>
+      )}
+      {rootExpanded && !loading.has(ROOT) && visible.length === 0 && (
         <p className="exo-explorer-hint">This folder is empty.</p>
       )}
       {errors.has(ROOT) && (

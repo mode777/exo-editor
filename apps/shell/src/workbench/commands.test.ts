@@ -27,6 +27,7 @@ function setup(context: CommandContext = NO_WORKSPACE) {
     rename: vi.fn(),
     delete: vi.fn(),
     refreshExplorer: vi.fn(),
+    collapseExplorer: vi.fn(),
   }
   return {
     handlers,
@@ -66,6 +67,7 @@ describe('exo command registry', () => {
       'exo.explorer.rename',
       'exo.explorer.delete',
       'exo.explorer.refresh',
+      'exo.explorer.collapseAll',
       'exo.file.save',
       'exo.workspace.restoreAccess',
       'view.toggleTheme',
@@ -89,6 +91,7 @@ describe('exo command registry', () => {
         'exo.explorer.newFile',
         'exo.explorer.newFolder',
         'exo.explorer.refresh',
+        'exo.explorer.collapseAll',
       ]),
     )
     expect(ids).not.toContain('exo.explorer.rename')
@@ -106,6 +109,23 @@ describe('exo command registry', () => {
     expect(selectedIds).toEqual(
       expect.arrayContaining(['exo.explorer.rename', 'exo.explorer.delete', 'exo.file.save']),
     )
+  })
+
+  it('runs collapse folders only with a workspace', () => {
+    const withoutWorkspace = setup()
+    expect(withoutWorkspace.registry.run('exo.explorer.collapseAll')).toBe(false)
+    expect(withoutWorkspace.handlers.collapseExplorer).not.toHaveBeenCalled()
+
+    const workspace = setup({
+      hasWorkspace: true,
+      writable: true,
+      hasSelection: false,
+      hasActiveDocument: false,
+      hasEditorChoice: false,
+      remote: false,
+    })
+    expect(workspace.registry.run('exo.explorer.collapseAll')).toBe(true)
+    expect(workspace.handlers.collapseExplorer).toHaveBeenCalledTimes(1)
   })
 
   it('offers restore access only on a read-only workspace', () => {

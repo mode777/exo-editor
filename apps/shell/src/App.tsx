@@ -223,6 +223,7 @@ function Shell({ runtime }: { runtime: WorkspaceRuntime }) {
       rename: () => requestExplorerCommand('rename'),
       delete: () => requestExplorerCommand('delete'),
       refreshExplorer: () => runtime.refreshExplorer(),
+      collapseExplorer: () => requestExplorerCommand('collapse-all'),
     }),
     [
       disconnectWorkspace,

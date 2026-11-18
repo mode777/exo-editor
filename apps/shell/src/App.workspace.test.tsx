@@ -99,15 +99,135 @@ describe('workspace shell integration', () => {
       expect(row(workspace.container, 'exo.json')).toBeNull()
       expect(workspace.container.textContent).not.toContain('.exo')
       expect(workspace.container.textContent).toContain('memory-workspace · memory')
+      expect(workspace.container.querySelector('.exo-explorer-title')?.textContent).toBe(
+        'memory-workspace',
+      )
+      expect(workspace.container.querySelector('.exo-explorer-toolbar')).toBeNull()
 
-      doubleClick(row(workspace.container, 'dir'))
+      click(row(workspace.container, 'dir'))
       await vi.waitFor(() => expect(row(workspace.container, 'b.txt')).not.toBeNull())
+
+      click(row(workspace.container, 'a.txt'))
+      expect(workspace.container.querySelector('textarea')).toBeNull()
 
       doubleClick(row(workspace.container, 'a.txt'))
       await vi.waitFor(() =>
         expect(workspace.container.querySelector('textarea')?.value).toBe('one'),
       )
       expect(useWorkbenchStore.getState().tabs.map((tab) => tab.path)).toContain('/a.txt')
+    } finally {
+      await unmount(workspace)
+    }
+  })
+
+  it('shows the workspace header actions and collapses every folder', async () => {
+    const workspace = await mountWorkspace({
+      '/dir/a.txt': 'one',
+      '/other/b.txt': 'two',
+      '/c.txt': 'three',
+    })
+    try {
+      await vi.waitFor(() => expect(row(workspace.container, 'dir')).not.toBeNull())
+      const header = workspace.container.querySelector('.exo-explorer-header')
+      expect(header?.textContent).toContain('memory-workspace')
+      for (const label of [
+        'New File',
+        'New Folder',
+        'Refresh Explorer',
+        'Collapse Folders in Explorer',
+      ]) {
+        expect(header?.querySelector(`[aria-label="${label}"]`), label).not.toBeNull()
+      }
+      expect(
+        header?.querySelector<HTMLButtonElement>('[aria-label="Collapse Folders in Explorer"]')
+          ?.disabled,
+      ).toBe(true)
+
+      click(row(workspace.container, 'dir'))
+      click(row(workspace.container, 'other'))
+      await vi.waitFor(() => expect(row(workspace.container, 'a.txt')).not.toBeNull())
+      await vi.waitFor(() => expect(row(workspace.container, 'b.txt')).not.toBeNull())
+
+      const collapse = workspace.container.querySelector<HTMLButtonElement>(
+        '[aria-label="Collapse Folders in Explorer"]',
+      )
+      expect(collapse?.disabled).toBe(false)
+      await act(async () => {
+        collapse?.click()
+      })
+
+      expect(row(workspace.container, 'a.txt')).toBeNull()
+      expect(row(workspace.container, 'b.txt')).toBeNull()
+      expect(row(workspace.container, 'dir')).not.toBeNull()
+      expect(row(workspace.container, 'other')).not.toBeNull()
+      expect(collapse?.disabled).toBe(true)
+    } finally {
+      await unmount(workspace)
+    }
+  })
+
+  it('collapses and restores the tree from the workspace twisty without re-listing', async () => {
+    const workspace = await mountWorkspace({ '/dir/nested/deep.txt': 'x' })
+    try {
+      await vi.waitFor(() => expect(row(workspace.container, 'dir')).not.toBeNull())
+      click(row(workspace.container, 'dir'))
+      await vi.waitFor(() => expect(row(workspace.container, 'nested')).not.toBeNull())
+      click(row(workspace.container, 'nested'))
+      await vi.waitFor(() => expect(row(workspace.container, 'deep.txt')).not.toBeNull())
+
+      const session = workspace.runtime.getSession()
+      expect(session).not.toBeNull()
+      const list = vi.spyOn(session!, 'list')
+      const twisty = workspace.container.querySelector<HTMLButtonElement>('.exo-explorer-twisty')
+      expect(twisty?.getAttribute('aria-expanded')).toBe('true')
+
+      await act(async () => {
+        twisty?.click()
+      })
+      expect(twisty?.getAttribute('aria-expanded')).toBe('false')
+      expect(row(workspace.container, 'dir')).toBeNull()
+      expect(row(workspace.container, 'deep.txt')).toBeNull()
+
+      await act(async () => {
+        twisty?.click()
+      })
+      expect(twisty?.getAttribute('aria-expanded')).toBe('true')
+      expect(row(workspace.container, 'deep.txt')).not.toBeNull()
+      expect(list).not.toHaveBeenCalled()
+    } finally {
+      await unmount(workspace)
+    }
+  })
+
+  it('collapses folders from the command palette', async () => {
+    const workspace = await mountWorkspace({ '/dir/a.txt': 'one' })
+    try {
+      await vi.waitFor(() => expect(row(workspace.container, 'dir')).not.toBeNull())
+      click(row(workspace.container, 'dir'))
+      await vi.waitFor(() => expect(row(workspace.container, 'a.txt')).not.toBeNull())
+
+      const paletteButton = Array.from(
+        workspace.container.querySelectorAll<HTMLButtonElement>('button'),
+      ).find((button) => button.textContent === 'Command Palette')
+      await act(async () => {
+        paletteButton?.click()
+      })
+      await vi.waitFor(() =>
+        expect(workspace.container.querySelector('.quick-open-item')).not.toBeNull(),
+      )
+      const item = Array.from(
+        workspace.container.querySelectorAll<HTMLButtonElement>('.quick-open-item'),
+      ).find(
+        (button) =>
+          button.querySelector('.quick-open-label')?.textContent === 'Collapse Folders in Explorer',
+      )
+      expect(item).toBeDefined()
+      await act(async () => {
+        item?.click()
+      })
+
+      expect(row(workspace.container, 'a.txt')).toBeNull()
+      expect(row(workspace.container, 'dir')).not.toBeNull()
     } finally {
       await unmount(workspace)
     }
@@ -362,7 +482,7 @@ describe('workspace shell integration', () => {
             : original(path, options),
         )
 
-      doubleClick(row(workspace.container, 'dir'))
+      click(row(workspace.container, 'dir'))
       await vi.waitFor(() =>
         expect(workspace.container.textContent).toContain('Access to /dir was denied.'),
       )

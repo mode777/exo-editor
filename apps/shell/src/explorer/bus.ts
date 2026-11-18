@@ -1,4 +1,4 @@
-export type ExplorerCommand = 'new-file' | 'new-folder' | 'rename' | 'delete'
+export type ExplorerCommand = 'new-file' | 'new-folder' | 'rename' | 'delete' | 'collapse-all'
 
 const bus = new EventTarget()
 

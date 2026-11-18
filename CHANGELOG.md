@@ -9,6 +9,10 @@ Additive post-release updates: the plugin file picker and directory listing.
 
 ### Added
 
+- The explorer shows the active workspace's name in a header row with New File,
+  New Folder, Refresh Explorer and Collapse Folders in Explorer actions, expands
+  and collapses folders on a single click, and offers `exo.explorer.collapseAll`
+  in the View menu and command palette.
 - `plugin/request-files` / `shell/files-selected` and the shell-owned workspace
   picker for active visible plugin handlers; paths only, no content or handles.
 - `plugin/request-list` / `shell/list-result`, the `workspace:list` manifest

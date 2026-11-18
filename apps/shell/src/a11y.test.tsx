@@ -165,7 +165,7 @@ describe('Exo-owned surface accessibility', () => {
 
     const directory = rows.find((row) => row.textContent?.includes('dir'))
     expect(directory?.getAttribute('aria-expanded')).toBe('false')
-    await act(async () => doubleClick(directory ?? null))
+    await act(async () => click(directory ?? null))
     await vi.waitFor(() =>
       expect(
         Array.from(container.querySelectorAll<HTMLElement>('.exo-tree-row')).some((row) =>
@@ -185,11 +185,39 @@ describe('Exo-owned surface accessibility', () => {
     ).toHaveLength(1)
   })
 
+  it('explorer header exposes named controls and the root toggle state', async () => {
+    const { container } = await mountWorkspace({ '/dir/b.txt': 'two' })
+    await vi.waitFor(() => expect(container.querySelector('.exo-explorer-header')).not.toBeNull())
+    const header = container.querySelector('.exo-explorer-header')
+    for (const label of [
+      'New File',
+      'New Folder',
+      'Refresh Explorer',
+      'Collapse Folders in Explorer',
+    ]) {
+      expect(header?.querySelector(`[aria-label="${label}"]`), label).not.toBeNull()
+    }
+    const twisty = header?.querySelector<HTMLButtonElement>('.exo-explorer-twisty')
+    expect(twisty?.getAttribute('aria-expanded')).toBe('true')
+    await expectNoViolations(header)
+    await act(async () => click(twisty ?? null))
+    expect(twisty?.getAttribute('aria-expanded')).toBe('false')
+  })
+
   it('announces the read-only state once', async () => {
     const { container } = await mountWorkspace({ '/a.txt': 'one' }, { writable: false })
     await vi.waitFor(() =>
       expect(container.querySelector('.exo-tree-row')?.textContent).toContain('a.txt'),
     )
+    expect(container.querySelector<HTMLButtonElement>('[aria-label="New File"]')?.disabled).toBe(
+      true,
+    )
+    expect(container.querySelector<HTMLButtonElement>('[aria-label="New Folder"]')?.disabled).toBe(
+      true,
+    )
+    expect(
+      container.querySelector<HTMLButtonElement>('[aria-label="Refresh Explorer"]')?.disabled,
+    ).toBe(false)
     const announcements = Array.from(container.querySelectorAll('[role="status"]')).filter(
       (element) => element.textContent?.includes('Read-only workspace'),
     )

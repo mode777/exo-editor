@@ -18,6 +18,7 @@ function createHandlers(): ExoCommandHandlers {
     rename: vi.fn(),
     delete: vi.fn(),
     refreshExplorer: vi.fn(),
+    collapseExplorer: vi.fn(),
   }
 }
 

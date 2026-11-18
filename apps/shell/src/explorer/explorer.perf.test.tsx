@@ -67,7 +67,7 @@ describe('explorer listing structure', () => {
       (row) => row.textContent?.includes('dir'),
     )
     await act(async () => {
-      directory?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true }))
+      directory?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
     })
     await vi.waitFor(() => expect(list).toHaveBeenCalledTimes(2), { timeout: 10_000 })
     expect(list.mock.calls[1][0]).toBe('/dir')

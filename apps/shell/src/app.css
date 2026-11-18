@@ -21,10 +21,64 @@
   color: var(--vscode-descriptionForeground);
 }
 
-.exo-explorer-toolbar {
+.exo-explorer-header {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
   gap: 4px;
+  min-height: 24px;
+  color: var(--vscode-foreground);
+}
+
+.exo-explorer-twisty {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--vscode-foreground);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.exo-explorer-twisty:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+}
+
+.exo-explorer-twisty:focus-visible,
+.exo-explorer-actions .icon-button:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 1px;
+}
+
+.exo-explorer-title {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.exo-explorer-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 1px;
+  margin-left: auto;
+}
+
+.exo-explorer-actions .icon-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.exo-explorer-actions .icon-button:disabled:hover {
+  background: transparent;
 }
 
 .exo-explorer-action {

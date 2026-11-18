@@ -32,6 +32,10 @@ export const workbenchMenus: MenuDefinition[] = [
         label: 'Refresh Explorer',
         commandId: 'exo.explorer.refresh',
       },
+      {
+        label: 'Collapse Folders in Explorer',
+        commandId: 'exo.explorer.collapseAll',
+      },
       { separator: true },
       {
         label: 'Toggle Primary Side Bar',
