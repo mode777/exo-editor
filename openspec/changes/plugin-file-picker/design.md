@@ -208,6 +208,41 @@ re-prompt every reader for a user-mediated action).
 4. Rollback is the shell deploy; the message and capability are additive, so
    older plugins are unaffected.
 
+## Verification
+
+Deployed on 2026-11-18 at commit `a868f08`
+(`https://mode777.github.io/exo-editor/`) in Chrome Headless Shell
+131.0.6778.264. The workspace was an OPFS handle exposed through the same
+`showDirectoryPicker` stub as the layer 5-10 checks, containing
+`picker.picker.txt`, `a.txt`, `plain.txt`, `textures/albedo.png` and an
+`exo.json` that declares the deployed fixture manifest.
+
+- The picker fixture's button opened the dialog only after the iframe/button was
+  focused. A programmatic click without focus produced `permission-denied` in
+  the fixture observation, which is the intended active/focused gate.
+- The dialog named the plugin, listed `textures/`, `a.txt`,
+  `picker.picker.txt` and `plain.txt`, and showed neither `exo.json` nor `.exo`.
+  Arrow Down moved focus between rows; Escape cancelled and recorded
+  `picks: [{ paths: [] }]`.
+- A second request from the same fixture while the dialog was open recorded
+  `rate-limited` without opening a second dialog.
+- Selecting `a.txt` produced `picks: [{ paths: ["/a.txt"] }]` (paths only), the
+  fixture received the content through `plugin/request-file`, appended
+  `[fixture picked /a.txt]` and reported dirty. Save wrote exactly
+  `picker document\n[fixture picked /a.txt]\n[fixture save 1]` to OPFS.
+- A tab switch and a tab close while the dialog was open closed it silently
+  without adding an empty `picks` entry. A raw picker request from the hidden
+  `a.txt` handler received `permission-denied`.
+- Disabling the fixture through `exo.json` and a focus refresh closed the open
+  dialog and disposed the handler. Switching to a second OPFS workspace
+  (`exo-switch-ws`) closed the dialog, mounted the new workspace and left no
+  plugin iframe. Headless CDP cannot click through the open modal, so the test
+  temporarily hid the dialog backdrop to reach Open Folder; the pending request
+  itself remained open until the switch reset it.
+- Old-shell fallback is covered by the SDK tests: a missing `filePicker` bit
+  parses as `false` and `requestFiles()` rejects locally with
+  `unsupported-message` without sending a message.
+
 ## Open Questions
 
 None that change the specs or task breakdown. Future work may add extension

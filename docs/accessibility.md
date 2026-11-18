@@ -117,6 +117,9 @@ same `showDirectoryPicker` stub as the layer 5-9 verification.
 - Consent dialog: focus starts on Deny; Tab reaches Allow plugin and the plugin
   homepage link; the next Tab wraps to Deny. Escape closes the Exo Code dialog
   and the next consent prompt appears in order. Result: pass.
+- File picker (added 2026-11-18 at commit `a868f08`): the dialog opened from the
+  visible fixture, focus entered the dialog, Arrow Down moved between rows,
+  Escape closed it and the fixture recorded an empty selection. Result: pass.
 - Settings dialog: focus enters the dialog, twelve Tab presses stay inside it,
   and Escape closes it. Result: pass.
 - The automated axe and contrast suites above pass in the same run; the shell's

@@ -13,7 +13,10 @@ specs. Layer 9 (`monaco-code-plugin`) adds the Monaco reference plugin, the
 opt-in visible handler surface and its child-path deployment. A post-layer-9
 change (`plugin-initiated-save`, archived as
 `2026-11-16-plugin-initiated-save`) adds the id-less `plugin/request-save` intent
-and Ctrl/Cmd+S in the reference editor. The parallel Stratofold provider track
+and Ctrl/Cmd+S in the reference editor. The post-layer-10 change
+`plugin-file-picker` adds the user-mediated workspace picker, the
+`capabilities.filePicker` support bit and SDK `1.2.0`; its deployed verification
+is recorded in the change design. The parallel Stratofold provider track
 (P1-P3) is archived and verified; it does not gate the numbered layers. The
 contracts are ratified, and the shell app (`apps/shell`) builds, tests and
 deploys to GitHub Pages through CI. Do not scaffold code ahead of the [roadmap](./ROADMAP.md) layer

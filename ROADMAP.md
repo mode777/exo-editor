@@ -761,6 +761,18 @@ both states opened the same connect dialog, and Cancel on the unsaved-changes
 prompt left the document dirty and unchanged with the dialog closed. The local
 gate passed with 666 shell tests and a 151,022/152,000 js gzip budget.
 
+**Follow-up (2026-11-18):** the post-layer-10 change `plugin-file-picker` adds
+`plugin/request-files` / `shell/files-selected`, the shell-owned workspace
+picker for active visible handlers, the `capabilities.filePicker` support bit
+and SDK `1.2.0`. Verified against deployed commit `a868f08`: the picker opened
+only from a focused visible fixture frame, listed no reserved paths, returned
+paths only, read the selected file through `plugin/request-file`, saved the
+fixture edit, handled keyboard navigation and Escape, rate-limited a second
+request, closed on tab switch, tab close, plugin disable and workspace switch,
+and denied a hidden handler. The local gate passed with 691 shell tests and a
+153,541/154,000 js gzip budget; the 2,000-byte increase is recorded in
+[`docs/performance.md`](./docs/performance.md).
+
 ---
 
 ## Deferred beyond v1

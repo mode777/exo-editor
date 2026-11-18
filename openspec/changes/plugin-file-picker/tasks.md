@@ -33,10 +33,10 @@
 ## 5. Integration and deployed verification
 
 - [x] 5.1 Run the full local gate: `npm ci`, lint, format check, typecheck, tests, shell build, budget, CSP, custom elements, no-SDK, no-Monaco, template build/copy, code-plugin build/copy, `check:dist-secrets` and `openspec validate --all`; verify every command passes
-- [ ] 5.2 Push `main`, confirm the CI `verify` and Pages deploy jobs pass, and confirm the deployed fixture and shell assets are current
-- [ ] 5.3 Against the deployed shell, open a `*.picker.txt` document, trigger the picker from the visible fixture, select a file, verify only the path arrives, the plugin reads it, and the document remains dirty/saveable as before
-- [ ] 5.4 Against the deployed shell, verify keyboard-only navigation, Escape cancellation, one-picker-at-a-time behavior, hidden/inactive denial, reserved paths absent, tab close, plugin disable and workspace switch while the picker is open
-- [ ] 5.5 Record the deployed evidence and the old-shell fallback evidence in the change notes, and update `ROADMAP.md`/`AGENTS.md` if the project tracks this post-v1 follow-up there
+- [x] 5.2 Push `main`, confirm the CI `verify` and Pages deploy jobs pass, and confirm the deployed fixture and shell assets are current
+- [x] 5.3 Against the deployed shell, open a `*.picker.txt` document, trigger the picker from the visible fixture, select a file, verify only the path arrives, the plugin reads it, and the document remains dirty/saveable as before
+- [x] 5.4 Against the deployed shell, verify keyboard-only navigation, Escape cancellation, one-picker-at-a-time behavior, hidden/inactive denial, reserved paths absent, tab close, plugin disable and workspace switch while the picker is open
+- [x] 5.5 Record the deployed evidence and the old-shell fallback evidence in the change notes, and update `ROADMAP.md`/`AGENTS.md` if the project tracks this post-v1 follow-up there
 
 ## Workflow follow-up
 
