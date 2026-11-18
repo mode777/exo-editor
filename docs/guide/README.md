@@ -79,6 +79,13 @@ this repository in v1; see the compatibility section of
 - [Testing and troubleshooting](./testing.md) covers the local and deployed
   checks.
 
+## Agent skill
+
+[`.agents/skills/create-exo-plugin/SKILL.md`](../../.agents/skills/create-exo-plugin/SKILL.md)
+is a single-file skill for coding assistants: it scaffolds a standalone plugin
+repo from this template, vendors the SDK and ships to GitHub Pages. Outside
+this repository, install it by its raw file link.
+
 ## Dry run
 
 On 2026-11-16 the quickstart was followed from this guide and the template
