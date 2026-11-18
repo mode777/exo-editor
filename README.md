@@ -70,6 +70,7 @@ Verification is always against the deployed URL, never a local dev server.
 | [Plugin SDK contract](./docs/contracts/plugin-sdk.md) | Typed client, origin rules, compatibility policy, template |
 | [Manifest schema](./schema/exo.schema.json) | Shared JSON Schema for `exo.json` and `exo-manifest.json` |
 | [Plugin author guide](./docs/guide/README.md) | Quickstart, manifest, protocol, SDK, hosting, consent, testing |
+| [Agent skill](./.agents/skills/create-exo-plugin/SKILL.md) | Single-file skill for assistants building an Exo plugin and hosting it on GitHub Pages; installable by [raw link](https://raw.githubusercontent.com/mode777/exo-editor/main/.agents/skills/create-exo-plugin/SKILL.md) |
 | [Demo workspace](./examples/demo-workspace/README.md) | Shipped code and template plugins in one workspace |
 | [Walkthrough](./docs/walkthrough.md) | Recorded acceptance path with screenshots |
 | [Accessibility](./docs/accessibility.md) | Scope, automated checks, manual script, upstream exceptions |
