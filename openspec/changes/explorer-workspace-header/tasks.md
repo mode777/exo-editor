@@ -26,7 +26,7 @@
 ## 5. Verification
 
 - [x] 5.1 Run the full local gate from `AGENTS.md` (`lint`, `format:check`, `typecheck`, `test`, `build`, the dist checks, template and code-plugin builds and `check:dist-secrets`) and confirm it passes.
-- [ ] 5.2 Deploy by pushing `main` and verify against `https://mode777.github.io/exo-editor/` with the demo workspace: the explorer header shows the workspace name and four icons, icon actions work, a directory expands on one click, Collapse Folders closes every folder, and a read-only workspace shows disabled New File/New Folder. Record the deployed result in `design.md` and leave this task open if it cannot be verified there.
+- [x] 5.2 Deploy by pushing `main` and verify against `https://mode777.github.io/exo-editor/` with the demo workspace: the explorer header shows the workspace name and four icons, icon actions work, a directory expands on one click, Collapse Folders closes every folder, and a read-only workspace shows disabled New File/New Folder. Record the deployed result in `design.md` and leave this task open if it cannot be verified there.
 
 ## Workflow follow-up
 

@@ -126,3 +126,24 @@ location, drop to reduced opacity and lose the hover background.
 No data migration and no contract change. Deploy is the normal push to `main`;
 rollback is reverting the change. Existing workspaces, persisted handles, remote
 connections and plugin state are untouched.
+
+## Deployed verification
+
+Verified on 2026-11-18 against `https://mode777.github.io/exo-editor/` at commit
+`cb1b731` (deployed asset `assets/index-DOxJJNXg.js`) with
+`chrome-headless-shell` 131.0.6778.264 at 1280x800. The workspace was an OPFS
+directory named `demo-workspace` returned by a `showDirectoryPicker` stub,
+matching the capture method used by `docs/walkthrough.md`.
+
+- The header shows `demo-workspace` with the twisty and the four actions in
+  order, New File/New Folder/Refresh enabled, and Collapse Folders disabled with
+  nothing expanded.
+- One click on a directory shows its children; Collapse Folders removes them,
+  keeps the root's direct children, and disables itself; the twisty hides and
+  restores the tree.
+- One click on a file does not open an editor; a double-click opens it.
+- After a reload with write permission reported as `prompt`, the workspace
+  restores read-only, the banner appears, New File and New Folder are disabled
+  and Refresh stays enabled.
+- No page errors were logged.
+
