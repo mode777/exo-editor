@@ -148,6 +148,43 @@ function requestFiles(context: Started, id: string, payload: Record<string, unkn
   context.frame.emit({ exo: 1, type: 'plugin/request-files', id, payload }, PLUGIN_ORIGIN)
 }
 
+function requestList(
+  context: Started,
+  id: string | undefined,
+  payload: Record<string, unknown> | undefined,
+) {
+  context.frame.emit(
+    {
+      exo: 1,
+      type: 'plugin/request-list',
+      ...(id ? { id } : {}),
+      ...(payload ? { payload } : {}),
+    },
+    PLUGIN_ORIGIN,
+  )
+}
+
+function listReply(context: Started, id: string) {
+  return context.frame.posted
+    .map((entry) => entry.message as { type?: string; replyTo?: string; payload?: unknown })
+    .find((message) => message.type === 'shell/list-result' && message.replyTo === id)
+}
+
+async function waitForList(context: Started, id: string) {
+  return vi.waitFor(() => {
+    const reply = listReply(context, id)
+    expect(reply).toBeDefined()
+    return reply
+  })
+}
+
+function errorFor(context: Started, replyTo?: string): { code?: string } | undefined {
+  return context.frame.posted
+    .map((entry) => entry.message as { type?: string; replyTo?: string; payload?: unknown })
+    .filter((message) => message.type === 'shell/error' && message.replyTo === replyTo)
+    .at(-1)?.payload as { code?: string } | undefined
+}
+
 function selection(context: Started, id: string) {
   return context.frame.posted
     .map((entry) => entry.message as { type?: string; replyTo?: string; payload?: unknown })
@@ -196,7 +233,13 @@ describe('handler session', () => {
       mode: 'editor',
       plugin: { id: 'com.example.code', version: '1.2.0' },
       file: { path: '/src/a.ts', name: 'a.ts', dir: '/src', version: context.stat.version },
-      capabilities: { read: true, write: true, requestFiles: true, filePicker: true },
+      capabilities: {
+        read: true,
+        write: true,
+        requestFiles: true,
+        filePicker: true,
+        directoryListing: true,
+      },
       settings: { 'editor.size': 2 },
     })
     const serialized = JSON.stringify(init?.payload)
@@ -752,6 +795,186 @@ describe('handler session', () => {
     context.frame.emit({ exo: 1, type: 'plugin/dirty', payload: { dirty: true } }, PLUGIN_ORIGIN)
     expect(context.dirty).toEqual([true])
   })
+})
+
+const listingCandidate = () => candidate({ permissions: ['workspace:read', 'workspace:list'] })
+
+describe('handler directory listing', () => {
+  it('advertises the support bit and serves the first page without metadata', async () => {
+    const context = await start({ candidate: listingCandidate() })
+    ready(context)
+    expect(postedType(context.frame, 'shell/init')?.payload).toMatchObject({
+      capabilities: { directoryListing: true },
+    })
+
+    requestList(context, 'l1', { path: '/' })
+    const reply = await waitForList(context, 'l1')
+    expect(reply?.payload).toEqual({
+      entries: [
+        { path: '/src', kind: 'directory' },
+        { path: '/notes.txt', kind: 'file', size: 5 },
+      ],
+    })
+    expect(JSON.stringify(reply?.payload)).not.toContain('mtime')
+    expect(JSON.stringify(reply?.payload)).not.toContain('version')
+    expect(JSON.stringify(reply?.payload)).not.toContain('hello')
+  })
+
+  it('resolves relative and absolute directories', async () => {
+    const context = await start({ candidate: listingCandidate() }, '/src/a.ts')
+    ready(context)
+
+    requestList(context, 'rel', { path: '.' })
+    expect((await waitForList(context, 'rel'))?.payload).toEqual({
+      entries: [
+        { path: '/src/a.ts', kind: 'file', size: 18 },
+        { path: '/src/types.ts', kind: 'file', size: 17 },
+      ],
+    })
+
+    requestList(context, 'abs', { path: '/src' })
+    expect((await waitForList(context, 'abs'))?.payload).toEqual({
+      entries: [
+        { path: '/src/a.ts', kind: 'file', size: 18 },
+        { path: '/src/types.ts', kind: 'file', size: 17 },
+      ],
+    })
+  })
+
+  it('maps missing, file and reserved paths', async () => {
+    const context = await start({ candidate: listingCandidate() })
+    ready(context)
+
+    requestList(context, 'missing', { path: '/missing' })
+    await vi.waitFor(() => {
+      expect(errorFor(context, 'missing')).toMatchObject({ code: 'not-found' })
+    })
+
+    requestList(context, 'file', { path: '/notes.txt' })
+    await vi.waitFor(() => {
+      expect(errorFor(context, 'file')).toMatchObject({ code: 'not-a-directory' })
+    })
+
+    requestList(context, 'reserved-file', { path: '/exo.json' })
+    await vi.waitFor(() => {
+      expect(errorFor(context, 'reserved-file')).toMatchObject({ code: 'permission-denied' })
+    })
+    requestList(context, 'reserved-dir', { path: '/.exo' })
+    await vi.waitFor(() => {
+      expect(errorFor(context, 'reserved-dir')).toMatchObject({ code: 'permission-denied' })
+    })
+    expect(listReply(context, 'missing')).toBeUndefined()
+  })
+
+  it('denies listing without workspace:list and performs no provider call', async () => {
+    const session = await makeSession()
+    const facade = session.forPlugin('com.example.code')
+    const providerList = vi.spyOn(facade, 'list')
+    const context = await start({ session }, '/src/a.ts')
+    ready(context)
+
+    requestList(context, 'denied', { path: '/' })
+    await vi.waitFor(() => {
+      expect(postedType(context.frame, 'shell/error')).toMatchObject({
+        payload: { code: 'permission-denied' },
+        replyTo: 'denied',
+      })
+    })
+    expect(providerList).not.toHaveBeenCalled()
+  })
+
+  it('rejects malformed and out-of-phase requests', async () => {
+    const malformed: Array<{ id?: string; payload?: Record<string, unknown> }> = [
+      { payload: { path: '/' } },
+      { id: 'bad-path', payload: { path: 1 } },
+      { id: 'bad-cursor', payload: { path: '/', cursor: 1 } },
+      { id: 'extra', payload: { path: '/', extra: true } },
+      { id: 'no-payload' },
+    ]
+    for (const item of malformed) {
+      const context = await start({ candidate: listingCandidate() })
+      ready(context)
+      requestList(context, item.id, item.payload)
+      expect(errorFor(context, item.id)).toMatchObject({ code: 'protocol-violation' })
+      expect(listReply(context, item.id ?? '')).toBeUndefined()
+    }
+
+    const early = await start({ candidate: listingCandidate() })
+    requestList(early, 'early', { path: '/' })
+    expect(postedType(early.frame, 'shell/error')).toMatchObject({
+      payload: { code: 'protocol-violation' },
+    })
+  })
+
+  it('paginates a 1,001-entry directory and keeps the entry payload minimal', async () => {
+    const initialFiles: Record<string, string> = {}
+    for (let index = 0; index < 1001; index += 1) {
+      initialFiles[`/big/f${String(index).padStart(4, '0')}.txt`] = 'x'
+    }
+    const session = await makeSession({ initialFiles })
+    const context = await start({ session, candidate: listingCandidate() }, '/src/a.ts')
+    ready(context)
+
+    requestList(context, 'p1', { path: '/big' })
+    const first = await waitForList(context, 'p1')
+    const firstPayload = first?.payload as {
+      entries: Array<Record<string, unknown>>
+      nextCursor?: string
+    }
+    expect(firstPayload.entries).toHaveLength(1000)
+    expect(firstPayload.nextCursor).toBeDefined()
+    expect(Object.keys(firstPayload.entries[0]).sort()).toEqual(['kind', 'path', 'size'])
+
+    requestList(context, 'p2', { path: '/big', cursor: firstPayload.nextCursor })
+    const second = await waitForList(context, 'p2')
+    expect(second?.payload).toEqual({
+      entries: [{ path: '/big/f1000.txt', kind: 'file', size: 1 }],
+    })
+  })
+
+  it('keeps reads on the normal request-file path after discovery', async () => {
+    const context = await start({ candidate: listingCandidate() })
+    ready(context)
+    requestList(context, 'l1', { path: '/' })
+    const reply = await waitForList(context, 'l1')
+    const entries = (reply?.payload as { entries: Array<{ path: string }> }).entries
+    expect(entries.map((entry) => entry.path)).toContain('/notes.txt')
+    await requestFile(context, 'read-after-list', '/notes.txt')
+    expect(postedType(context.frame, 'shell/file-content')).toMatchObject({
+      payload: { path: '/notes.txt', text: 'hello' },
+      replyTo: 'read-after-list',
+    })
+  })
+
+  it.each(['closed', 'workspace-switch'] as const)(
+    'drops a page that resolves after %s disposal',
+    async (reason) => {
+      const session = await makeSession()
+      const facade = session.forPlugin('com.example.code')
+      let release: () => void = () => undefined
+      const gate = new Promise<void>((resolve) => {
+        release = resolve
+      })
+      const delayed = {
+        capabilities: () => session.capabilities(),
+        forPlugin: () => ({
+          ...facade,
+          list: () => gate.then(() => []),
+        }),
+      } as unknown as WorkspaceSession
+      const context = await start({ session: delayed, candidate: listingCandidate() }, '/src/a.ts')
+      ready(context)
+      requestList(context, 'late', { path: '/' })
+      const disposing = context.handler.dispose(reason)
+      context.frame.emit({ exo: 1, type: 'plugin/dispose-ack' }, PLUGIN_ORIGIN)
+      await disposing
+      release()
+      await Promise.resolve()
+      await Promise.resolve()
+      expect(listReply(context, 'late')).toBeUndefined()
+      expect(postedType(context.frame, 'shell/error')).toBeUndefined()
+    },
+  )
 })
 
 describe('handler subscriptions', () => {

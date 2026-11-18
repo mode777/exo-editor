@@ -29,6 +29,7 @@ export type ShellErrorCode =
   | 'permission-denied'
   | 'not-found'
   | 'not-a-file'
+  | 'not-a-directory'
   | 'too-large'
   | 'conflict'
   | 'rate-limited'

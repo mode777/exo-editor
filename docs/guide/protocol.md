@@ -40,6 +40,15 @@ instance plus the session echo, not the origin string.
   content. Read each path with `plugin/request-file`. The picker is available
   only to an active, visible, focused handler; an older shell answers
   `unsupported-message`, so keep a manual path-entry fallback.
+- List: `plugin/request-list` asks for one directory level and requires the
+  manifest's `workspace:list` permission. Check
+  `capabilities.directoryListing` first; absence means an older shell. The reply
+  is `shell/list-result` with at most 1,000 entries sorted directories first and
+  an opaque `nextCursor` when more remain. Entries carry `path`, `kind` and, for
+  files, `size`; no content, `mtime`, version or handle. Later pages come from a
+  stable snapshot, so re-list without a cursor to observe new files. A file path
+  returns `not-a-directory`, a missing directory `not-found`, and a malformed or
+  expired cursor also `not-found`.
 - Dirty: the plugin reports `plugin/dirty`. The shell never infers it from
   content.
 - Save: the shell sends `shell/request-save`; the handler replies with

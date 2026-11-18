@@ -5,25 +5,32 @@ release process are in [`docs/releases.md`](./docs/releases.md).
 
 ## [0.1.0] - 2026-11-18
 
-Additive post-release update: the plugin file picker.
+Additive post-release updates: the plugin file picker and directory listing.
 
 ### Added
 
 - `plugin/request-files` / `shell/files-selected` and the shell-owned workspace
   picker for active visible plugin handlers; paths only, no content or handles.
-- `@exo/plugin-sdk` `1.2.0` with `EditorClient.requestFiles()` and the
-  `capabilities.filePicker` support bit.
+- `plugin/request-list` / `shell/list-result`, the `workspace:list` manifest
+  permission and the `capabilities.directoryListing` support bit: one directory
+  level, 1,000-entry snapshot pages with an opaque cursor and minimal
+  path/kind/size entries.
+- `@exo/plugin-sdk` `1.3.0` with `EditorClient.listDirectory()` and the
+  `capabilities.directoryListing` support bit. `1.2.0` added
+  `EditorClient.requestFiles()`.
 
 ### Compatibility
 
 - Shell: `0.1.0`
 - Protocol: `1`
 - Manifest schema: `1`
-- SDK: `1.2.0`
+- SDK: `1.3.0`
 
 ### Breaking
 
-- None. The message and capability are additive within protocol major `1`.
+- None. The messages, permission and capability are additive within protocol
+  major `1`; existing manifests keep their consent until they add
+  `workspace:list`.
 
 ## [0.1.0] - 2026-11-16
 

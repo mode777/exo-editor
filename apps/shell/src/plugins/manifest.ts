@@ -35,7 +35,12 @@ export const MANIFEST_RELATIVE_ASSET_PATTERN =
   '^(?!/)(?![A-Za-z][A-Za-z0-9+.-]*:)(?!.*[?#\\u0000]).+$'
 export const MANIFEST_HTTPS_URL_PATTERN = '^https://[^\\s@#]+$'
 
-export const PLUGIN_PERMISSIONS = ['workspace:read', 'workspace:write', 'events:subscribe'] as const
+export const PLUGIN_PERMISSIONS = [
+  'workspace:read',
+  'workspace:write',
+  'workspace:list',
+  'events:subscribe',
+] as const
 export const MANIFEST_SETTING_TYPES = ['boolean', 'string', 'number'] as const
 export const MANIFEST_RENDERINGS = ['hidden', 'frame'] as const
 
@@ -51,6 +56,11 @@ export function hasWorkspaceRead(permissions: PluginPermission[]): boolean {
 
 export function hasWorkspaceWrite(permissions: PluginPermission[]): boolean {
   return permissions.includes('workspace:write')
+}
+
+/** Listing is a separate permission; the manifest validator requires read too. */
+export function hasWorkspaceList(permissions: PluginPermission[]): boolean {
+  return permissions.includes('workspace:list')
 }
 
 export function hasEventsSubscribe(permissions: PluginPermission[]): boolean {
@@ -334,6 +344,12 @@ function parsePermissions(value: unknown): PluginPermission[] | ManifestIssue {
     return issue('invalid-manifest', {
       field: '/permissions',
       message: 'workspace:write requires workspace:read.',
+    })
+  }
+  if (seen.has('workspace:list') && !seen.has('workspace:read')) {
+    return issue('invalid-manifest', {
+      field: '/permissions',
+      message: 'workspace:list requires workspace:read.',
     })
   }
   return permissions

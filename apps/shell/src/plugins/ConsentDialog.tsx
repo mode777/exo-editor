@@ -19,6 +19,8 @@ const PERMISSION_TEXT: Record<PluginPermission, string> = {
   'workspace:read':
     'Read workspace files it opens or requests, including files you select in its picker.',
   'workspace:write': 'Write changes to workspace files when you save.',
+  'workspace:list':
+    'List folder contents and file names in the workspace, including files it has not opened.',
   'events:subscribe': 'Receive shell notifications such as theme and file changes.',
 }
 

@@ -136,13 +136,15 @@ interface ShellInit {
   file?: FileMetadata
   /**
    * Present only when mode is 'editor'. `requestFiles` is the permission bit;
-   * `filePicker` is the shell support bit and is absent on older shells.
+   * `filePicker` and `directoryListing` are shell support bits and are absent
+   * on older shells.
    */
   capabilities?: {
     read: boolean
     write: boolean
     requestFiles: boolean
     filePicker?: boolean
+    directoryListing?: boolean
   }
   /** Present only when mode is 'editor'. */
   limits?: { maxFileSize: number; maxRequestBytes: number }
@@ -173,7 +175,7 @@ reinterpret a frame that starts in one mode as the other.
 | Phase | Allowed plugin messages |
 | --- | --- |
 | `register` | `plugin/ready`, `plugin/register`, `plugin/register-complete` |
-| `editor` | `plugin/ready`, `plugin/request-file`, `plugin/request-files`, `plugin/dirty`, `plugin/request-save`, `plugin/save-content`, `plugin/subscribe`, `plugin/unsubscribe`, `plugin/dispose-ack` |
+| `editor` | `plugin/ready`, `plugin/request-file`, `plugin/request-files`, `plugin/request-list`, `plugin/dirty`, `plugin/request-save`, `plugin/save-content`, `plugin/subscribe`, `plugin/unsubscribe`, `plugin/dispose-ack` |
 
 - `plugin/ready` is accepted once per frame. A second `ready`, a
   `plugin/register-complete` before `ready`, or a registration message after
@@ -326,6 +328,59 @@ shell/files-selected   { paths: WorkspacePath[] }      // [] means cancelled
   picker without a reply; a late answer is dropped.
 - The shell logs the plugin id, outcome and error code, not the selected paths.
 
+### 5.2.2 Permissioned directory listing
+
+```text
+plugin/request-list   { path: WorkspacePath, cursor?: string }
+shell/list-result     { entries: DirectoryEntry[], nextCursor?: string }
+
+DirectoryEntry = { path: WorkspacePath, kind: 'file' | 'directory', size?: number }
+```
+
+- `plugin/request-list` is an editor-phase, correlated request. It requires the
+  manifest permission `workspace:list`; a handler without it receives
+  `permission-denied`, performs no provider listing and returns no entries.
+  `workspace:list` is a manifest permission, not a shell capability:
+  `capabilities.directoryListing` only says the shell implements the message.
+- `path` is required. A relative path resolves against the handler file's
+  directory; a leading `/` is workspace-absolute. The shell normalizes and
+  contains the path, denies reserved requested directories with
+  `permission-denied` and lists one directory level only. The reply never
+  includes descendants of a listed child directory.
+- The shell serves pages from a workspace-scoped, handler-bound snapshot created
+  by the first request (no cursor). A page holds at most 1,000 direct children,
+  sorted directories before files and then by path using the workspace's
+  case-sensitivity rule. `nextCursor` is an opaque token and is present only when
+  more entries remain. Later pages slice the same snapshot, so a create or delete
+  between pages does not change them; a fresh request without a cursor observes
+  the new state.
+- An entry carries `path`, `kind` and, for files, a byte `size`. It carries no
+  `mtime`, content version, content, handle, `File` or `Blob`; a listed file is
+  read through `plugin/request-file` and the normal read checks.
+- Reserved entries (`/exo.json`, `/.exo/**`) are filtered through the
+  plugin-scoped workspace facade and re-checked before a page is served. They are
+  never listed, returned, cached as an entry or accepted as a requested
+  directory.
+- An invalid cursor is `not-found`, including a malformed cursor, a cursor for a
+  different path, an evicted snapshot and a cursor from another handler. The
+  plugin lists again without a cursor.
+- A missing directory is `not-found`; a file path is `not-a-directory`;
+  `internal` covers an unexpected provider failure. A protocol-violation reply
+  covers a missing `id`, a non-string `path`, a non-string `cursor` or an unknown
+  field.
+- At most four listing requests per frame may be in flight, and a frame may send
+  at most twenty listing requests in a rolling second. Exceeding either limit
+  returns `rate-limited` without queueing or performing the listing. A page has a
+  five-second deadline and returns `timeout` with no partial entries.
+- Listing snapshots are handler-scoped and workspace-scoped. They are discarded
+  and pending pages are aborted on handler disposal, tab close, plugin removal and
+  workspace switch; a page that resolves late is dropped and produces no
+  `shell/list-result`. The cache is bounded per handler with LRU eviction; the
+  newest snapshot is always admitted so a large directory is never silently
+  truncated.
+- Listing is not a watcher and grants no write. A hidden handler may list if it
+  holds the permission; no visible surface or user gesture is required.
+
 ### 5.3 Dirty state and save
 
 ```text
@@ -407,6 +462,7 @@ interface ShellError {
     | 'permission-denied'
     | 'not-found'
     | 'not-a-file'
+    | 'not-a-directory'
     | 'too-large'
     | 'conflict'
     | 'rate-limited'
@@ -436,6 +492,11 @@ are cleared on workspace switch.
 | Pending file pickers per frame | 1 |
 | Open file pickers per shell | 1 |
 | Paths per file selection | 32 |
+| Entries per listing page | 1,000 |
+| In-flight listing requests per frame | 4 |
+| Listing requests per rolling second per frame | 20 |
+| Listing page timeout | 5 s |
+| Listing snapshots per handler | bounded with LRU eviction; the newest snapshot is always admitted |
 
 When a plugin already has 20 handler frames open, the shell refrains from mounting
 another one: the new document opens in the shell's fallback renderer with a
@@ -471,6 +532,14 @@ for repeated violations, tears down the frame.
 - Close a picker without a reply when its handler is disposed, hidden, inactive
   or belongs to a released workspace.
 - Never pass `FileSystemHandle`, `File`, or `Blob` objects to a frame.
+- List only through the plugin-scoped facade, re-check the reserved set for every
+  entry before it enters a page or snapshot, and never cache a reserved path or
+  accept one as a listing directory.
+- Validate `workspace:list` at the handler boundary, reject foreign or mismatched
+  cursors, and drop listing pages that resolve after disposal or a workspace
+  switch.
+- Return only `path`, `kind` and, for files, `size` from a listing; never `mtime`,
+  a content version, content or a handle.
 - Never include another document's path in an error message.
 - Re-check `workspace:read` and `workspace:write` at the handler boundary; a
   registry entry is not a capability.

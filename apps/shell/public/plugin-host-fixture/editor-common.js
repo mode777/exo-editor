@@ -21,6 +21,10 @@
     picks: [],
     pickReads: [],
     pendingPickRead: null,
+    lists: [],
+    listReads: [],
+    pendingListRead: null,
+    listStarted: false,
     dirty: false,
     disposed: 'pending',
     external: null,
@@ -32,7 +36,7 @@
   function render() {
     state.origin = location.origin
     observation.textContent = JSON.stringify(state)
-    document.title = `Exo fixture ${fixtureMode} ${state.phase} events:${state.events.length} picks:${state.picks.length}`
+    document.title = `Exo fixture ${fixtureMode} ${state.phase} events:${state.events.length} picks:${state.picks.length} lists:${state.lists.length}`
   }
 
   function post(type, payload, replyTo, id) {
@@ -50,6 +54,86 @@
   function pickFiles() {
     if (fixtureMode !== 'picker') return
     post('plugin/request-files', { multiple: false }, undefined, `pick-${state.picks.length + 1}`)
+  }
+
+  const listProbes = [
+    { id: 'list-root', path: '/' },
+    { id: 'list-dir', path: '.' },
+    { id: 'list-big', path: '/listing/big' },
+    { id: 'list-file', path: null },
+    { id: 'list-missing', path: '/missing-listing-dir' },
+    { id: 'list-reserved', path: '/exo.json' },
+  ]
+  let listProbeIndex = 0
+
+  function requestList(requestId, path, cursor) {
+    post(
+      'plugin/request-list',
+      cursor === undefined ? { path } : { path, cursor },
+      undefined,
+      requestId,
+    )
+  }
+
+  function startListing() {
+    if (fixtureMode !== 'list' || state.listStarted) return
+    state.listStarted = true
+    nextListProbe()
+  }
+
+  function nextListProbe() {
+    if (listProbeIndex >= listProbes.length) return
+    const probe = listProbes[listProbeIndex]
+    listProbeIndex += 1
+    requestList(probe.id, probe.path === null ? state.file.path : probe.path)
+  }
+
+  function isListProbe(replyTo) {
+    return (
+      replyTo === 'list-root-2' ||
+      replyTo === 'list-big-2' ||
+      listProbes.some((probe) => probe.id === replyTo)
+    )
+  }
+
+  function onListResult(replyTo, payload) {
+    const entries = Array.isArray(payload.entries) ? payload.entries : []
+    state.lists.push({
+      id: replyTo,
+      count: entries.length,
+      entries: entries
+        .slice(0, 5)
+        .map((entry) =>
+          entry.kind === 'file' ? `${entry.path} (file ${entry.size})` : `${entry.path} (dir)`,
+        ),
+      nextCursor: payload.nextCursor || null,
+      reserved: entries.filter(
+        (entry) =>
+          entry.path === '/exo.json' ||
+          entry.path === '/.exo' ||
+          String(entry.path).startsWith('/.exo/'),
+      ).length,
+    })
+    render()
+
+    if (replyTo === 'list-root') {
+      const file = entries.find(
+        (entry) => entry.kind === 'file' && entry.path !== (state.file && state.file.path),
+      )
+      if (file) {
+        state.pendingListRead = file.path
+        post('plugin/request-file', { path: file.path, encoding: 'utf8' }, undefined, 'list-read')
+      }
+      if (payload.nextCursor) {
+        requestList('list-root-2', '/', payload.nextCursor)
+        return
+      }
+    }
+    if (replyTo === 'list-big' && payload.nextCursor) {
+      requestList('list-big-2', '/listing/big', payload.nextCursor)
+      return
+    }
+    if (isListProbe(replyTo)) nextListProbe()
   }
 
   function onFileSelected(payload) {
@@ -83,6 +167,7 @@
       settings: payload.settings,
     }
     if (fixtureMode === 'events') subscribeAll()
+    if (fixtureMode === 'list') setTimeout(startListing, 300)
     render()
     // Delay the first read so a verifier can observe init without content.
     setTimeout(() => requestFile('read-1'), 500)
@@ -141,6 +226,16 @@
         state.buffer = `${state.buffer || ''}\n[fixture picked ${payload.path}]`
       }
       markDirty()
+      return
+    }
+    if (fixtureMode === 'list' && state.pendingListRead === payload.path) {
+      state.listReads.push({
+        path: payload.path,
+        version: payload.version,
+        length: typeof payload.text === 'string' ? payload.text.length : -1,
+      })
+      state.pendingListRead = null
+      render()
       return
     }
     if (typeof payload.text === 'string' && !state.dirty) {
@@ -224,6 +319,9 @@
       case 'shell/files-selected':
         onFileSelected(data.payload || {})
         break
+      case 'shell/list-result':
+        onListResult(data.replyTo, data.payload || {})
+        break
       case 'shell/request-save':
         onSave(data.id)
         break
@@ -257,8 +355,9 @@
         onDispose(data.payload)
         break
       case 'shell/error':
-        state.errors.push(data.payload)
+        state.errors.push(Object.assign({ replyTo: data.replyTo || null }, data.payload || {}))
         render()
+        if (fixtureMode === 'list' && isListProbe(data.replyTo)) nextListProbe()
         break
     }
   })

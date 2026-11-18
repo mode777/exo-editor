@@ -83,6 +83,33 @@ selected path with `readFile`. If `filePicker` is missing (an older shell), it
 rejects locally with `unsupported-message`, so keep manual path entry as the
 fallback. `directory` is an optional start hint, not a permission.
 
+To discover files in a directory, declare `workspace:list` and page through the
+listing:
+
+```ts
+if (editor.capabilities.directoryListing) {
+  let cursor: string | undefined
+  do {
+    const page = await editor.listDirectory('.', cursor ? { cursor } : {})
+    for (const entry of page.entries) {
+      if (entry.kind === 'file') {
+        // `entry.path` is workspace-rooted; content still comes from readFile.
+        const content = await editor.readFile(entry.path, 'utf8')
+        // Use the path and content.
+      }
+    }
+    cursor = page.nextCursor
+  } while (cursor)
+}
+```
+
+The SDK rejects locally with `unsupported-message` when
+`capabilities.directoryListing` is absent and with `permission-denied` when the
+manifest lacks `workspace:list`. Pass `nextCursor` through unchanged; the SDK
+does not define its format. Listing is one level at a time: list a returned
+directory with another call. Keep exact-path reads and the picker as the
+fallback on an older shell.
+
 Rules the SDK enforces for you:
 
 - `shell/init` must echo the fragment's session and mode before any payload is

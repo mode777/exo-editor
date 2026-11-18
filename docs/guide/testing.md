@@ -38,6 +38,10 @@ plus the shell text surface. The recorded acceptance path is
 - The file picker opens only from an active visible handler, returns only the
   paths the user selected, hides `exo.json`/`.exo`, and leaves reads to
   `plugin/request-file`. Cancelling returns an empty path list.
+- Listing returns one directory level of `path`/`kind`/`size` entries, hides
+  `exo.json`/`.exo`, paginates with `nextCursor`, and answers a file path with
+  `not-a-directory` and a missing directory with `not-found`. A plugin without
+  `workspace:list` receives `permission-denied` and lists nothing.
 - Dirty state reaches the tab, Save writes exact text or bytes, a conflict
   leaves the buffer and disk intact.
 - An external change is visible and does not silently replace a dirty buffer.
@@ -58,6 +62,9 @@ plus the shell text surface. The recorded acceptance path is
 | `too-large` | File or payload exceeds the advertised limit | Ask for a smaller file/range or show a no-editor state |
 | `timeout` in the plugin log | Controller never sent `ready`, or registration never completed | Check the SDK boot path and the frame's console |
 | `unsupported-message` on a picker | Shell predates `plugin/request-files` or omits `filePicker` | Hide the picker action and fall back to manual path entry |
+| `unsupported-message` on a listing | Shell predates `plugin/request-list` or omits `directoryListing` | Fall back to exact-path reads and the picker |
+| `permission-denied` on a listing | Manifest lacks `workspace:list`, or the path is reserved | Add `workspace:read` and `workspace:list`; never list `/.exo` or `/exo.json` |
+| `not-a-directory` / `not-found` on a listing | Path is a file, missing, or the cursor expired | List a directory, and re-list without a cursor after `not-found` |
 | `protocol-violation` | Unknown message, wrong session, wrong mode or content outside save | Remove hand-written protocol code; use the SDK |
 | Manifest rejected with no frame | Unknown field or invalid page | Validate against the schema and the contract's field table |
 

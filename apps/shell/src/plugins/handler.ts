@@ -8,7 +8,13 @@ import {
 import { basename, dirname, isReservedPath, normalizePath } from '../workspace/paths'
 import type { FrameHandle, FrameSurface, FrameTransport, PluginMessage } from './frame'
 import type { FilePickerOpenRequest, FilePickerOutcome } from './file-picker'
-import { hasEventsSubscribe, hasWorkspaceRead, hasWorkspaceWrite } from './manifest'
+import { ListingBroker } from './listing'
+import {
+  hasEventsSubscribe,
+  hasWorkspaceList,
+  hasWorkspaceRead,
+  hasWorkspaceWrite,
+} from './manifest'
 import type { EventBus, EventSubscriber } from './events'
 import type { EditorCandidate } from './registry'
 import type { SettingValues } from './settings'
@@ -238,6 +244,7 @@ export class HandlerSession {
   private pickerId: string | null = null
   private pickerAbort: AbortController | null = null
   private readonly readIds = new Set<string>()
+  private readonly listing: ListingBroker
 
   constructor(options: HandlerSessionOptions) {
     this.options = options
@@ -250,6 +257,13 @@ export class HandlerSession {
     this.clearTimeoutImpl =
       options.clearTimeoutImpl ?? (clearTimeout.bind(globalThis) as typeof clearTimeout)
     this.violations = new ViolationBudget(() => this.fail('protocol-violation', 'editor'))
+    this.listing = new ListingBroker({
+      list: (path, options) =>
+        this.options.session.forPlugin(this.options.candidate.pluginId).list(path, options),
+      caseSensitive: options.session.capabilities().caseSensitive,
+      setTimeoutImpl: this.setTimeoutImpl,
+      clearTimeoutImpl: this.clearTimeoutImpl,
+    })
     this.subscription = options.events.createSubscriber({
       label: options.candidate.pluginId,
       identity: options.candidate.identity,
@@ -343,6 +357,7 @@ export class HandlerSession {
     this.clearTimers()
     this.cancelFilePicker()
     this.failLiveSave('internal')
+    this.listing.reset()
     if (!this.frame) {
       this.phase = 'closed'
       return
@@ -366,6 +381,7 @@ export class HandlerSession {
     this.clearTimers()
     this.cancelFilePicker()
     this.failLiveSave('internal')
+    this.listing.reset()
     this.readings.clear()
     this.readIds.clear()
     this.frame?.close()
@@ -464,6 +480,7 @@ export class HandlerSession {
     this.clearTimers()
     this.cancelFilePicker()
     this.failLiveSave('internal')
+    this.listing.reset()
     this.frame?.close()
     this.frame = null
     this.options.onFailure({ code, phase, message })
@@ -488,6 +505,7 @@ export class HandlerSession {
     this.clearTimers()
     this.cancelFilePicker()
     this.failLiveSave('internal')
+    this.listing.reset()
     this.readings.clear()
     this.readIds.clear()
     this.frame?.close()
@@ -557,6 +575,9 @@ export class HandlerSession {
         return
       case 'plugin/request-files':
         void this.handleRequestFiles(envelope)
+        return
+      case 'plugin/request-list':
+        void this.handleRequestList(envelope)
         return
       case 'plugin/dirty':
         this.handleDirty(envelope)
@@ -631,6 +652,7 @@ export class HandlerSession {
         write: this.options.canWrite && hasWorkspaceWrite(candidate.permissions),
         requestFiles: hasWorkspaceRead(candidate.permissions),
         filePicker: this.options.onRequestFiles !== undefined,
+        directoryListing: true,
       },
       limits: {
         maxFileSize: this.options.maxFileSize,
@@ -886,6 +908,53 @@ export class HandlerSession {
       id,
     )
     this.log('handler-picker', 'ok')
+  }
+
+  private async handleRequestList(envelope: Envelope): Promise<void> {
+    const id = envelope.id
+    if (!id) {
+      this.violation(envelope)
+      return
+    }
+    const payload = envelope.payload
+    if (
+      !isPlainObject(payload) ||
+      typeof payload.path !== 'string' ||
+      (payload.cursor !== undefined && typeof payload.cursor !== 'string') ||
+      Object.keys(payload).some((key) => key !== 'path' && key !== 'cursor')
+    ) {
+      this.violation(envelope)
+      return
+    }
+    if (!hasWorkspaceList(this.options.candidate.permissions)) {
+      this.sendError('permission-denied', id)
+      this.log('handler-list', 'permission-denied')
+      return
+    }
+
+    let path: WorkspacePath
+    try {
+      path = resolveHandlerReadPath(this.file.path, payload.path)
+    } catch {
+      this.sendError('permission-denied', id)
+      this.log('handler-list', 'permission-denied')
+      return
+    }
+    if (isReservedPath(path, this.options.session.capabilities().caseSensitive)) {
+      this.sendError('permission-denied', id)
+      this.log('handler-list', 'permission-denied')
+      return
+    }
+
+    const result = await this.listing.list(path, payload.cursor as string | undefined)
+    if (this.phase !== 'active') return
+    if (!result.ok) {
+      this.sendError(result.code, id)
+      this.log('handler-list', result.code)
+      return
+    }
+    postEnvelope(this.frame, this.boundary.targetOrigin, 'shell/list-result', result.page, id)
+    this.log('handler-list', 'ok', path)
   }
 
   private async handleRequestFile(envelope: Envelope): Promise<void> {

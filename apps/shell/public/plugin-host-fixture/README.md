@@ -50,14 +50,15 @@ without breaking the other variants.
 and acknowledges `shell/dispose`. State is mirrored into `#observation` and the
 document title so a hidden frame remains inspectable in devtools.
 
-| File glob           | Page                    | Behaviour                                                                      |
-| ------------------- | ----------------------- | ------------------------------------------------------------------------------ |
-| `**/*.picker.txt`   | `editor-picker.html`    | Visible frame with a Pick button; exercises `plugin/request-files`             |
-| `**/*.events.txt`   | `editor-events.html`    | Subscribes to the four v1 topics and records sequences and events              |
-| `**/*.txt`          | `editor.html`           | Read, report dirty, save with a `[fixture save N]` marker, acknowledge dispose |
-| `**/*.append.txt`   | `editor-append.html`    | Same, with an `[fixture append N]` marker and a second visible edit signal     |
-| `**/*.repeat.txt`   | `editor-repeat.html`    | Requests the same file twice and records both versions in `#observation`       |
-| `**/*.neverack.txt` | `editor-never-ack.html` | Ignores `shell/dispose` so the 1 s teardown timeout is observable              |
+| File glob           | Page                    | Behaviour                                                                       |
+| ------------------- | ----------------------- | ------------------------------------------------------------------------------- |
+| `**/*.list.txt`     | `editor-list.html`      | Probes `plugin/request-list`: root, relative, large, file, missing and reserved |
+| `**/*.picker.txt`   | `editor-picker.html`    | Visible frame with a Pick button; exercises `plugin/request-files`              |
+| `**/*.events.txt`   | `editor-events.html`    | Subscribes to the four v1 topics and records sequences and events               |
+| `**/*.txt`          | `editor.html`           | Read, report dirty, save with a `[fixture save N]` marker, acknowledge dispose  |
+| `**/*.append.txt`   | `editor-append.html`    | Same, with an `[fixture append N]` marker and a second visible edit signal      |
+| `**/*.repeat.txt`   | `editor-repeat.html`    | Requests the same file twice and records both versions in `#observation`        |
+| `**/*.neverack.txt` | `editor-never-ack.html` | Ignores `shell/dispose` so the 1 s teardown timeout is observable               |
 
 The `events` mode subscribes to `theme/changed`, `workspace/file-changed`,
 `workspace/closed` and `config/changed` after `shell/init`. `#observation`
@@ -147,6 +148,26 @@ carries the full new map to subscribed frames of this plugin only.
     returns paths and the fixture reads them, but the shell offers no Save. A
     hidden `.txt` editor has no Pick button and a picker request from it is
     denied.
+21. Open `listing/one.list.txt` with the deployed manifest. The listing fixture
+    probes `plugin/request-list` in order: the workspace root (absolute), its own
+    directory (relative `.`), `/listing/big`, its own file path, a missing path
+    and `/exo.json`. `#observation.lists` records each page's entry count, the
+    first five entries with path/kind/size, `nextCursor` and the number of
+    reserved entries; `errors` records `not-a-directory` for the file,
+    `not-found` for the missing path and `permission-denied` for `/exo.json`.
+    `#observation.listReads` proves a listed path is read through
+    `plugin/request-file`.
+22. Create `listing/big/` with 1,001 files and reopen the document. The
+    `list-big` page records `count: 1000` and a `nextCursor`, and the follow-up
+    `list-big-2` page records the remaining entry without a cursor. A 1,001-entry
+    root page also continues automatically as `list-root-2`.
+23. Enable `readonly-manifest.json` instead and open the same document. Every
+    listing request is answered with `permission-denied` and no `lists` page is
+    recorded, because that manifest declares only `workspace:read`.
+24. Switch to another workspace while the listing page is in flight: the old
+    frame is disposed, no late `list-result` is recorded, and the new workspace
+    starts with no listing state. Disabling the plugin or closing the tab has the
+    same effect.
 
 Changes are only observed for open documents plus the shell's own writes; both
 providers are non-watchable, so an unopened file is not reported.

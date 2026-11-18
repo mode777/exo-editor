@@ -194,6 +194,29 @@ describe('consent fingerprint', () => {
     expect(configured).toBe(base)
   })
 
+  it('re-prompts when listing is added and keeps read-only consent stable', async () => {
+    const readOnly = manifest({ permissions: ['workspace:read'] })
+    const withList = manifest({ permissions: ['workspace:read', 'workspace:list'] })
+
+    // The sorted permission input includes listing, so adding it re-prompts.
+    expect(fingerprintInput(withList).permissions).toEqual(['workspace:list', 'workspace:read'])
+    expect(await computeFingerprint(withList, digest)).not.toBe(
+      await computeFingerprint(readOnly, digest),
+    )
+
+    // A plugin that never adds listing keeps the fingerprint of its stored consent.
+    const stored = await computeFingerprint(readOnly, digest)
+    expect(await computeFingerprint(manifest({ permissions: ['workspace:read'] }), digest)).toBe(
+      stored,
+    )
+    expect(
+      await computeFingerprint(
+        manifest({ permissions: ['workspace:write', 'workspace:read'] }),
+        digest,
+      ),
+    ).not.toBe(await computeFingerprint(manifest({ permissions: ['workspace:read'] }), digest))
+  })
+
   it('changes on every capability field', async () => {
     const base = await computeFingerprint(manifest(), digest)
     const variants = [

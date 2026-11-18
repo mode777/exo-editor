@@ -227,12 +227,12 @@
         },
         "permissions": {
           "type": "array",
-          "maxItems": 3,
+          "maxItems": 4,
           "uniqueItems": true,
           "items": {
-            "enum": ["workspace:read", "workspace:write", "events:subscribe"]
+            "enum": ["workspace:read", "workspace:write", "workspace:list", "events:subscribe"]
           },
-          "$comment": "workspace:write without workspace:read is rejected by the validator; JSON Schema cannot express that dependency cleanly."
+          "$comment": "workspace:write and workspace:list without workspace:read are rejected by the validator; JSON Schema cannot express those dependencies cleanly."
         },
         "contributes": { "$ref": "#/$defs/contributes" }
       }

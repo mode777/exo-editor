@@ -280,6 +280,29 @@ describe('manifest validation', () => {
     expect(validate({ permissions: [] }).ok).toBe(true)
   })
 
+  it('accepts listing with read and rejects listing alone or duplicated', () => {
+    const valid = validate({ permissions: ['workspace:read', 'workspace:list'] })
+    expect(valid.ok).toBe(true)
+    if (valid.ok) {
+      expect(valid.manifest.permissions).toEqual(['workspace:read', 'workspace:list'])
+    }
+
+    expect(errorOf(validate({ permissions: ['workspace:list'] }))).toMatchObject({
+      code: 'invalid-manifest',
+      field: '/permissions',
+    })
+    expect(errorOf(validate({ permissions: ['workspace:write', 'workspace:list'] })).field).toBe(
+      '/permissions',
+    )
+    expect(
+      errorOf(validate({ permissions: ['workspace:read', 'workspace:list', 'workspace:list'] }))
+        .field,
+    ).toBe('/permissions/2')
+    expect(
+      validate({ permissions: ['workspace:read', 'workspace:list', 'workspace:write'] }).ok,
+    ).toBe(true)
+  })
+
   it('accepts a configuration contribution with all supported setting types', () => {
     const result = validate(
       withConfiguration({

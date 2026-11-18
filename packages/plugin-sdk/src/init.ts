@@ -26,6 +26,7 @@ const SHELL_ERROR_CODES: ShellErrorCode[] = [
   'permission-denied',
   'not-found',
   'not-a-file',
+  'not-a-directory',
   'too-large',
   'conflict',
   'rate-limited',
@@ -107,6 +108,10 @@ function capabilitiesAt(value: Record<string, unknown>, path: string): EditorCap
       capabilities.filePicker === undefined
         ? false
         : booleanAt(capabilities, 'filePicker', `${path}.capabilities`),
+    directoryListing:
+      capabilities.directoryListing === undefined
+        ? false
+        : booleanAt(capabilities, 'directoryListing', `${path}.capabilities`),
   }
 }
 

@@ -13,7 +13,7 @@ replace the contracts; the normative version rules are in
 | Shell SemVer | `0.1.0` | `apps/shell/package.json`, `SHELL_VERSION`, advertised in `shell/init` | The deployed shell release; independent of the protocol major |
 | Protocol major | `1` | Envelope `exo: 1`, `PROTOCOL_VERSION`, handshake | The wire compatibility axis; the shell accepts exactly one major per release |
 | Manifest schema | `1` | `manifest.schemaVersion` / `exo.json` `schemaVersion` | The manifest shape; a new version needs a validator and a consent re-prompt |
-| SDK SemVer | `1.2.0` | `packages/plugin-sdk/package.json` | The client package; its MAJOR equals the protocol major it speaks |
+| SDK SemVer | `1.3.0` | `packages/plugin-sdk/package.json` | The client package; its MAJOR equals the protocol major it speaks |
 | Artifact versions | `0.1.0` | template and code-plugin packages | Demo/reference artifacts; not a compatibility promise |
 
 Changing one axis does not imply a change to the others. The shell version
@@ -24,8 +24,9 @@ SDK version answers "which client API is this".
 ## Current release
 
 The first public release is shell `0.1.0`, protocol `1`, manifest schema `1`,
-SDK `1.1.0`, dated 2026-11-16. The current SDK minor is `1.2.0`, which adds the
-additive file-picker helper without changing the protocol major. "v1" in the
+SDK `1.1.0`, dated 2026-11-16. The current SDK minor is `1.3.0`, which adds the
+additive directory-listing helper without changing the protocol major; `1.2.0`
+added the file-picker helper. "v1" in the
 product documents is the first supported protocol major and release milestone,
 not a claim that the shell package is on SemVer `1.x`. A shell `1.0.0` is a
 separate decision governed by this plan; it is not made by the release-readiness

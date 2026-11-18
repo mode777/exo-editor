@@ -42,7 +42,13 @@ function editorInit(overrides: Partial<EditorInit> = {}): EditorInit {
       mtime: 1000,
       version: 'v1',
     },
-    capabilities: { read: true, write: true, requestFiles: true, filePicker: true },
+    capabilities: {
+      read: true,
+      write: true,
+      requestFiles: true,
+      filePicker: true,
+      directoryListing: true,
+    },
     limits: { maxFileSize: 10 * 1024 * 1024, maxRequestBytes: 16 * 1024 * 1024 },
     ...overrides,
   }
@@ -110,6 +116,43 @@ describe('handshake', () => {
           write: true,
           requestFiles: true,
           filePicker: 'yes',
+        } as unknown as EditorInit['capabilities'],
+      }),
+    })
+    await expect(promise).rejects.toMatchObject({ code: 'protocol-violation' })
+  })
+
+  it('parses the directoryListing support bit and defaults absence to false', async () => {
+    const newShell = transport('editor')
+    const newPromise = connectPlugin({ transport: newShell })
+    newShell.emit({ exo: 1, type: 'shell/init', payload: editorInit() })
+    const connected = await newPromise
+    if (connected.mode !== 'editor') throw new Error('expected editor mode')
+    expect(connected.editor.capabilities.directoryListing).toBe(true)
+
+    const oldShell = transport('editor')
+    const oldPromise = connectPlugin({ transport: oldShell })
+    const payload = editorInit()
+    delete (payload.capabilities as Partial<EditorInit['capabilities']>).directoryListing
+    oldShell.emit({ exo: 1, type: 'shell/init', payload })
+    const old = await oldPromise
+    if (old.mode !== 'editor') throw new Error('expected editor mode')
+    expect(old.editor.capabilities.directoryListing).toBe(false)
+  })
+
+  it('rejects a non-boolean directoryListing support bit', async () => {
+    const fake = transport('editor')
+    const promise = connectPlugin({ transport: fake })
+    fake.emit({
+      exo: 1,
+      type: 'shell/init',
+      payload: editorInit({
+        capabilities: {
+          read: true,
+          write: true,
+          requestFiles: true,
+          filePicker: true,
+          directoryListing: 'yes',
         } as unknown as EditorInit['capabilities'],
       }),
     })

@@ -26,7 +26,13 @@ function init(overrides: Partial<EditorInit> = {}): EditorInit {
       mtime: 1000,
       version: 'v1',
     },
-    capabilities: { read: true, write: true, requestFiles: true, filePicker: true },
+    capabilities: {
+      read: true,
+      write: true,
+      requestFiles: true,
+      filePicker: true,
+      directoryListing: true,
+    },
     limits: { maxFileSize: 10 * 1024 * 1024, maxRequestBytes: 16 * 1024 * 1024 },
     ...overrides,
   }
@@ -60,6 +66,7 @@ describe('editor client', () => {
       write: true,
       requestFiles: true,
       filePicker: true,
+      directoryListing: true,
     })
     expect(editor.settings).toEqual({ 'template.greeting': 'hello' })
     expect(transport.posted.filter((item) => item.type === 'plugin/request-file')).toHaveLength(0)
@@ -411,7 +418,13 @@ describe('editor client', () => {
     ).toHaveLength(0)
 
     const denied = await connect({
-      capabilities: { read: true, write: false, requestFiles: false, filePicker: true },
+      capabilities: {
+        read: true,
+        write: false,
+        requestFiles: false,
+        filePicker: true,
+        directoryListing: true,
+      },
     })
     await expect(denied.editor.requestFiles()).rejects.toMatchObject({ code: 'permission-denied' })
     expect(
@@ -445,6 +458,121 @@ describe('editor client', () => {
   it('rejects a pending picker on disposal', async () => {
     const { transport, editor } = await connect()
     const pending = editor.requestFiles()
+    transport.emit({ exo: 1, type: 'shell/dispose', payload: { reason: 'closed' } })
+    await expect(pending).rejects.toMatchObject({ code: 'closed' })
+  })
+
+  it('lists a directory and passes the opaque cursor unchanged', async () => {
+    const { transport, editor } = await connect({
+      permissions: ['workspace:read', 'workspace:list'],
+    })
+    const first = editor.listDirectory('/assets')
+    const firstId = postedId(transport, 'plugin/request-list')
+    expect(transport.last('plugin/request-list')?.payload).toEqual({ path: '/assets' })
+    transport.emit({
+      exo: 1,
+      type: 'shell/list-result',
+      replyTo: firstId,
+      payload: {
+        entries: [
+          { path: '/assets/sub', kind: 'directory' },
+          { path: '/assets/a.txt', kind: 'file', size: 4 },
+        ],
+        nextCursor: 'v1.snapshot.2',
+      },
+    })
+    await expect(first).resolves.toEqual({
+      entries: [
+        { path: '/assets/sub', kind: 'directory' },
+        { path: '/assets/a.txt', kind: 'file', size: 4 },
+      ],
+      nextCursor: 'v1.snapshot.2',
+    })
+
+    const second = editor.listDirectory('/assets', { cursor: 'v1.snapshot.2' })
+    const secondId = postedId(transport, 'plugin/request-list')
+    expect(transport.last('plugin/request-list')?.payload).toEqual({
+      path: '/assets',
+      cursor: 'v1.snapshot.2',
+    })
+    transport.emit({
+      exo: 1,
+      type: 'shell/list-result',
+      replyTo: secondId,
+      payload: { entries: [] },
+    })
+    await expect(second).resolves.toEqual({ entries: [] })
+  })
+
+  it('preflights listing support and permission without sending', async () => {
+    const old = await connect({
+      permissions: ['workspace:read', 'workspace:list'],
+      capabilities: {
+        read: true,
+        write: true,
+        requestFiles: true,
+        filePicker: true,
+        directoryListing: false,
+      },
+    })
+    await expect(old.editor.listDirectory('/')).rejects.toMatchObject({
+      code: 'unsupported-message',
+    })
+    expect(old.transport.posted.filter((item) => item.type === 'plugin/request-list')).toHaveLength(
+      0,
+    )
+
+    const denied = await connect({ permissions: ['workspace:read'] })
+    await expect(denied.editor.listDirectory('/')).rejects.toMatchObject({
+      code: 'permission-denied',
+    })
+    expect(
+      denied.transport.posted.filter((item) => item.type === 'plugin/request-list'),
+    ).toHaveLength(0)
+  })
+
+  it('rejects a listing with the shell error code and leaves other requests pending', async () => {
+    const { transport, editor } = await connect({
+      permissions: ['workspace:read', 'workspace:list'],
+    })
+    const listing = editor.listDirectory('/notes.txt')
+    const listingId = postedId(transport, 'plugin/request-list')
+    transport.emit({
+      exo: 1,
+      type: 'shell/error',
+      replyTo: listingId,
+      payload: { code: 'not-a-directory' },
+    })
+    await expect(listing).rejects.toMatchObject({ code: 'not-a-directory' })
+  })
+
+  it('rejects a malformed listing page and entry shape', async () => {
+    const { transport, editor } = await connect({
+      permissions: ['workspace:read', 'workspace:list'],
+    })
+    const cases: unknown[] = [
+      {},
+      { entries: [1] },
+      { entries: [{ path: '/a', kind: 'file' }] },
+      { entries: [{ path: '/a', kind: 'file', size: 1, mtime: 1 }] },
+      { entries: [{ path: '/a', kind: 'directory', size: 1 }] },
+      { entries: [{ path: '/a', kind: 'other' }] },
+      { entries: [], nextCursor: 1 },
+      { entries: [], nextCursor: '' },
+    ]
+    for (const payload of cases) {
+      const pending = editor.listDirectory('/')
+      const id = postedId(transport, 'plugin/request-list')
+      transport.emit({ exo: 1, type: 'shell/list-result', replyTo: id, payload })
+      await expect(pending).rejects.toMatchObject({ code: 'protocol-violation' })
+    }
+  })
+
+  it('rejects a pending listing on disposal', async () => {
+    const { transport, editor } = await connect({
+      permissions: ['workspace:read', 'workspace:list'],
+    })
+    const pending = editor.listDirectory('/')
     transport.emit({ exo: 1, type: 'shell/dispose', payload: { reason: 'closed' } })
     await expect(pending).rejects.toMatchObject({ code: 'closed' })
   })

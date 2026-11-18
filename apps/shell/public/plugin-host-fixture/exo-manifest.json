@@ -13,7 +13,7 @@
   "runtime": {
     "entry": "plugin.html"
   },
-  "permissions": ["workspace:read", "workspace:write", "events:subscribe"],
+  "permissions": ["workspace:read", "workspace:write", "workspace:list", "events:subscribe"],
   "contributes": {
     "configuration": {
       "properties": {
@@ -36,6 +36,12 @@
       }
     },
     "fileEditors": [
+      {
+        "glob": "**/*.list.txt",
+        "entry": "editor-list.html",
+        "label": "Fixture Listing",
+        "priority": 50
+      },
       {
         "glob": "**/*.picker.txt",
         "entry": "editor-picker.html",

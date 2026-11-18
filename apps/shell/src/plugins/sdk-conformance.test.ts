@@ -31,7 +31,7 @@ function manifest(): PluginManifest {
       publisher: { name: 'Exo' },
       engines: { exo: '>=0.1.0' },
       runtime: { entry: 'plugin.html' },
-      permissions: ['workspace:read', 'workspace:write'],
+      permissions: ['workspace:read', 'workspace:write', 'workspace:list'],
       contributes: {
         fileEditors: [
           {
@@ -120,7 +120,7 @@ function candidate(): EditorCandidate {
     pluginId: 'com.example.template',
     pluginVersion: '0.1.0',
     origin: PLUGIN_ORIGIN,
-    permissions: ['workspace:read', 'workspace:write', 'events:subscribe'],
+    permissions: ['workspace:read', 'workspace:write', 'workspace:list', 'events:subscribe'],
     glob: '**/*.template.txt',
     entry: 'editor.html',
     entryUrl: `${PLUGIN_ORIGIN}/plugin/editor.html`,
@@ -203,6 +203,10 @@ describe('SDK conformance against the shell', () => {
     })
     expect(editor.capabilities.filePicker).toBe(true)
     await expect(editor.requestFiles()).resolves.toEqual([workspace.path])
+    expect(editor.capabilities.directoryListing).toBe(true)
+    await expect(editor.listDirectory('/')).resolves.toEqual({
+      entries: [{ path: workspace.path, kind: 'file', size: workspace.stat.size }],
+    })
 
     editor.setDirty(true)
     expect(dirty).toEqual([true])

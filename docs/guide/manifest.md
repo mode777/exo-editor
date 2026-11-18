@@ -90,6 +90,22 @@ Each `contributes.fileEditors` entry maps a glob to a handler page:
 A file editor contribution requires `workspace:read` or `workspace:write`.
 `workspace:write` implies read.
 
+## Permissions
+
+| Permission | What it allows |
+| --- | --- |
+| `workspace:read` | Read known paths it opens or requests, and paths the user selects in its picker. |
+| `workspace:write` | Save changes to workspace files through the normal save flow. Requires `workspace:read`. |
+| `workspace:list` | Enumerate one directory level at a time through `plugin/request-list`. Requires `workspace:read`. |
+| `events:subscribe` | Subscribe to the v1 shell event topics. |
+
+Listing is separate from reading so the consent text can name discovery
+explicitly. Adding `workspace:list` to an already-approved reader changes the
+consent fingerprint and re-prompts; a plugin that keeps only `workspace:read`
+keeps its stored consent. A manifest that uses listing should set an
+`engines.exo` range that includes a listing-capable shell. Listing returns paths,
+kinds and file sizes only; bytes still come from `plugin/request-file`.
+
 ## Optional pieces
 
 - `contributes.configuration` declares workspace-scoped settings. The shell

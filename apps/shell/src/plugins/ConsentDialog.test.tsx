@@ -123,6 +123,16 @@ describe('consent dialog', () => {
     expect(rendered.textContent).toContain('Renders its own editor surface')
   })
 
+  it('explains directory listing in plain language', async () => {
+    const { container: rendered } = await render(
+      request({ permissions: ['workspace:read', 'workspace:list'] }),
+    )
+    const text = rendered.textContent ?? ''
+    expect(text).toContain('workspace:list')
+    expect(text).toContain('List folder contents and file names in the workspace')
+    expect(text).toContain('including files it has not opened')
+  })
+
   it('warns when the plugin shares the shell origin', async () => {
     const sameOrigin = request({
       manifestOrigin: SHELL_ORIGIN,

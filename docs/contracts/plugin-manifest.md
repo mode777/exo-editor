@@ -175,7 +175,7 @@ settings view fails with `conflict` rather than overwriting an external edit.
 | `icon` | string | no | Relative to the manifest. `https` absolute also allowed. Rendered only after validation; failures are ignored. |
 | `engines.exo` | string | yes | SemVer range. The shell refuses a plugin whose range excludes its version. |
 | `runtime.entry` | string | yes | Relative HTML path to the controller document, loaded as a hidden registration iframe. No query, fragment or `..` segment. Must share the manifest's origin. Its directory is the plugin root: every other page the plugin loads must be a sibling or descendant of it. |
-| `permissions` | array | yes | Subset of `workspace:read`, `workspace:write`, `events:subscribe`. No duplicates. `workspace:write` implies `workspace:read`. A `contributes.fileEditors` entry requires `workspace:read` or `workspace:write`; registrations from a plugin without either are rejected with `permission-denied`. |
+| `permissions` | array | yes | Subset of `workspace:read`, `workspace:write`, `workspace:list`, `events:subscribe`. No duplicates. `workspace:write` and `workspace:list` require `workspace:read`. A `contributes.fileEditors` entry requires `workspace:read` or `workspace:write`; registrations from a plugin without either are rejected with `permission-denied`. `workspace:list` additionally allows one directory level per `plugin/request-list` and re-prompts an already-approved reader when added. |
 | `contributes.fileEditors` | array | no | Maximum 20. Each entry: `glob` (required), `entry` (required, relative HTML URL for the per-document iframe, inside the plugin root), `label` (required, 1-40 chars), `priority` (integer -100..100, default 0), `rendering` (`"hidden"` or `"frame"`, default `"hidden"`). Every editor entry uses the entry-resolution rules in section 4 and requires `workspace:read` or `workspace:write`. |
 | `contributes.configuration` | object | no | Optional workspace settings declaration. `configuration.properties` is an object of at most 50 named settings, each with `type` (`boolean`, `string` or `number`), a required matching `default`, an optional `enum`, an optional `description`, and an optional `scope` that must be `workspace`. See section 3.1. |
 
@@ -356,7 +356,9 @@ different origin is a different plugin.
 - The **exact origin** the manifest was loaded from: scheme, host and port.
 - The controller entry URL and the plugin root, plus each declared editor entry.
 - Whether each editor renders its own frame or stays headless.
-- The requested permissions in plain language.
+- The requested permissions in plain language, including directory listing as
+  permission to list folder contents and file names in the workspace, including
+  files the plugin has not opened.
 - The declared file-editor glob patterns and labels.
 - Whether the plugin can write to the workspace.
 - Whether the plugin shares the shell origin. In that case the dialog states that
@@ -394,7 +396,10 @@ glob changes the fingerprint and re-prompts. Adding, removing or renaming a page
 inside the root does not, because the user approved the directory tree (D14).
 The input list is exhaustive: a new manifest field that changes what the plugin
 can do must be added to the fingerprint in the same change, or consent would
-silently cover behaviour the user never saw.
+silently cover behaviour the user never saw. `workspace:list` is a separate
+permission for this reason: a plugin that previously declared only
+`workspace:read` gains a different sorted permissions input when it adds listing,
+so it re-prompts, while a read-only plugin keeps its stored consent.
 
 ### Storage
 
@@ -428,7 +433,11 @@ interface ConsentRecord {
   in this release. A future version requires a new OpenSpec change and a consent
   UI that can explain new fields.
 - `engines.exo` is checked against the shell version. A plugin that requires a
-  newer shell is listed as incompatible rather than attempted.
+  newer shell is listed as incompatible rather than attempted. A manifest that
+  uses `workspace:list` should set a range that includes a listing-capable shell;
+  the shell checks `engines.exo` before the permission vocabulary, so an older
+  shell reports `incompatible-engine` instead of rejecting a correctly versioned
+  plugin as `invalid-manifest`.
 - The protocol version is separate from both and is negotiated in the handshake
   (see [`plugin-protocol.md`](./plugin-protocol.md)).
 - The SDK does not parse, validate or rewrite a manifest, and it does not infer
