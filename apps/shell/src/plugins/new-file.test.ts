@@ -158,7 +158,7 @@ describe('NewFileController', () => {
     files.cancel()
   })
 
-  it('opens a template-created file and never auto-opens a runtime request', async () => {
+  it('reports both templates and runtime requests, leaving the open decision to the shell', async () => {
     const session = await makeSession()
     const { controller: files, created } = controller()
     files.beginTemplate({
@@ -180,6 +180,6 @@ describe('NewFileController', () => {
     const promise = files.request(request(session))
     await files.submit('/', 'runtime.txt')
     await expect(promise).resolves.toMatchObject({ ok: true })
-    expect(created).not.toHaveBeenCalled()
+    expect(created).toHaveBeenCalledWith('/runtime.txt', 'request')
   })
 })

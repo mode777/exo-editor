@@ -184,8 +184,9 @@ export class WorkspaceRuntime {
     this.pluginHost = options.pluginHost ?? new PluginHost()
     this.filePicker = new FilePickerController()
     this.newFiles = new NewFileController({
-      onCreated: (path) => {
-        this.openDocument(path)
+      onCreated: (path, kind) => {
+        this.refreshExplorer()
+        if (kind === 'template') this.openDocument(path)
       },
       onLog: (event) =>
         this.pluginHost.logHandler(event.identity, event.phase, event.code, event.message),

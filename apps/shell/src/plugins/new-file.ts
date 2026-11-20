@@ -251,7 +251,7 @@ export class NewFileController {
         .write(path, request.content.bytes, { create: true, createOnly: true })
       if (this.pending !== pending) return
       this.log(pending.view.identity, 'new-file', 'created', path)
-      if (pending.view.kind === 'template') this.created?.(path, 'template')
+      this.created?.(path, pending.view.kind)
       this.finish(pending, { ok: true, path, version: stat.version })
     } catch (error) {
       if (this.pending !== pending) return
