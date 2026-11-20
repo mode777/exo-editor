@@ -328,9 +328,9 @@
       return
     }
     if (command === 'fixture.fail') {
-      post('plugin/command-result', { ok: false, message: 'Fixture command failed' }, id)
+      post('plugin/command-result', { ok: false, message: 'Fixture command failed' }, undefined, id)
     } else {
-      post('plugin/command-result', { ok: true }, id)
+      post('plugin/command-result', { ok: true }, undefined, id)
     }
     render()
   }

@@ -105,6 +105,19 @@ afterEach(() => {
 })
 
 describe('view pool', () => {
+  it('waits for a panel that mounts after the wait starts', async () => {
+    const { pool, transport } = await createPool()
+    const input = panelInput()
+    const waiting = pool.waitForPanel(IDENTITY, 'outline', 1000)
+    const element = placeholder()
+    pool.attachPanelSurface(input, element)
+    const frame = transport.frames[0] as FakeFrame
+    ready(frame)
+    const session = await waiting
+    expect(session).toBe(pool.panelSession(IDENTITY, 'outline'))
+    expect(session?.active).toBe(true)
+  })
+
   it('mounts a panel only on first reveal and retains it when hidden', async () => {
     const { pool, transport } = await createPool()
     const input = panelInput()

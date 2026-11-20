@@ -142,7 +142,7 @@
       const command = data.payload && data.payload.command
       const args = data.payload && data.payload.args ? data.payload.args : null
       state.commands.push({ id: data.id, command, args })
-      post('plugin/command-result', { ok: true }, data.id)
+      post('plugin/command-result', { ok: true }, undefined, data.id)
       render()
       return
     }

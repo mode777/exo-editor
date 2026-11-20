@@ -413,9 +413,11 @@ export class ViewPool {
   private waitForSession(key: string, timeoutMs: number): Promise<ViewSession | null> {
     const current = this.records.get(key)
     if (current?.session?.active) return Promise.resolve(current.session)
-    if (!current || current.handle.phase === 'failed' || current.handle.phase === 'closed') {
+    if (current && (current.handle.phase === 'failed' || current.handle.phase === 'closed')) {
       return Promise.resolve(null)
     }
+    // The record may not exist yet: a reveal schedules a React render that
+    // attaches the surface. Wait for it instead of failing the invocation.
     return new Promise<ViewSession | null>((resolve) => {
       let settled = false
       let timer: ReturnType<typeof setTimeout> | null = null
@@ -433,7 +435,7 @@ export class ViewPool {
           finish(record.session)
           return
         }
-        if (!record || record.handle.phase === 'failed' || record.handle.phase === 'closed') {
+        if (record && (record.handle.phase === 'failed' || record.handle.phase === 'closed')) {
           finish(null)
         }
       })
