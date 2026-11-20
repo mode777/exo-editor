@@ -2,7 +2,9 @@ import { compileGlob } from './glob'
 import {
   hasWorkspaceRead,
   resolvePluginEntry,
+  type ManifestContentView,
   type ManifestFileEditor,
+  type ManifestPanel,
   type PluginManifest,
 } from './manifest'
 import type { FrameHandle, FrameSandbox, FrameTransport, PluginMessage } from './frame'
@@ -52,22 +54,41 @@ export interface RegisteredEditor {
   registrationOrder: number
 }
 
+export interface RegisteredPanel extends ManifestPanel {
+  /** Arrival order within this plugin, starting at zero. */
+  registrationOrder: number
+}
+
+export interface RegisteredContentView extends ManifestContentView {
+  /** Arrival order within this plugin, starting at zero. */
+  registrationOrder: number
+}
+
 export type RegistrationRejectionReason =
   'not-declared' | 'permission-denied' | 'invalid-glob' | 'invalid-contribution'
 
 export interface RejectedContribution {
   index: number
   reason: RegistrationRejectionReason
+  kind?: 'fileEditor' | 'panel' | 'contentView'
   message?: string
 }
 
 export interface RegistrationAck {
   accepted: string[]
+  acceptedPanels: string[]
+  acceptedContentViews: string[]
   rejected: RejectedContribution[]
 }
 
 export type RegistrationOutcome =
-  | { kind: 'active'; editors: RegisteredEditor[]; ack: RegistrationAck }
+  | {
+      kind: 'active'
+      editors: RegisteredEditor[]
+      panels: RegisteredPanel[]
+      contentViews: RegisteredContentView[]
+      ack: RegistrationAck
+    }
   | { kind: 'failed'; code: RegistrationErrorCode; phase: RegistrationPhase; message?: string }
 
 export type ShellErrorCode = import('./protocol').ShellErrorCode
@@ -92,6 +113,17 @@ type Phase = 'mounting' | 'awaiting-ready' | 'awaiting-register' | 'complete' | 
 
 function manifestEditorFor(manifest: PluginManifest, glob: string): ManifestFileEditor | undefined {
   return manifest.fileEditors.find((editor) => editor.glob === glob)
+}
+
+function manifestPanelFor(manifest: PluginManifest, id: string): ManifestPanel | undefined {
+  return manifest.panels.find((panel) => panel.id === id)
+}
+
+function manifestContentViewFor(
+  manifest: PluginManifest,
+  id: string,
+): ManifestContentView | undefined {
+  return manifest.contentViews.find((view) => view.id === id)
 }
 
 /**
@@ -123,6 +155,8 @@ export class RegistrationSession {
   private contributionIndex = 0
   private registrationOrder = 0
   private readonly pending = new Map<string, RegisteredEditor>()
+  private readonly pendingPanels = new Map<string, RegisteredPanel>()
+  private readonly pendingContentViews = new Map<string, RegisteredContentView>()
   private readonly rejected: RejectedContribution[] = []
 
   constructor(options: RegistrationSessionOptions) {
@@ -175,6 +209,8 @@ export class RegistrationSession {
     this.phase = 'closed'
     this.clearTimers()
     this.pending.clear()
+    this.pendingPanels.clear()
+    this.pendingContentViews.clear()
     this.frame?.close()
   }
 
@@ -203,6 +239,8 @@ export class RegistrationSession {
     this.phase = 'closed'
     this.clearTimers()
     this.pending.clear()
+    this.pendingPanels.clear()
+    this.pendingContentViews.clear()
     this.frame?.close()
     this.options.onOutcome({ kind: 'failed', code, phase, message })
   }
@@ -337,24 +375,74 @@ export class RegistrationSession {
       this.violation(envelope)
       return
     }
-    if (payload.fileEditors === undefined) return
-    if (!Array.isArray(payload.fileEditors)) {
-      this.violation(envelope)
-      return
+
+    if (payload.fileEditors !== undefined) {
+      if (!Array.isArray(payload.fileEditors)) {
+        this.violation(envelope)
+        return
+      }
+      for (const raw of payload.fileEditors) {
+        const index = this.contributionIndex
+        this.contributionIndex += 1
+        const result = this.validateContribution(raw)
+        if ('reason' in result) {
+          this.rejected.push({ index, kind: 'fileEditor', ...result })
+          continue
+        }
+        const key = `${result.glob}\u0000${result.entryUrl}`
+        if (this.pending.has(key)) continue
+        this.pending.set(key, { ...result, registrationOrder: this.registrationOrder })
+        this.registrationOrder += 1
+      }
     }
 
-    for (const raw of payload.fileEditors) {
-      const index = this.contributionIndex
-      this.contributionIndex += 1
-      const result = this.validateContribution(raw)
-      if ('reason' in result) {
-        this.rejected.push({ index, ...result })
-        continue
+    if (payload.panels !== undefined) {
+      if (!Array.isArray(payload.panels)) {
+        this.violation(envelope)
+        return
       }
-      const key = `${result.glob}\u0000${result.entryUrl}`
-      if (this.pending.has(key)) continue
-      this.pending.set(key, { ...result, registrationOrder: this.registrationOrder })
-      this.registrationOrder += 1
+      for (const raw of payload.panels) {
+        const index = this.contributionIndex
+        this.contributionIndex += 1
+        if (typeof raw !== 'string') {
+          this.rejected.push({ index, kind: 'panel', reason: 'invalid-contribution' })
+          continue
+        }
+        const declared = manifestPanelFor(this.options.manifest, raw)
+        if (!declared) {
+          this.rejected.push({ index, kind: 'panel', reason: 'not-declared' })
+          continue
+        }
+        if (this.pendingPanels.has(raw)) continue
+        this.pendingPanels.set(raw, { ...declared, registrationOrder: this.registrationOrder })
+        this.registrationOrder += 1
+      }
+    }
+
+    if (payload.contentViews !== undefined) {
+      if (!Array.isArray(payload.contentViews)) {
+        this.violation(envelope)
+        return
+      }
+      for (const raw of payload.contentViews) {
+        const index = this.contributionIndex
+        this.contributionIndex += 1
+        if (typeof raw !== 'string') {
+          this.rejected.push({ index, kind: 'contentView', reason: 'invalid-contribution' })
+          continue
+        }
+        const declared = manifestContentViewFor(this.options.manifest, raw)
+        if (!declared) {
+          this.rejected.push({ index, kind: 'contentView', reason: 'not-declared' })
+          continue
+        }
+        if (this.pendingContentViews.has(raw)) continue
+        this.pendingContentViews.set(raw, {
+          ...declared,
+          registrationOrder: this.registrationOrder,
+        })
+        this.registrationOrder += 1
+      }
     }
   }
 
@@ -428,8 +516,12 @@ export class RegistrationSession {
       this.registrationTimer = null
     }
     const editors = [...this.pending.values()]
+    const panels = [...this.pendingPanels.values()]
+    const contentViews = [...this.pendingContentViews.values()]
     const ack: RegistrationAck = {
       accepted: editors.map((editor) => editor.glob),
+      acceptedPanels: panels.map((panel) => panel.id),
+      acceptedContentViews: contentViews.map((view) => view.id),
       rejected: this.rejected,
     }
     this.phase = 'complete'
@@ -438,6 +530,6 @@ export class RegistrationSession {
     this.closeTimer = this.setTimeoutImpl(() => {
       this.close()
     }, ACK_CLOSE_DELAY_MS)
-    this.options.onOutcome({ kind: 'active', editors, ack })
+    this.options.onOutcome({ kind: 'active', editors, panels, contentViews, ack })
   }
 }

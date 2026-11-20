@@ -5,17 +5,18 @@
  */
 
 export const PROTOCOL_VERSION = '1'
-export const SDK_VERSION = '1.4.0'
+export const SDK_VERSION = '1.5.0'
 
 export const READY_TIMEOUT_MS = 10_000
 export const REGISTRATION_TIMEOUT_MS = 10_000
 export const MAX_IN_FLIGHT_REQUESTS = 64
 export const MAX_ID_LENGTH = 64
 export const MAX_LOCAL_EVENT_BYTES = 1024 * 1024
+export const MAX_VIEW_PAYLOAD_BYTES = 64 * 1024
 
 const LOCAL_TOPIC_PATTERN = /^local\/[a-z0-9][a-z0-9._-]{0,63}$/
 
-export type PluginMode = 'register' | 'editor'
+export type PluginMode = 'register' | 'editor' | 'view'
 export type ThemeName = 'dark' | 'light' | 'high-contrast'
 export type PluginPermission =
   'workspace:read' | 'workspace:write' | 'workspace:list' | 'events:subscribe'
@@ -97,7 +98,15 @@ export interface EditorCapabilities {
   directoryListing: boolean
   /** Shell support bit for plugin-local publication and subscription. */
   localEvents: boolean
+  /** Shell support bit for `plugin/open-file`. */
+  openFile: boolean
+  /** Shell support bit for `plugin/open-view`. */
+  openView: boolean
+  /** Shell support bit for `plugin/request-panel`. */
+  requestPanel: boolean
 }
+
+export type ViewCapabilities = EditorCapabilities
 
 export interface RegistrationCapabilities {
   /** Shell support bit for plugin-local publication and subscription. */
@@ -160,7 +169,31 @@ export interface EditorInit extends ShellInitBase {
   limits: EditorLimits
 }
 
-export type ShellInit = RegistrationInit | EditorInit
+export interface ViewOpenedBy {
+  pluginId: string
+  pluginName: string
+  origin: string
+}
+
+export interface ViewInitData {
+  kind: 'panel' | 'content'
+  id: string
+  title: string
+  instanceId: string
+  location?: 'primary' | 'secondary'
+  /** One-shot data from the opener; never file content. */
+  payload?: unknown
+  openedBy?: ViewOpenedBy
+}
+
+export interface ViewInit extends ShellInitBase {
+  mode: 'view'
+  view: ViewInitData
+  capabilities: ViewCapabilities
+  limits: EditorLimits
+}
+
+export type ShellInit = RegistrationInit | EditorInit | ViewInit
 
 export interface FileEditorContribution {
   glob: string
@@ -169,18 +202,42 @@ export interface FileEditorContribution {
 }
 
 export type RegistrationRejectionReason =
-  'not-declared' | 'permission-denied' | 'invalid-glob' | 'invalid-contribution'
+  | 'not-declared'
+  | 'permission-denied'
+  | 'invalid-glob'
+  | 'invalid-contribution'
+  | 'target-not-registered'
 
 export interface RejectedContribution {
   index: number
   reason: RegistrationRejectionReason
+  kind?: 'fileEditor' | 'panel' | 'contentView'
   message?: string
 }
 
 export interface RegistrationAck {
   accepted: string[]
+  acceptedPanels: string[]
+  acceptedContentViews: string[]
   rejected: RejectedContribution[]
 }
+
+export interface OpenViewOptions {
+  /** Omit to target the caller's own plugin. */
+  pluginId?: string
+  viewId: string
+  /** Reuses an existing tab when the same key is open. */
+  instanceKey?: string
+  /** One-shot JSON data; at most 64 KiB. */
+  payload?: unknown
+}
+
+export interface PanelResult {
+  panel: string
+  open: boolean
+}
+
+export type PanelAction = 'show' | 'hide' | 'toggle'
 
 export interface ShellErrorPayload {
   code: ShellErrorCode

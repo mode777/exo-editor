@@ -3,6 +3,7 @@ import {
   VSCodeWorkbench,
   type FileIconResolver,
   type InitialWorkbenchSession,
+  type WorkbenchCommand,
   type WorkbenchTab,
 } from 'vscode-workbench'
 import { DocumentArea } from './document/DocumentArea'
@@ -20,13 +21,13 @@ import {
   type CommandContext,
   type ExoCommandHandlers,
 } from './workbench/commands'
-import { workbenchConfig } from './workbench/config'
 import { workbenchMenus } from './workbench/menus'
 import { createQuickOpenProvider } from './workbench/quick-open'
 import { ExoStatusBar } from './workbench/status-bar'
 import { activeDocumentPath, configurePresetStore, installCloseGuard } from './workbench/tabs'
 import type { EditorCandidate } from './plugins/registry'
-import { workbenchViews } from './workbench/views'
+import { derivePluginWorkbench, pluginViewId } from './workbench/plugin-views'
+import { SecondaryViewPicker } from './workbench/SecondaryViewPicker'
 import { workspaceErrorMessage, type WorkspacePath } from './workspace/contract'
 import {
   useDirtyDocuments,
@@ -72,9 +73,26 @@ function Shell({ runtime }: { runtime: WorkspaceRuntime }) {
   const dirty = useDirtyDocuments()
   const host = usePluginHost()
   const filePicker = useFilePicker()
+  const pluginWorkbench = useMemo(() => derivePluginWorkbench(host), [host])
+  const secondaryViews = useMemo(
+    () =>
+      host.records.flatMap((record) =>
+        record.phase === 'active' && record.manifest
+          ? record.panels
+              .filter((panel) => panel.location === 'secondary')
+              .map((panel) => ({
+                id: pluginViewId(record.identity ?? '', panel.id),
+                title: panel.title,
+                pluginName: record.manifest?.name ?? 'Plugin',
+              }))
+          : [],
+      ),
+    [host],
+  )
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [settingsSection, setSettingsSection] = useState<SettingsSection>('general')
   const [connectOpen, setConnectOpen] = useState(false)
+  const [viewPickerOpen, setViewPickerOpen] = useState(false)
   const [pendingClose, setPendingClose] = useState<PendingClose | null>(null)
   const [closeError, setCloseError] = useState<string | null>(null)
   const [openWith, setOpenWith] = useState<{
@@ -143,9 +161,7 @@ function Shell({ runtime }: { runtime: WorkspaceRuntime }) {
       },
       {
         onClosed: (tabs) => {
-          runtime.closeDocuments(
-            tabs.map((tab) => tab.path).filter((path): path is WorkspacePath => Boolean(path)),
-          )
+          runtime.closeTabs(tabs)
         },
       },
     )
@@ -224,6 +240,7 @@ function Shell({ runtime }: { runtime: WorkspaceRuntime }) {
       delete: () => requestExplorerCommand('delete'),
       refreshExplorer: () => runtime.refreshExplorer(),
       collapseExplorer: () => requestExplorerCommand('collapse-all'),
+      selectSecondaryView: () => setViewPickerOpen(true),
     }),
     [
       disconnectWorkspace,
@@ -238,6 +255,15 @@ function Shell({ runtime }: { runtime: WorkspaceRuntime }) {
   const getContext = useCallback((): CommandContext => {
     const current = runtime.getSnapshot()
     const activePath = activeDocumentPath()
+    const hostSnapshot = runtime.pluginHost.getSnapshot()
+    const secondaryViewCount = hostSnapshot.records.reduce(
+      (total, record) =>
+        total +
+        (record.phase === 'active'
+          ? record.panels.filter((panel) => panel.location === 'secondary').length
+          : 0),
+      0,
+    )
     return {
       hasWorkspace: current.phase === 'ready',
       writable: current.writable,
@@ -245,12 +271,39 @@ function Shell({ runtime }: { runtime: WorkspaceRuntime }) {
       hasActiveDocument: Boolean(activePath),
       hasEditorChoice: activePath ? runtime.documents.candidatesFor(activePath).length > 1 : false,
       remote: Boolean(current.remote),
+      secondaryViewCount,
     }
   }, [runtime])
 
+  const getDynamicCommands = useCallback((): WorkbenchCommand[] => {
+    const commands: WorkbenchCommand[] = []
+    for (const record of runtime.pluginHost.getSnapshot().records) {
+      if (record.phase !== 'active' || !record.identity || !record.manifest) continue
+      const identity = record.identity
+      for (const panel of record.panels) {
+        const viewId = pluginViewId(identity, panel.id)
+        commands.push({
+          id: `exo.views.show.${viewId}`,
+          title: `Show ${panel.title}`,
+          category: `Views · ${record.manifest.name}`,
+          run: () => runtime.showPanel(viewId, panel.location),
+        })
+      }
+      for (const view of record.contentViews) {
+        commands.push({
+          id: `exo.views.open.${encodeURIComponent(identity)}.${view.id}`,
+          title: `Open ${view.title}`,
+          category: `Views · ${record.manifest.name}`,
+          run: () => runtime.openContentView(identity, view.id),
+        })
+      }
+    }
+    return commands
+  }, [runtime])
+
   const commands = useMemo(
-    () => createExoCommandRegistry(getContext, handlers),
-    [getContext, handlers],
+    () => createExoCommandRegistry(getContext, handlers, getDynamicCommands),
+    [getContext, getDynamicCommands, handlers],
   )
   const quickOpen = useMemo(createQuickOpenProvider, [])
   const renderDocument = useCallback((tab: WorkbenchTab) => <DocumentArea tab={tab} />, [])
@@ -287,8 +340,8 @@ function Shell({ runtime }: { runtime: WorkspaceRuntime }) {
     <>
       <ThemeSync onChange={(theme) => runtime.publishTheme(theme)} />
       <VSCodeWorkbench
-        config={workbenchConfig}
-        views={workbenchViews}
+        config={pluginWorkbench.config}
+        views={pluginWorkbench.views}
         commands={commands}
         menus={workbenchMenus}
         quickOpen={quickOpen}
@@ -343,6 +396,15 @@ function Shell({ runtime }: { runtime: WorkspaceRuntime }) {
         shellOrigin={typeof window === 'undefined' ? '' : window.location.origin}
         onApprove={(identity) => runtime.pluginHost.approveConsent(identity)}
         onDeny={(identity) => runtime.pluginHost.denyConsent(identity)}
+      />
+      <SecondaryViewPicker
+        open={viewPickerOpen}
+        views={secondaryViews}
+        onChoose={(id) => {
+          runtime.showPanel(id, 'secondary')
+          setViewPickerOpen(false)
+        }}
+        onClose={() => setViewPickerOpen(false)}
       />
       {pendingClose && (
         <ClosePromptDialog

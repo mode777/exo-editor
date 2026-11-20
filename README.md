@@ -27,6 +27,12 @@ still additive within protocol major `1`. The parallel Stratofold provider track
 (P1-P3) is archived and verified; it does not gate the numbered layers.
 Verification is always against the deployed URL, never a local dev server.
 
+Post-release updates are additive within protocol major `1`: the workspace file
+picker and directory listing (SDK `1.2.0`/`1.3.0`), plugin-local events
+(`1.4.0`), and plugin panels, content views and navigation intents
+(`1.5.0`, shell `0.3.0`). Panels mount lazily and content views open as
+read-only tabs; both are user-invoked and excluded from the consent fingerprint.
+
 ## How it fits together
 
 - **Shell** - React 19 + TypeScript, static hosting, no backend. Composes the

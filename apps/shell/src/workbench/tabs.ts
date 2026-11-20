@@ -59,6 +59,43 @@ export function openFileTab(path: WorkspacePath, title = basename(path)): void {
   useWorkbenchStore.getState().openTab(tab)
 }
 
+export interface ContentViewTabInfo {
+  key: string
+  title: string
+  pluginName: string
+  identity: string
+  viewId: string
+  instanceKey: string
+}
+
+export function contentViewOf(tab: WorkbenchTab): ContentViewTabInfo | undefined {
+  return (tab as WorkbenchTab & { contentView?: ContentViewTabInfo }).contentView
+}
+
+/** A content view is a shell-owned tab; the kit's closed kind is adapted here. */
+export function openContentViewTab(info: ContentViewTabInfo): void {
+  const tab = {
+    id: info.key,
+    title: `${info.title} — ${info.pluginName}`,
+    kind: 'content',
+    contentView: info,
+  } as unknown as WorkbenchTab
+  useWorkbenchStore.getState().openTab(tab)
+}
+
+/** Remove every content tab of a plugin, e.g. when it is disabled or removed. */
+export function closeContentTabsFor(identity: string): void {
+  useWorkbenchStore.setState((state) => {
+    const tabs = state.tabs.filter((tab) => contentViewOf(tab)?.identity !== identity)
+    if (tabs.length === state.tabs.length) return state
+    const activeExists = tabs.some((tab) => tab.id === state.activeTabId)
+    return {
+      tabs,
+      activeTabId: activeExists ? state.activeTabId : (tabs.at(-1)?.id ?? null),
+    }
+  })
+}
+
 export function activateFileTab(path: WorkspacePath): void {
   useWorkbenchStore.getState().activateTab(path)
 }

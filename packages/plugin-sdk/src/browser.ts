@@ -46,10 +46,10 @@ export function parseExoFragment(hash: string): ParsedFragment {
   const params = new URLSearchParams(hash.startsWith('#') ? hash.slice(1) : hash)
   const hostOrigin = parseExoHost(params.get('exo-host'))
   const mode = params.get('exo-mode')
-  if (mode !== 'register' && mode !== 'editor') {
+  if (mode !== 'register' && mode !== 'editor' && mode !== 'view') {
     throw new ExoProtocolError(
       'bootstrap',
-      'The plugin URL needs exo-mode=register or exo-mode=editor.',
+      'The plugin URL needs exo-mode=register, exo-mode=editor or exo-mode=view.',
     )
   }
   const sessionId = params.get('exo-session')

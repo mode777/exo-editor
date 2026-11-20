@@ -15,7 +15,7 @@ describe('deployed plugin fixture', () => {
     const result = validateManifest(
       JSON.parse(raw) as unknown,
       'https://mode777.github.io/exo-editor/plugin-host-fixture/exo-manifest.json',
-      '0.1.0',
+      '0.3.0',
     )
     expect(result.ok).toBe(true)
     if (!result.ok) return
@@ -29,6 +29,18 @@ describe('deployed plugin fixture', () => {
       const file = resolve(fixtureDir, editor.entry)
       expect(existsSync(file), editor.entry).toBe(true)
     }
+    expect(result.manifest.panels.map((panel) => panel.id)).toEqual([
+      'fixture-panel',
+      'fixture-inspector',
+    ])
+    expect(result.manifest.contentViews.map((view) => view.id)).toEqual(['fixture-tutorial'])
+    for (const page of [
+      ...result.manifest.panels.map((panel) => panel.entry),
+      ...result.manifest.contentViews.map((view) => view.entry),
+    ]) {
+      expect(existsSync(resolve(fixtureDir, page)), page).toBe(true)
+    }
+    expect(existsSync(resolve(fixtureDir, 'view-common.js'))).toBe(true)
     expect(existsSync(resolve(fixtureDir, 'editor-common.js'))).toBe(true)
   })
 
@@ -53,23 +65,33 @@ describe('deployed plugin fixture', () => {
     expect(byGlob.get('**/*.sibling.txt')?.entry).toBe('sibling.html')
   })
 
-  it('registers every declared editor glob', () => {
+  it('registers every declared editor glob and view id', () => {
     const manifest = JSON.parse(readFileSync(resolve(fixtureDir, 'exo-manifest.json'), 'utf8')) as {
-      contributes: { fileEditors: Array<{ glob: string; entry: string }> }
+      contributes: {
+        fileEditors: Array<{ glob: string; entry: string }>
+        panels: Array<{ id: string }>
+        contentViews: Array<{ id: string }>
+      }
     }
     const controller = readFileSync(resolve(fixtureDir, 'plugin.html'), 'utf8')
     for (const editor of manifest.contributes.fileEditors) {
       expect(controller).toContain(`glob: '${editor.glob}'`)
       expect(controller).toContain(`entry: '${editor.entry}'`)
     }
+    for (const panel of manifest.contributes.panels) {
+      expect(controller).toContain(`'${panel.id}'`)
+    }
+    for (const view of manifest.contributes.contentViews) {
+      expect(controller).toContain(`'${view.id}'`)
+    }
   })
 
-  it('declares a second identity for cross-plugin local-event isolation', () => {
+  it('declares a second identity for cross-plugin local-event and view checks', () => {
     const raw = readFileSync(resolve(fixtureDir, 'other-manifest.json'), 'utf8')
     const result = validateManifest(
       JSON.parse(raw) as unknown,
       'https://mode777.github.io/exo-editor/plugin-host-fixture/other-manifest.json',
-      '0.2.0',
+      '0.3.0',
     )
     expect(result.ok).toBe(true)
     if (!result.ok) return
@@ -77,6 +99,10 @@ describe('deployed plugin fixture', () => {
     expect(result.manifest.fileEditors).toEqual([
       expect.objectContaining({ glob: '**/*.local-other.txt', entry: 'editor-local-events.html' }),
     ])
+    expect(result.manifest.contentViews).toEqual([
+      expect.objectContaining({ id: 'other-tutorial', entry: 'view-content.html' }),
+    ])
+    expect(existsSync(resolve(fixtureDir, 'other-plugin.html'))).toBe(true)
     expect(existsSync(resolve(fixtureDir, 'editor-local-events.html'))).toBe(true)
   })
 })

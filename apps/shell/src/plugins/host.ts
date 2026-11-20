@@ -6,7 +6,9 @@ import {
   RegistrationSession,
   type RegistrationErrorCode,
   type RegistrationOutcome,
+  type RegisteredContentView,
   type RegisteredEditor,
+  type RegisteredPanel,
 } from './registration'
 import { EditorRegistry, type EditorCandidate } from './registry'
 import type { PluginConfigStore } from './store'
@@ -31,6 +33,8 @@ export interface PluginHostRecord {
   fingerprint?: string
   consent: 'none' | 'granted' | 'denied' | 'revoked'
   registrations: RegisteredEditor[]
+  panels: RegisteredPanel[]
+  contentViews: RegisteredContentView[]
   error?: {
     code: PluginHostErrorCode
     phase: PluginHostFailurePhase
@@ -77,10 +81,18 @@ export interface HandlerLifecycle {
   ): void
 }
 
+export interface ViewLifecycle {
+  closeFor(
+    identity: string,
+    reason: 'closed' | 'workspace-switch' | 'plugin-removed' | 'error',
+  ): void
+}
+
 export interface PluginHostOptions {
   fetchImpl?: typeof fetch
   transport?: FrameTransport
   handlerLifecycle?: HandlerLifecycle
+  viewLifecycle?: ViewLifecycle
   consentStore?: ConsentStore
   consentStorage?: ConsentStorage | null
   digest?: Digest
@@ -154,6 +166,8 @@ function cloneRecord(record: PluginHostRecord): PluginHostRecord {
     ...record,
     manifest: record.manifest ? cloneManifest(record.manifest) : undefined,
     registrations: [...record.registrations],
+    panels: record.panels.map((panel) => ({ ...panel })),
+    contentViews: record.contentViews.map((view) => ({ ...view })),
     error: record.error ? { ...record.error } : undefined,
   }
 }
@@ -176,6 +190,7 @@ export class PluginHost {
   private readonly now: () => number
   private readonly createSessionId: (() => string) | undefined
   private handlerLifecycleValue: HandlerLifecycle | undefined
+  private viewLifecycleValue: ViewLifecycle | undefined
   private readonly setTimeoutImpl: typeof setTimeout | undefined
   private readonly clearTimeoutImpl: typeof clearTimeout | undefined
   private readonly fetchLimit: number
@@ -223,6 +238,7 @@ export class PluginHost {
     this.now = options.now ?? (() => Date.now())
     this.createSessionId = options.createSessionId
     this.handlerLifecycleValue = options.handlerLifecycle
+    this.viewLifecycleValue = options.viewLifecycle
     this.setTimeoutImpl = options.setTimeoutImpl
     this.clearTimeoutImpl = options.clearTimeoutImpl
     this.fetchLimit = options.fetchConcurrency ?? 4
@@ -323,6 +339,8 @@ export class PluginHost {
     record.phase = 'denied'
     record.consent = 'denied'
     record.registrations = []
+    record.panels = []
+    record.contentViews = []
     record.error = undefined
     this.consentRequest = null
     this.log('consent', record, 'denied')
@@ -339,6 +357,8 @@ export class PluginHost {
     record.phase = 'awaiting-consent'
     record.consent = 'revoked'
     record.registrations = []
+    record.panels = []
+    record.contentViews = []
     record.error = undefined
     this.denied.delete(identity)
     if (this.consentRequest?.identity === identity) this.consentRequest = null
@@ -400,6 +420,8 @@ export class PluginHost {
             phase: 'disabled',
             consent: 'none',
             registrations: [],
+            panels: [],
+            contentViews: [],
           })
           continue
         }
@@ -412,6 +434,8 @@ export class PluginHost {
         record.fingerprint = undefined
         record.consent = 'none'
         record.registrations = []
+        record.panels = []
+        record.contentViews = []
         record.error = undefined
         continue
       }
@@ -424,6 +448,8 @@ export class PluginHost {
           phase: 'loading',
           consent: 'none',
           registrations: [],
+          panels: [],
+          contentViews: [],
         }
         this.records.set(entry.manifest, record)
         this.enqueueManifest(record)
@@ -439,6 +465,8 @@ export class PluginHost {
         record.fingerprint = undefined
         record.consent = 'none'
         record.registrations = []
+        record.panels = []
+        record.contentViews = []
         record.error = undefined
         this.enqueueManifest(record)
       } else if (record.identity && record.phase === 'active') {
@@ -705,6 +733,8 @@ export class PluginHost {
     if (outcome.kind === 'active') {
       record.phase = 'active'
       record.registrations = outcome.editors
+      record.panels = outcome.panels
+      record.contentViews = outcome.contentViews
       record.error = undefined
       record.consent = 'granted'
       this.registry.add(
@@ -719,10 +749,17 @@ export class PluginHost {
         },
         outcome.editors,
       )
-      this.log('register', record, 'active', `${outcome.editors.length} editor(s)`)
+      this.log(
+        'register',
+        record,
+        'active',
+        `${outcome.editors.length} editor(s), ${outcome.panels.length} panel(s), ${outcome.contentViews.length} content view(s)`,
+      )
     } else {
       record.phase = 'failed'
       record.registrations = []
+      record.panels = []
+      record.contentViews = []
       record.error = {
         code: outcome.code,
         phase: outcome.phase,
@@ -770,6 +807,7 @@ export class PluginHost {
       this.registrationActive = Math.max(0, this.registrationActive - 1)
     }
     this.handlerLifecycleValue?.closeFor(identity, 'plugin-removed')
+    this.viewLifecycleValue?.closeFor(identity, 'plugin-removed')
     this.registry.remove(identity)
     this.registrationQueue = this.registrationQueue.filter((entry) => entry !== record)
   }
@@ -809,6 +847,14 @@ export class PluginHost {
 
   setHandlerLifecycle(lifecycle: HandlerLifecycle | undefined): void {
     this.handlerLifecycleValue = lifecycle
+  }
+
+  setViewLifecycle(lifecycle: ViewLifecycle | undefined): void {
+    this.viewLifecycleValue = lifecycle
+  }
+
+  logView(identity: string, phase: string, code?: string, message?: string): void {
+    this.logHandler(identity, phase, code, message)
   }
 
   logHandler(identity: string, phase: string, code?: string, message?: string): void {

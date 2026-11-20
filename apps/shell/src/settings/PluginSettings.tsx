@@ -76,10 +76,14 @@ function phaseText(record: PluginHostRecord | undefined): string {
       return 'Consent denied for this session'
     case 'registering':
       return 'Registering…'
-    case 'active':
-      return record.registrations.length === 0
-        ? 'Active (no editors)'
-        : `Active — ${record.registrations.map((editor) => editor.label).join(', ')}`
+    case 'active': {
+      const labels = [
+        ...record.registrations.map((editor) => editor.label),
+        ...record.panels.map((panel) => panel.title),
+        ...record.contentViews.map((view) => view.title),
+      ]
+      return labels.length === 0 ? 'Active (no contributions)' : `Active — ${labels.join(', ')}`
+    }
     case 'failed':
       return record.error ? `Failed — ${record.error.code} (${record.error.phase})` : 'Failed'
   }
@@ -125,6 +129,24 @@ export function RuntimeRow({
           Editors:{' '}
           {record.registrations.map((editor) => (
             <code key={`${editor.glob}:${editor.entryUrl}`}>{editor.label}</code>
+          ))}
+        </p>
+      )}
+      {record.panels.length > 0 && (
+        <p className="exo-plugin-views">
+          Panels:{' '}
+          {record.panels.map((panel) => (
+            <code key={panel.id}>
+              {panel.title} ({panel.location})
+            </code>
+          ))}
+        </p>
+      )}
+      {record.contentViews.length > 0 && (
+        <p className="exo-plugin-views">
+          Content views:{' '}
+          {record.contentViews.map((view) => (
+            <code key={view.id}>{view.title}</code>
           ))}
         </p>
       )}

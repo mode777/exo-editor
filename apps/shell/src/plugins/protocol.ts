@@ -44,7 +44,7 @@ export interface Envelope {
   payload?: unknown
 }
 
-export type FrameMode = 'register' | 'editor'
+export type FrameMode = 'register' | 'editor' | 'view'
 
 export interface FrameBoundary {
   /** A same-origin frame is sandboxed to an opaque origin. */

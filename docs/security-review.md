@@ -30,6 +30,7 @@ reverting. Findings are recorded in [Findings](#findings).
 | 10 | Secret-free delivery | `editor-shell` - Static, backend-free delivery | `scripts/check-dist-secrets.mjs` (new), CI after the child-path copies | `scripts/check-dist-secrets.test.mjs` (new), `check:dist-secrets` |
 | 11 | User-mediated file picker | `plugin-protocol` - File picker request; `plugin-file-editors` - User-mediated file selection | `plugins/file-picker.ts`, `plugins/handler.ts` (active/visible/focused gate, reserved-path re-check), `document/FilePickerDialog.tsx` | `handler.test.ts`, `handlers.test.ts`, `file-picker.test.ts`, `FilePickerDialog.test.tsx`, `sdk-conformance.test.ts` |
 | 12 | Plugin-local event isolation | `plugin-events` - Plugin-local topic namespace; Delivery semantics; Limits and failure isolation | `plugins/events.ts` (identity filter, per-identity sequences, per-frame rate), `plugins/handler.ts` (`plugin/publish` validation) | `events.test.ts`, `handler.test.ts`, `registration.test.ts`, `sdk-conformance.test.ts` |
+| 13 | View surfaces and navigation intents | `plugin-views` - Panel contributions; Content-view contributions; Navigation and panel intents; Cross-plugin content views; View lifecycle | `plugins/frame-session.ts` (shared gate, path and intent checks), `plugins/view-session.ts`, `plugins/view-pool.ts` (lazy mount, caps, surfaces), `workspace/runtime.ts` (open-file/view/panel resolution) | `view-session.test.ts`, `view-pool.test.ts`, `runtime.views.test.ts`, `plugin-views.test.tsx`, `ContentViewSurface.test.tsx`, `SecondaryViewPicker.test.tsx` |
 
 ## Control details
 
@@ -256,6 +257,41 @@ reverting. Findings are recorded in [Findings](#findings).
   plugin's subscriber receives the event. Removing the shell-topic guard makes
   "rejects a shell topic publication without changing its sequence" fail.
 
+### 13. View surfaces and navigation intents
+
+- Requirements: `plugin-views` "Panel contributions", "Content-view
+  contributions and instances", "Navigation and panel intents", "Cross-plugin
+  content views", "View lifecycle and failure isolation"; `plugin-protocol` "View
+  frame bootstrap and handshake", "View navigation intents"; `plugin-manifest`
+  section 3.2.
+- Enforcement: `FrameSession` applies the same origin/source, payload-size,
+  protocol-violation and disposal rules to view frames; `ViewSession` adds only
+  the view block and rejects editor-only messages; `ViewPool` caps panels and
+  content tabs and positions frames only over shell-owned placeholders;
+  `plugin/open-file`, `plugin/open-view` and `plugin/request-panel` require the
+  frame to be visible and active, re-check `workspace:read` for files, reject
+  reserved paths after normalization, cap content-view payloads at 64 KiB and
+  accept panel requests only for the caller's own registered panels. A content
+  view payload is one-shot data, never logged and never put in a URL. The
+  activity-bar title, secondary picker and content-view chrome include the plugin
+  name.
+- Tests: `view-session.test.ts` "reads only absolute paths and returns text",
+  "opens files through the intent with read and visibility gates", "opens a view
+  and rejects an oversized payload", "requests a panel and returns its resulting
+  state", "rejects the eleventh intent in one rolling second",
+  "treats editor-only messages as protocol violations", "disposes with an
+  acknowledgement and drops late messages"; `view-pool.test.ts` lazy mount,
+  retain, content cap, close and detach; `runtime.views.test.ts` cross-plugin
+  open and host teardown; `plugin-views.test.tsx` and `ContentViewSurface.test.tsx`
+  for derived chrome and a11y; `SecondaryViewPicker.test.tsx` for keyboard and
+  axe.
+- Mutation: remove the `visible()` check from `FrameSession.handleOpenFile`.
+  Result: `view-session.test.ts` "opens files through the intent with read and
+  visibility gates" fails on the hidden-frame case. Remove the
+  `MAX_VIEW_PAYLOAD_BYTES` check: "opens a view and rejects an oversized payload"
+  fails. Remove the `isReservedPath` check: the reserved `/exo.json` intent case
+  opens a tab and fails.
+
 ## Findings
 
 | ID | Severity | Finding | Disposition |
@@ -265,6 +301,7 @@ reverting. Findings are recorded in [Findings](#findings).
 | F3 | info | The upstream workbench command palette and chrome are not Exo-owned and are excluded from automated axe scans. | Accepted; documented with rationale and owner in `docs/accessibility.md`. |
 | F4 | critical (dependency) | `monaco-editor@0.57.0` pins `dompurify@3.4.15` (bundled in `apps/code-plugin`), which is affected by DOMPurify advisories including IN_PLACE node removal and `application/xhtml+xml` parsing. | Accepted with rationale and follow-up owner: Monaco uses the string/`RETURN_TRUSTED_TYPE` path, does not set `IN_PLACE` or `SAFE_FOR_TEMPLATES`, parses as `text/html`, and the editor renders workspace content as text, not as HTML. The code plugin runs in a sandboxed frame with no storage. Upgrade when `monaco-editor` bumps its pinned DOMPurify; re-check this row on every dependency update. |
 | F5 | moderate (dev) | `npm audit` reports a `minimatch` ReDoS in the TypeScript ESLint dependency tree. | Accepted: development-only tooling, no runtime or deployed artifact, inputs are repository files rather than untrusted plugin data. Update with the next tooling bump. |
+| F6 | low | Panels and content views are excluded from the consent fingerprint, so an already-approved plugin can add an activity-bar item, a side panel or a content-view tab without a new prompt. | Accepted by design: the surfaces are user-invoked, grant no autonomous data or file access, and every shell chrome surface names the plugin so a new surface cannot impersonate the shell. The first-grant prompt lists them and the security review tracks the mitigation; adding them to the fingerprint is a one-change follow-up with a single re-prompt if required later. |
 
 No open finding above accepted severity. There is no server, secret, account or
 first-party API in the deployed artifact. The dependency audit result is part of

@@ -6,7 +6,7 @@ normative messages, payloads, limits, error codes and ordering rules live in
 plugin SDK implements this page; read it when debugging or writing your own
 client.
 
-## Two frames, one plugin
+## Three frames, one plugin
 
 1. **Controller frame.** The shell mounts `runtime.entry` from the manifest as a
    hidden iframe. It appends `exo-host`, `exo-mode=register` and `exo-session` to
@@ -14,13 +14,18 @@ client.
 2. The controller sends `plugin/ready` with the protocol version and echoes the
    session id. The shell answers with `shell/init` (workspace metadata, theme,
    locale, permissions, limits and settings; no file content).
-3. The controller declares editors with `plugin/register`, then
-   `plugin/register-complete`. The shell answers with `shell/register-ack` and
-   removes the controller frame after the acknowledgement.
+3. The controller declares editors, panels and content views with
+   `plugin/register`, then `plugin/register-complete`. The shell answers with
+   `shell/register-ack` and removes the controller frame after the
+   acknowledgement.
 4. **Handler frame.** When a matching file opens, the shell mounts
    `contributes.fileEditors[].entry` with `exo-mode=editor` and a new session.
    It sends metadata only in `shell/init`. The handler asks for bytes with
    `plugin/request-file`; content crosses only in the reply.
+5. **View frame.** When a registered panel is first revealed, or a content view
+   opens a tab, the shell mounts its entry with `exo-mode=view` and a new session.
+   `shell/init` carries a `view` block and no file. A view shares reads,
+   listings, the picker and events, and has no save or dirty state.
 
 Each frame has its own session id. A message from a different window, a different
 origin, or a missing or wrong session echo is dropped. A same-origin plugin runs
@@ -64,6 +69,31 @@ instance plus the session echo, not the origin string.
 - Dispose: the shell sends `shell/dispose`, waits for `plugin/dispose-ack` up to
   the contract limit and removes the frame. A closed frame accepts no later
   messages.
+
+## Panels, content views and intents
+
+A view frame (`exo-mode=view`) gets `{ view: { kind, id, title, instanceId,
+location?, payload?, openedBy? } }` instead of a file. A panel is mounted on its
+first reveal and retained hidden; a content view is one frame per open tab. A
+content view may receive a 64 KiB JSON payload, and `openedBy` when another
+plugin opened it. The payload is data, not content and not a channel back: the
+opener only receives `shell/open-result`.
+
+Both editor and view frames can ask the shell to navigate or change layout:
+
+```text
+plugin/open-file      { path }                                  // workspace:read
+plugin/open-view      { pluginId?, viewId, instanceKey?, payload? }
+plugin/request-panel  { panel, action: 'show' | 'hide' | 'toggle' }
+shell/open-result     { ok: true }
+shell/panel-result    { panel, open }
+```
+
+The frame must be visible and active, and a view must use a `/`-rooted path for
+`open-file`. Reserved paths are denied, content-view payloads are capped at
+64 KiB, and each frame gets ten intents per rolling second. `request-panel`
+only addresses the caller's own registered panels. See the
+[protocol contract](../contracts/plugin-protocol.md#56-navigation-and-panel-intents).
 
 ## Events
 

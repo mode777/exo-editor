@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Exo fixture content view</title>
+    <style>
+      body {
+        font:
+          13px system-ui,
+          sans-serif;
+        margin: 0;
+        padding: 12px;
+      }
+      button {
+        display: block;
+        width: 100%;
+        margin: 0 0 6px;
+        padding: 6px;
+      }
+      pre {
+        white-space: pre-wrap;
+        word-break: break-word;
+        font-size: 11px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Fixture Content View</h1>
+    <p>Read-only content supplied by the fixture. Payload and opener are in the observation.</p>
+    <button id="publish" type="button">Publish local event</button>
+    <button id="subscribe-theme" type="button">Subscribe theme</button>
+    <button id="open-file" type="button">Open /notes.txt</button>
+    <pre id="observation">starting</pre>
+    <script src="view-common.js"></script>
+  </body>
+</html>

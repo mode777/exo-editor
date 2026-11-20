@@ -42,6 +42,8 @@ function manifest(overrides: Partial<PluginManifest> = {}): PluginManifest {
         priority: 0,
       },
     ],
+    panels: [],
+    contentViews: [],
     ...overrides,
   }
 }
@@ -294,16 +296,158 @@ describe('registration session', () => {
     }
     expect(ack.accepted).toEqual(['**/*.ts'])
     expect(ack.rejected).toEqual([
-      { index: 0, reason: 'not-declared' },
-      { index: 1, reason: 'permission-denied' },
-      { index: 2, reason: 'invalid-contribution' },
-      { index: 3, reason: 'invalid-glob' },
+      { index: 0, kind: 'fileEditor', reason: 'not-declared' },
+      { index: 1, kind: 'fileEditor', reason: 'permission-denied' },
+      { index: 2, kind: 'fileEditor', reason: 'invalid-contribution' },
+      { index: 3, kind: 'fileEditor', reason: 'invalid-glob' },
     ])
     const outcome = context.outcomes[0]
     expect(outcome.kind).toBe('active')
     if (outcome.kind === 'active') {
       expect(outcome.editors).toHaveLength(1)
     }
+  })
+
+  it('registers declared panels and content views with an additive ack', () => {
+    const context = start({
+      manifest: manifest({
+        panels: [
+          {
+            id: 'outline',
+            title: 'Outline',
+            icon: 'list-tree',
+            location: 'primary',
+            entry: 'views/outline.html',
+            entryUrl: 'https://plugins.example.com/monaco/views/outline.html',
+          },
+          {
+            id: 'inspector',
+            title: 'Inspector',
+            location: 'secondary',
+            entry: 'other.html',
+            entryUrl: 'https://plugins.example.com/monaco/other.html',
+          },
+        ],
+        contentViews: [
+          {
+            id: 'tutorial',
+            title: 'Tutorial',
+            entry: 'views/tutorial.html',
+            entryUrl: 'https://plugins.example.com/monaco/views/tutorial.html',
+          },
+        ],
+      }),
+    })
+    ready(context)
+    context.frame.emit(
+      {
+        exo: 1,
+        type: 'plugin/register',
+        payload: { panels: ['outline', 'inspector'], contentViews: ['tutorial'] },
+      },
+      context.manifest.manifestOrigin,
+    )
+    complete(context)
+    const ack = postedType(context.frame, 'shell/register-ack')?.payload as {
+      accepted: string[]
+      acceptedPanels: string[]
+      acceptedContentViews: string[]
+      rejected: unknown[]
+    }
+    expect(ack.accepted).toEqual([])
+    expect(ack.acceptedPanels).toEqual(['outline', 'inspector'])
+    expect(ack.acceptedContentViews).toEqual(['tutorial'])
+    expect(ack.rejected).toEqual([])
+    const outcome = context.outcomes[0]
+    expect(outcome.kind).toBe('active')
+    if (outcome.kind !== 'active') return
+    expect(outcome.panels).toEqual([
+      {
+        id: 'outline',
+        title: 'Outline',
+        icon: 'list-tree',
+        location: 'primary',
+        entry: 'views/outline.html',
+        entryUrl: 'https://plugins.example.com/monaco/views/outline.html',
+        registrationOrder: 0,
+      },
+      {
+        id: 'inspector',
+        title: 'Inspector',
+        location: 'secondary',
+        entry: 'other.html',
+        entryUrl: 'https://plugins.example.com/monaco/other.html',
+        registrationOrder: 1,
+      },
+    ])
+    expect(outcome.contentViews).toEqual([
+      {
+        id: 'tutorial',
+        title: 'Tutorial',
+        entry: 'views/tutorial.html',
+        entryUrl: 'https://plugins.example.com/monaco/views/tutorial.html',
+        registrationOrder: 2,
+      },
+    ])
+  })
+
+  it('rejects undeclared and malformed view registrations', () => {
+    const context = start({
+      manifest: manifest({
+        panels: [
+          {
+            id: 'outline',
+            title: 'Outline',
+            location: 'primary',
+            entry: 'views/outline.html',
+            entryUrl: 'https://plugins.example.com/monaco/views/outline.html',
+          },
+        ],
+        contentViews: [
+          {
+            id: 'tutorial',
+            title: 'Tutorial',
+            entry: 'views/tutorial.html',
+            entryUrl: 'https://plugins.example.com/monaco/views/tutorial.html',
+          },
+        ],
+      }),
+    })
+    ready(context)
+    context.frame.emit(
+      {
+        exo: 1,
+        type: 'plugin/register',
+        payload: { panels: ['missing', 'outline', 'outline'], contentViews: ['tutorial', 42] },
+      },
+      context.manifest.manifestOrigin,
+    )
+    complete(context)
+    const ack = postedType(context.frame, 'shell/register-ack')?.payload as {
+      acceptedPanels: string[]
+      acceptedContentViews: string[]
+      rejected: Array<{ index: number; kind?: string; reason: string }>
+    }
+    expect(ack.acceptedPanels).toEqual(['outline'])
+    expect(ack.acceptedContentViews).toEqual(['tutorial'])
+    expect(ack.rejected).toEqual([
+      { index: 0, kind: 'panel', reason: 'not-declared' },
+      { index: 4, kind: 'contentView', reason: 'invalid-contribution' },
+    ])
+  })
+
+  it('rejects a non-array view registration as a protocol violation', () => {
+    const context = start()
+    ready(context)
+    context.frame.emit(
+      { exo: 1, type: 'plugin/register', payload: { panels: 'outline' } },
+      context.manifest.manifestOrigin,
+    )
+    const error = postedType(context.frame, 'shell/error')?.payload as {
+      code?: string
+    }
+    expect(error?.code).toBe('protocol-violation')
+    expect(postedType(context.frame, 'shell/register-ack')).toBeUndefined()
   })
 
   it('rejects editor contributions from a plugin without read permission', () => {
@@ -318,7 +462,7 @@ describe('registration session', () => {
       rejected: Array<{ index: number; reason: string }>
     }
     expect(ack.accepted).toEqual([])
-    expect(ack.rejected).toEqual([{ index: 0, reason: 'permission-denied' }])
+    expect(ack.rejected).toEqual([{ index: 0, kind: 'fileEditor', reason: 'permission-denied' }])
     const outcome = context.outcomes[0]
     expect(outcome.kind).toBe('active')
     if (outcome.kind === 'active') expect(outcome.editors).toEqual([])

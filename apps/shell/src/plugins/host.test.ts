@@ -336,6 +336,82 @@ describe('plugin host', () => {
     host.dispose()
   })
 
+  it('exposes registered panels and content views and removes them on stop', async () => {
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse(
+        manifestJson({
+          contributes: {
+            fileEditors: [],
+            panels: [
+              {
+                id: 'outline',
+                title: 'Outline',
+                icon: 'list-tree',
+                location: 'primary',
+                entry: 'views/outline.html',
+              },
+            ],
+            contentViews: [{ id: 'tutorial', title: 'Tutorial', entry: 'views/tutorial.html' }],
+          },
+        }),
+        MANIFEST_URL,
+      ),
+    )
+    const { host, transport, config } = createHost(fetchImpl)
+    config.setEntries(entries(MANIFEST_URL))
+    await waitForRecord(host, MANIFEST_URL, 'awaiting-consent')
+    host.approveConsent(host.getSnapshot().consentRequest?.identity ?? '')
+    await vi.waitFor(() => {
+      expect(transport.frames.length).toBeGreaterThan(0)
+    })
+    const frame = transport.frames[0]
+    if (!frame) throw new Error('Frame not found')
+    ready(frame, 'https://plugins.example.com')
+    frame.emit(
+      {
+        exo: 1,
+        type: 'plugin/register',
+        payload: { panels: ['outline'], contentViews: ['tutorial'] },
+      },
+      'https://plugins.example.com',
+    )
+    frame.emit(
+      { exo: 1, type: 'plugin/register-complete', payload: {} },
+      'https://plugins.example.com',
+    )
+    await waitForRecord(host, MANIFEST_URL, 'active')
+    const record = host.getSnapshot().records[0]
+    expect(record?.panels).toEqual([
+      {
+        id: 'outline',
+        title: 'Outline',
+        icon: 'list-tree',
+        location: 'primary',
+        entry: 'views/outline.html',
+        entryUrl: 'https://plugins.example.com/monaco/views/outline.html',
+        registrationOrder: 0,
+      },
+    ])
+    expect(record?.contentViews).toEqual([
+      {
+        id: 'tutorial',
+        title: 'Tutorial',
+        entry: 'views/tutorial.html',
+        entryUrl: 'https://plugins.example.com/monaco/views/tutorial.html',
+        registrationOrder: 1,
+      },
+    ])
+
+    config.setEntries([{ index: 0, manifest: MANIFEST_URL, enabled: false }])
+    await waitForRecord(host, MANIFEST_URL, 'disabled')
+    expect(host.getSnapshot().records[0]?.panels).toEqual([])
+    expect(host.getSnapshot().records[0]?.contentViews).toEqual([])
+
+    host.detach()
+    expect(host.getSnapshot().records).toEqual([])
+    host.dispose()
+  })
+
   it('skips the prompt when a matching fingerprint is persisted', async () => {
     const storage = new MemoryStorage()
     const consentStore = new ConsentStore({ storage })

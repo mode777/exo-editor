@@ -76,11 +76,17 @@ https://plugins.example.com/monaco/editors/code.html
   #exo-host=https%3A%2F%2Feditor.example.com
   &exo-mode=editor
   &exo-session=<opaque-id>
+
+# view, mounted for one panel or content-view tab
+https://plugins.example.com/monaco/views/outline.html
+  #exo-host=https%3A%2F%2Feditor.example.com
+  &exo-mode=view
+  &exo-session=<opaque-id>
 ```
 
-- The editor URL is inside the plugin root (the controller entry's directory):
-  it may be a sibling of the controller page or a descendant. The shell never
-  substitutes the controller entry for an editor entry.
+- The editor or view URL is inside the plugin root (the controller entry's
+  directory): it may be a sibling of the controller page or a descendant. The
+  shell never substitutes the controller entry for a contribution entry.
 - Parameters are in the fragment so they are not sent to the plugin's server and
   do not affect caching.
 - `exo-host` is the shell origin. A plugin MUST post only to this origin; posting
@@ -112,6 +118,9 @@ https://plugins.example.com/monaco/editors/code.html
    handler is positioned inside the active document area, hidden without
    disposal when its tab is inactive, and still has no shell DOM access. The
    visibility flag is manifest metadata and is not sent in `shell/init`.
+   A view frame is displayed only inside the shell-owned placeholder for its
+   panel or content-view tab; it is hidden without disposal when switched away
+   and never receives a shell DOM node.
 2. Plugin sends `plugin/ready` with
    `{ protocolVersion: "1", sessionId: "<echo of exo-session>" }`.
 3. Shell verifies origin and source, then replies `shell/init`:
@@ -119,7 +128,7 @@ https://plugins.example.com/monaco/editors/code.html
 ```ts
 interface ShellInit {
   protocolVersion: '1'
-  mode: 'register' | 'editor'
+  mode: 'register' | 'editor' | 'view'
   sessionId: string
   plugin: { id: string; version: string }
   shell: { version: string; origin: string }
@@ -134,11 +143,23 @@ interface ShellInit {
   settings: Record<string, boolean | string | number>
   /** Present only when mode is 'editor'. Never contains file content. */
   file?: FileMetadata
+  /** Present only when mode is 'view'. */
+  view?: {
+    kind: 'panel' | 'content'
+    id: string
+    title: string
+    instanceId: string
+    location?: 'primary' | 'secondary'
+    /** One-shot data supplied at open time; never file content. */
+    payload?: unknown
+    /** Present when another plugin opened this content view. */
+    openedBy?: { pluginId: string; pluginName: string; origin: string }
+  }
   /**
-   * Registration init carries `{ localEvents }`. Editor init carries the
+   * Registration init carries `{ localEvents }`. Editor and view init carry the
    * permission bits plus the shell support bits: `filePicker`,
-   * `directoryListing` and `localEvents` are absent on older shells and a plugin
-   * must treat absence as false.
+   * `directoryListing`, `localEvents`, `openFile`, `openView` and `requestPanel`
+   * are absent on older shells and a plugin must treat absence as false.
    */
   capabilities?: {
     read?: boolean
@@ -147,8 +168,11 @@ interface ShellInit {
     filePicker?: boolean
     directoryListing?: boolean
     localEvents?: boolean
+    openFile?: boolean
+    openView?: boolean
+    requestPanel?: boolean
   }
-  /** Present only when mode is 'editor'. */
+  /** Present only when mode is 'editor' or 'view'. */
   limits?: { maxFileSize: number; maxRequestBytes: number }
 }
 ```
@@ -161,13 +185,13 @@ interface ShellInit {
    contains file content in the registration phase.
 5. Plugin proceeds with registration or its first file request.
 
-Handler init is not acknowledged and there is no heartbeat in v1; the first
+Frame init is not acknowledged and there is no heartbeat in v1; the first
 request is the earliest liveness signal, and an unresponsive handler surfaces as
 a failed save rather than a disconnect. Settings are resolved by the shell before
 the frame mounts: a stored value that matches the declaration wins, otherwise the
 declared default is sent. `config/changed` is the only live update channel and
-requires `events:subscribe`; a new handler always receives the current values in
-`shell/init`.
+requires `events:subscribe`; a new handler or view always receives the current
+values in `shell/init`.
 
 ### 3.3 Phase rules
 
@@ -177,22 +201,25 @@ reinterpret a frame that starts in one mode as the other.
 | Phase | Allowed plugin messages |
 | --- | --- |
 | `register` | `plugin/ready`, `plugin/register`, `plugin/register-complete` |
-| `editor` | `plugin/ready`, `plugin/request-file`, `plugin/request-files`, `plugin/request-list`, `plugin/dirty`, `plugin/request-save`, `plugin/save-content`, `plugin/subscribe`, `plugin/unsubscribe`, `plugin/publish`, `plugin/dispose-ack` |
+| `editor` | `plugin/ready`, `plugin/request-file`, `plugin/request-files`, `plugin/request-list`, `plugin/dirty`, `plugin/request-save`, `plugin/save-content`, `plugin/subscribe`, `plugin/unsubscribe`, `plugin/publish`, `plugin/open-file`, `plugin/open-view`, `plugin/request-panel`, `plugin/dispose-ack` |
+| `view` | `plugin/ready`, `plugin/request-file`, `plugin/request-files`, `plugin/request-list`, `plugin/subscribe`, `plugin/unsubscribe`, `plugin/publish`, `plugin/open-file`, `plugin/open-view`, `plugin/request-panel`, `plugin/dispose-ack` |
 
 - `plugin/ready` is accepted once per frame. A second `ready`, a
   `plugin/register-complete` before `ready`, or a registration message after
   `register-complete` is a protocol violation.
-- A message from the other phase's row, and any other message sent before
+- A message from another phase's row, and any other message sent before
   `ready`, is a protocol violation: the shell replies `shell/error` with
   `protocol-violation`, counts it toward the frame's budget and performs no state
   change.
 - `plugin/save-content` is accepted only when it carries a `replyTo` matching the
   single live `shell/request-save`. Content with no live request, or for a
   request that already timed out, is ignored, never written, and counted as a
-  protocol violation.
-- `plugin/publish` is accepted only in the editor phase. A registration frame
-  that sends it receives `protocol-violation`, publishes nothing and counts the
-  message toward its budget.
+  protocol violation. A view frame has no save path; `plugin/dirty`,
+  `plugin/request-save` and `plugin/save-content` are violations in the view
+  phase.
+- `plugin/publish` is accepted in the editor and view phases. A registration
+  frame that sends it receives `protocol-violation`, publishes nothing and counts
+  the message toward its budget.
 - `plugin/request-save` is an id-less intent notification. It asks the shell to
   run the normal Save action for the handler's document; it carries no content
   and must not have an `id` or a non-empty payload. The shell may coalesce it
@@ -212,12 +239,19 @@ frame with `protocol-violation`.
 ## 4. Registration phase
 
 ```text
-plugin/register          { fileEditors?: FileEditorContribution[] }
+plugin/register          { fileEditors?: FileEditorContribution[],
+                           panels?: string[], contentViews?: string[] }
 plugin/register-complete {}
-shell/register-ack      { accepted: string[]; rejected: RejectedContribution[] }
+shell/register-ack      { accepted: string[],
+                          acceptedPanels: string[],
+                          acceptedContentViews: string[],
+                          rejected: RejectedContribution[] }
 
 FileEditorContribution = { glob: string; entry: string; label?: string }
-RejectedContribution   = { index: number; reason: RegistrationRejection; message?: string }
+RejectedContribution   = { index: number,
+                           reason: RegistrationRejection,
+                           kind?: 'fileEditor' | 'panel' | 'contentView',
+                           message?: string }
 RegistrationRejection  = 'not-declared' | 'permission-denied' | 'invalid-glob' | 'invalid-contribution'
 ```
 
@@ -246,6 +280,15 @@ RegistrationRejection  = 'not-declared' | 'permission-denied' | 'invalid-glob' |
   so the plugin can flush logs.
 - Registrations become active only after `plugin/register-complete`. A plugin that
   never completes registers nothing.
+- `panels` and `contentViews` are arrays of declared ids. The shell preserves
+  arrival order, deduplicates repeated ids, and rejects an undeclared id with
+  `not-declared`; a panel id never becomes active unless it was declared in
+  `contributes.panels`, and likewise for content views. Only registered ids
+  appear in the host snapshot, the activity bar, the picker or the palette.
+- `shell/register-ack` is additive: `accepted` keeps its glob meaning,
+  `acceptedPanels` and `acceptedContentViews` carry the view ids, and a
+  `rejected` entry names its `kind` when it is not an editor. An older SDK ignores
+  the extra fields; a newer SDK defaults their absence to empty arrays.
 - Registration order is the order in which the shell accepted the contributions,
   and the plugin's declaration position in `exo.json` is the outer selection
   order. Equal-priority selection therefore never depends on network or handshake
@@ -464,7 +507,72 @@ shell/published      { topic: 'local/<name>', seq: number }        // replyTo = 
   local topics and 100 per second on one topic. The limits are in
   [`events.md`](./events.md#6-limits-and-failure).
 
-### 5.5 Disposal
+### 5.5 View session
+
+Panels and content views use `exo-mode=view` and the same handshake, sandbox,
+origin checks, settings, read/list/picker/events path and disposal as a handler.
+They have no file block, dirty state or save path.
+
+```text
+shell/init (view) {
+  mode: 'view',
+  view: { kind: 'panel' | 'content', id, title, instanceId, location?, payload?, openedBy? },
+  capabilities, limits
+}
+```
+
+- A panel is a singleton frame, mounted on first reveal and retained hidden while
+  another primary or secondary view is active. A never-revealed panel creates no
+  iframe.
+- A content view is one frame per open tab instance. The tab id is derived from
+  the plugin identity, view id and instance key. Opening an existing instance key
+  focuses its tab and ignores a new payload.
+- The view block never contains a file path, bytes, `File`, `Blob` or handle.
+  `payload` is structured-cloneable data of at most 64 KiB and is passed only in
+  `shell/init`; it is never put in the frame URL or the log. `openedBy` is advisory
+  display data added by the shell, not the caller.
+- A view frame can subscribe to shell topics and publish local topics under the
+  same identity, permission, sequence and queue rules as an editor frame. It can
+  read files, list directories and open the picker only through the normal
+  mediated path; it has no save or dirty method.
+- Closing a content tab disposes its frame with reason `closed`. Plugin stop,
+  revocation and workspace switch dispose every panel and content frame before
+  the registrations and session are released.
+
+### 5.6 Navigation and panel intents
+
+```text
+plugin/open-file      { path }                                  // correlated
+plugin/open-view      { pluginId?, viewId, instanceKey?, payload? }
+plugin/request-panel  { panel, action: 'show' | 'hide' | 'toggle' }
+shell/open-result     { ok: true }                              // replyTo = request id
+shell/panel-result    { panel, open: boolean }
+```
+
+- Intents are accepted in the editor and view phases, never in the registration
+  phase. Each carries an `id`; the shell replies with the correlated result or
+  `shell/error` with `replyTo`.
+- The frame must be visible and active. A hidden document tab, a hidden panel or
+  a content tab that is not active receives `permission-denied` and no action
+  happens.
+- `open-file` requires `workspace:read`. An editor resolves a relative path
+  against its document; a view must use a `/`-rooted path. Reserved paths
+  (`/exo.json`, `/.exo/**`) are denied after normalization. The shell checks that
+  the target exists and is a file, and caps plugin-initiated open file tabs at 50
+  per workspace.
+- `open-view` without `pluginId` targets the caller's own plugin. With it, the
+  shell resolves the active plugin with that id and passes `openedBy` to the
+  target. An unknown plugin or unregistered view is `not-found`. The payload is
+  limited to 64 KiB JSON; an oversized payload is `too-large` and opens nothing.
+  There is no reverse channel: the opener receives only `shell/open-result`.
+- `request-panel` only addresses the caller's own registered panels. `show`
+  reveals and lazily mounts the panel, `hide` closes the region only when that
+  panel is active, and `toggle` switches it. The result carries the panel id and
+  its resulting open state; an unregistered panel is `not-found`.
+- Each frame is limited to ten intents in a rolling second. Excess requests are
+  `rate-limited`, not a teardown. A malformed intent is a protocol violation.
+
+### 5.7 Disposal
 
 ```text
 shell/dispose         { reason: 'closed' | 'workspace-switch' | 'plugin-removed' | 'error' }
@@ -518,7 +626,10 @@ are cleared on workspace switch.
 | Save response timeout | 5 s |
 | Dispose acknowledgement | 1 s |
 | Protocol violations before teardown | 3 |
-| Frames per plugin per workspace | 1 registration + 1 per open document, max 20 |
+| Frames per plugin per workspace | 1 registration + 1 per open document (max 20) + 1 per mounted panel (max 8) + 1 per open content-view tab (max 10) |
+| Content-view payload | 64 KiB |
+| Plugin-initiated open file tabs | 50 per workspace |
+| Navigation and panel intents | 10 per rolling second per frame |
 | Pending file pickers per frame | 1 |
 | Open file pickers per shell | 1 |
 | Paths per file selection | 32 |
@@ -535,7 +646,11 @@ are cleared on workspace switch.
 When a plugin already has 20 handler frames open, the shell refrains from mounting
 another one: the new document opens in the shell's fallback renderer with a
 notice, and the plugin receives no message about it. This keeps a runaway plugin
-from exhausting memory without silently changing which editor is used.
+from exhausting memory without silently changing which editor is used. Panels and
+content views are capped separately: an 11th content-view tab is `rate-limited`,
+and a panel that cannot mount shows an inline unavailable state instead of a new
+iframe. Plugin-initiated `open-file` requests over 50 open file tabs are
+`rate-limited` with a message.
 
 Exceeding a limit produces `shell/error` with `too-large` or `rate-limited` and,
 for repeated violations, tears down the frame.
@@ -549,6 +664,11 @@ for repeated violations, tears down the frame.
   Removed or reinterpreted fields require a new major and a new OpenSpec change.
   A shell that predates an additive notification ignores it; the plugin must keep
   a working fallback (for `plugin/request-save`, the shell Save action).
+- The `view` mode, the `view` init block, the navigation/panel intents and the
+  extra registration fields are additive within protocol major `1`. An older
+  shell rejects a manifest that declares `contributes.panels` or
+  `contributes.contentViews` unless `engines.exo` excludes that shell, so the
+  plugin fails closed with `incompatible-engine` rather than a partial surface.
 - The SDK exposes the protocol version as a constant so plugins do not hard-code
   it. The SDK major tracks the protocol major; its compatibility and deprecation
   policy is in [`plugin-sdk.md`](./plugin-sdk.md#9-compatibility-and-deprecation-policy).
@@ -580,6 +700,17 @@ for repeated violations, tears down the frame.
 - Normalize every path before the reserved-path and containment checks; check
   after resolution, not before.
 - Drop messages after `shell/dispose` even if the frame is still alive.
+- Mount panel and content-view frames with the same sandbox, origin, source,
+  target-origin and size checks as handler frames; never send a `file` block to a
+  view frame.
+- Treat a content-view payload as opaque data: enforce the 64 KiB limit, never put
+  it in a URL, never log it and never forward it to another frame.
+- Gate every navigation and panel intent on the frame being active and visible,
+  re-check `workspace:read` for `open-file`, reject reserved paths after
+  normalization and accept `request-panel` only for the caller's own registered
+  panel.
+- Name the plugin in the activity-bar title, secondary picker and content-view
+  chrome; never render plugin-supplied HTML in shell chrome.
 - Do not log file contents. Log ids, paths, topics and error codes; a local
   event payload is opaque and is never logged.
 - A same-origin plugin entry must never receive `allow-same-origin` (D3, D9).

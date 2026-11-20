@@ -14,6 +14,8 @@ import {
   type ShellInit,
   type SettingValues,
   type ThemeName,
+  type ViewInit,
+  type ViewInitData,
 } from './protocol'
 
 const THEMES: ThemeName[] = ['dark', 'light', 'high-contrast']
@@ -118,7 +120,50 @@ function capabilitiesAt(value: Record<string, unknown>, path: string): EditorCap
       capabilities.localEvents === undefined
         ? false
         : booleanAt(capabilities, 'localEvents', `${path}.capabilities`),
+    openFile:
+      capabilities.openFile === undefined
+        ? false
+        : booleanAt(capabilities, 'openFile', `${path}.capabilities`),
+    openView:
+      capabilities.openView === undefined
+        ? false
+        : booleanAt(capabilities, 'openView', `${path}.capabilities`),
+    requestPanel:
+      capabilities.requestPanel === undefined
+        ? false
+        : booleanAt(capabilities, 'requestPanel', `${path}.capabilities`),
   }
+}
+
+function viewAt(value: Record<string, unknown>, path: string): ViewInitData {
+  const view = objectAt(value, 'view', path)
+  const kind = stringAt(view, 'kind', `${path}.view`)
+  if (kind !== 'panel' && kind !== 'content') {
+    invalid(`${path}.view.kind`, 'expected panel or content')
+  }
+  const data: ViewInitData = {
+    kind,
+    id: stringAt(view, 'id', `${path}.view`),
+    title: stringAt(view, 'title', `${path}.view`),
+    instanceId: stringAt(view, 'instanceId', `${path}.view`),
+  }
+  if (view.location !== undefined) {
+    const location = stringAt(view, 'location', `${path}.view`)
+    if (location !== 'primary' && location !== 'secondary') {
+      invalid(`${path}.view.location`, 'expected primary or secondary')
+    }
+    data.location = location
+  }
+  if (view.payload !== undefined) data.payload = view.payload
+  if (view.openedBy !== undefined) {
+    const openedBy = objectAt(view, 'openedBy', `${path}.view`)
+    data.openedBy = {
+      pluginId: stringAt(openedBy, 'pluginId', `${path}.view.openedBy`),
+      pluginName: stringAt(openedBy, 'pluginName', `${path}.view.openedBy`),
+      origin: stringAt(openedBy, 'origin', `${path}.view.openedBy`),
+    }
+  }
+  return data
 }
 
 function registrationCapabilitiesAt(
@@ -206,7 +251,16 @@ export function parseShellInit(
       capabilities: registrationCapabilitiesAt(init, '/'),
     } satisfies RegistrationInit
   }
-  if (mode !== 'editor') invalid('/mode', 'expected register or editor')
+  if (mode === 'view') {
+    return {
+      ...base,
+      mode,
+      view: viewAt(init, '/'),
+      capabilities: capabilitiesAt(init, '/'),
+      limits: limitsAt(init, '/'),
+    } satisfies ViewInit
+  }
+  if (mode !== 'editor') invalid('/mode', 'expected register, editor or view')
   return {
     ...base,
     mode,

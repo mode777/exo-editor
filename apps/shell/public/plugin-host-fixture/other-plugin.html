@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Exo fixture other controller</title>
+  </head>
+  <body>
+    <pre id="observation">starting</pre>
+    <script>
+      const params = new URLSearchParams(location.hash.slice(1))
+      const host = params.get('exo-host')
+      const mode = params.get('exo-mode')
+      const sessionId = params.get('exo-session')
+      document.getElementById('observation').textContent = JSON.stringify({
+        mode,
+        origin: location.origin,
+      })
+
+      window.addEventListener('message', (event) => {
+        if (!host) return
+        if (event.source !== parent) return
+        if (event.origin !== host && event.origin !== 'null') return
+        const data = event.data
+        if (!data || data.exo !== 1 || data.type !== 'shell/init') return
+        if (mode !== 'register') return
+        setTimeout(() => {
+          parent.postMessage(
+            {
+              exo: 1,
+              type: 'plugin/register',
+              payload: {
+                fileEditors: [{ glob: '**/*.local-other.txt', entry: 'editor-local-events.html' }],
+                contentViews: ['other-tutorial'],
+              },
+            },
+            host,
+          )
+          parent.postMessage({ exo: 1, type: 'plugin/register-complete', payload: {} }, host)
+        }, 300)
+      })
+
+      if (host && sessionId) {
+        parent.postMessage(
+          { exo: 1, type: 'plugin/ready', payload: { protocolVersion: '1', sessionId } },
+          host,
+        )
+      }
+    </script>
+  </body>
+</html>

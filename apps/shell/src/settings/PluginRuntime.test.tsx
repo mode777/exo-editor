@@ -16,6 +16,8 @@ function record(overrides: Partial<PluginHostRecord> = {}): PluginHostRecord {
     identity: 'https://plugins.example.com::com.example.test',
     consent: 'none',
     registrations: [],
+    panels: [],
+    contentViews: [],
     ...overrides,
   }
 }
@@ -91,6 +93,8 @@ describe('plugin runtime status row', () => {
             engines: { exo: '*' },
             permissions: ['workspace:read'],
             fileEditors: [],
+            panels: [],
+            contentViews: [],
           },
         })}
         onReview={onReview}

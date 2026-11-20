@@ -1245,6 +1245,145 @@ describe('handler subscriptions', () => {
   })
 })
 
+describe('handler navigation intents', () => {
+  it('resolves a relative editor path and opens it', async () => {
+    const opened: Array<{ id: string; path: string }> = []
+    const context = await start({
+      onOpenFile: async (request) => {
+        opened.push(request)
+        return { ok: true }
+      },
+    })
+    ready(context)
+    context.frame.emit(
+      { exo: 1, type: 'plugin/open-file', id: 'open-1', payload: { path: './types.ts' } },
+      PLUGIN_ORIGIN,
+    )
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(opened).toEqual([{ id: 'open-1', path: '/src/types.ts' }])
+    expect(postedType(context.frame, 'shell/open-result')).toMatchObject({ replyTo: 'open-1' })
+  })
+
+  it('denies a reserved path and a hidden frame', async () => {
+    const opened: unknown[] = []
+    const context = await start({
+      onOpenFile: async (request) => {
+        opened.push(request)
+        return { ok: true }
+      },
+    })
+    ready(context)
+    context.frame.emit(
+      { exo: 1, type: 'plugin/open-file', id: 'reserved', payload: { path: '/exo.json' } },
+      PLUGIN_ORIGIN,
+    )
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(opened).toEqual([])
+    const reserved = context.frame.posted
+      .map((entry) => entry.message as { type?: string; replyTo?: string; payload?: unknown })
+      .find((message) => message.type === 'shell/error' && message.replyTo === 'reserved')
+    expect(reserved?.payload).toMatchObject({ code: 'permission-denied' })
+
+    const hidden = await start({
+      isVisible: () => false,
+      onOpenFile: async (request) => {
+        opened.push(request)
+        return { ok: true }
+      },
+    })
+    ready(hidden)
+    hidden.frame.emit(
+      { exo: 1, type: 'plugin/open-file', id: 'hidden', payload: { path: '/notes.txt' } },
+      PLUGIN_ORIGIN,
+    )
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(opened).toEqual([])
+    const denied = hidden.frame.posted
+      .map((entry) => entry.message as { type?: string; replyTo?: string; payload?: unknown })
+      .find((message) => message.type === 'shell/error' && message.replyTo === 'hidden')
+    expect(denied?.payload).toMatchObject({ code: 'permission-denied' })
+  })
+
+  it('forwards open-view and request-panel and returns their results', async () => {
+    const views: unknown[] = []
+    const panels: unknown[] = []
+    const context = await start({
+      onOpenView: async (request) => {
+        views.push(request)
+        return { ok: true }
+      },
+      onRequestPanel: async (request) => {
+        panels.push(request)
+        return { ok: true, open: true }
+      },
+    })
+    ready(context)
+    context.frame.emit(
+      {
+        exo: 1,
+        type: 'plugin/open-view',
+        id: 'view-1',
+        payload: { viewId: 'tutorial', instanceKey: 'k1' },
+      },
+      PLUGIN_ORIGIN,
+    )
+    context.frame.emit(
+      { exo: 1, type: 'plugin/request-panel', id: 'panel-1', payload: { panel: 'outline' } },
+      PLUGIN_ORIGIN,
+    )
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(views).toEqual([{ id: 'view-1', viewId: 'tutorial', instanceKey: 'k1' }])
+    expect(panels).toEqual([])
+    expect(postedType(context.frame, 'shell/open-result')).toMatchObject({ replyTo: 'view-1' })
+
+    context.frame.emit(
+      {
+        exo: 1,
+        type: 'plugin/request-panel',
+        id: 'panel-2',
+        payload: { panel: 'outline', action: 'show' },
+      },
+      PLUGIN_ORIGIN,
+    )
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(panels).toEqual([{ id: 'panel-2', panel: 'outline', action: 'show' }])
+    expect(postedType(context.frame, 'shell/panel-result')).toMatchObject({
+      replyTo: 'panel-2',
+      payload: { panel: 'outline', open: true },
+    })
+  })
+
+  it('rejects the eleventh intent in one rolling second', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(5000)
+    const opened: unknown[] = []
+    const context = await start({
+      onOpenFile: async (request) => {
+        opened.push(request)
+        return { ok: true }
+      },
+    })
+    ready(context)
+    for (let index = 0; index < 11; index += 1) {
+      context.frame.emit(
+        {
+          exo: 1,
+          type: 'plugin/open-file',
+          id: `intent-${index}`,
+          payload: { path: '/notes.txt' },
+        },
+        PLUGIN_ORIGIN,
+      )
+    }
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(opened).toHaveLength(10)
+    const limited = context.frame.posted
+      .map((entry) => entry.message as { type?: string; replyTo?: string; payload?: unknown })
+      .find((message) => message.type === 'shell/error' && message.replyTo === 'intent-10')
+    expect(limited?.payload).toMatchObject({ code: 'rate-limited' })
+    now.mockRestore()
+  })
+})
+
 describe('resolveHandlerReadPath', () => {
   it('resolves siblings, parents inside the root and absolute paths', () => {
     expect(resolveHandlerReadPath('/src/editor.ts', './types.ts')).toBe('/src/types.ts')

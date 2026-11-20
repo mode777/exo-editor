@@ -3,6 +3,7 @@ import type { WorkspacePath } from './contract'
 import type { DocumentState } from './documents'
 import type { PluginConfigSnapshot } from '../plugins/store'
 import type { PluginHostSnapshot } from '../plugins/host'
+import type { ViewHandle } from '../plugins/view-pool'
 import type { PluginSettingsSnapshot } from '../plugins/settings'
 import type { FilePickerView } from '../plugins/file-picker'
 import type { WorkspaceRuntime, WorkspaceSnapshot } from './runtime'
@@ -63,6 +64,15 @@ export function usePluginHost(): PluginHostSnapshot {
   const runtime = useWorkspaceRuntime()
   const store = runtime.pluginHost
   return useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
+}
+
+export function useViewPoolSnapshot(): ViewHandle[] {
+  const runtime = useWorkspaceRuntime()
+  return useSyncExternalStore(
+    runtime.views.subscribe,
+    runtime.views.getSnapshot,
+    runtime.views.getSnapshot,
+  )
 }
 
 export function usePluginSettings(): PluginSettingsSnapshot {

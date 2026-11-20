@@ -11,10 +11,13 @@
     "exo": ">=0.2.0"
   },
   "runtime": {
-    "entry": "plugin.html"
+    "entry": "other-plugin.html"
   },
   "permissions": ["workspace:read", "events:subscribe"],
   "contributes": {
+    "contentViews": [
+      { "id": "other-tutorial", "title": "Other Tutorial", "entry": "view-content.html" }
+    ],
     "fileEditors": [
       {
         "glob": "**/*.local-other.txt",

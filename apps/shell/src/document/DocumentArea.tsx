@@ -2,8 +2,12 @@ import { useCallback, useEffect } from 'react'
 import type { WorkbenchTab } from 'vscode-workbench'
 import { workspaceErrorMessage, type WorkspacePath } from '../workspace/contract'
 import { useDocument, useWorkspaceRuntime, useWorkspaceSnapshot } from '../workspace/context'
+import { contentViewOf } from '../workbench/tabs'
+import { ContentViewSurface } from './ContentViewSurface'
 
 export function DocumentArea({ tab }: { tab: WorkbenchTab }) {
+  const content = contentViewOf(tab)
+  if (content) return <ContentViewSurface content={content} />
   if (!tab.path || tab.kind !== 'file') {
     return <div className="exo-document-placeholder">No editor is available for {tab.title}.</div>
   }

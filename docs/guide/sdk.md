@@ -123,6 +123,32 @@ Rules the SDK enforces for you:
   ignored.
 - A throwing listener does not break the connection.
 
+## Panels and content views
+
+Declare them in the manifest, register the ids you want active, then build the
+view page with the same SDK:
+
+```ts
+// controller
+registration.registerPanel('outline')
+registration.registerContentView('tutorial')
+
+// views/outline.ts
+const connection = await connectBrowserPlugin()
+if (connection.mode !== 'view') throw new Error('Expected a view frame')
+const view = connection.view
+view.onDispose(() => cleanup())
+await view.readFile('/notes.txt')
+await view.requestPanel('outline', 'toggle')
+await view.openView({ viewId: 'tutorial', instanceKey: 'chapter-2', payload: { chapter: 2 } })
+```
+
+`ViewClient` exposes reads, listings, the picker, events and the navigation
+helpers, and no save or dirty methods. `view.kind` is `panel` or `content`;
+`view.payload` and `view.openedBy` are one-shot data. A view must name a
+`/`-rooted path for `openFile`. Panels mount on first reveal; content views open a
+tab per instance key.
+
 ## Events
 
 ```ts

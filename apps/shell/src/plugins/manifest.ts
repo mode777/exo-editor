@@ -12,6 +12,10 @@ export const MANIFEST_SCHEMA_VERSION = 1
 export const MANIFEST_MAX_BYTES = 256 * 1024
 export const MANIFEST_TIMEOUT_MS = 5000
 export const MANIFEST_MAX_EDITORS = 20
+export const MANIFEST_MAX_PANELS = 8
+export const MANIFEST_MAX_CONTENT_VIEWS = 16
+export const MANIFEST_MAX_VIEW_TITLE = 80
+export const MANIFEST_MAX_ICON = 40
 export const MANIFEST_MAX_GLOB_LENGTH = 200
 export const MANIFEST_MAX_NAME = 80
 export const MANIFEST_MAX_DESCRIPTION = 500
@@ -26,6 +30,7 @@ export const MANIFEST_MAX_SETTING_DESCRIPTION = 500
 export const MANIFEST_MAX_SETTING_STRING = 4096
 
 export const MANIFEST_ID_PATTERN = '^[a-z0-9][a-z0-9.-]{2,63}$'
+export const MANIFEST_CONTRIBUTION_ID_PATTERN = '^[a-z0-9][a-z0-9.-]{0,63}$'
 export const MANIFEST_SETTING_KEY_PATTERN = '^[a-z][a-zA-Z0-9]*(?:[.-][a-zA-Z0-9]+)*$'
 export const MANIFEST_SEMVER_PATTERN =
   '^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-((?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\\+([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?$'
@@ -43,10 +48,12 @@ export const PLUGIN_PERMISSIONS = [
 ] as const
 export const MANIFEST_SETTING_TYPES = ['boolean', 'string', 'number'] as const
 export const MANIFEST_RENDERINGS = ['hidden', 'frame'] as const
+export const MANIFEST_PANEL_LOCATIONS = ['primary', 'secondary'] as const
 
 export type PluginPermission = (typeof PLUGIN_PERMISSIONS)[number]
 export type ManifestSettingType = (typeof MANIFEST_SETTING_TYPES)[number]
 export type ManifestRendering = (typeof MANIFEST_RENDERINGS)[number]
+export type ManifestPanelLocation = (typeof MANIFEST_PANEL_LOCATIONS)[number]
 export type SettingValue = boolean | string | number
 
 /** `workspace:write` implies read, so either permission grants reads. */
@@ -114,6 +121,26 @@ export interface ManifestFileEditor {
   rendering?: ManifestRendering
 }
 
+export interface ManifestPanel {
+  id: string
+  title: string
+  icon?: string
+  location: ManifestPanelLocation
+  /** Declared relative page, as written in the manifest. */
+  entry: string
+  /** Resolved absolute page URL. */
+  entryUrl: string
+}
+
+export interface ManifestContentView {
+  id: string
+  title: string
+  /** Declared relative page, as written in the manifest. */
+  entry: string
+  /** Resolved absolute page URL. */
+  entryUrl: string
+}
+
 export interface ManifestSetting {
   type: ManifestSettingType
   default: SettingValue
@@ -144,6 +171,8 @@ export interface PluginManifest {
   engines: { exo: string }
   permissions: PluginPermission[]
   fileEditors: ManifestFileEditor[]
+  panels: ManifestPanel[]
+  contentViews: ManifestContentView[]
   configuration?: ManifestConfiguration
 }
 
@@ -158,6 +187,8 @@ export type ResolvedEntry =
   { ok: true; url: string; path: string } | { ok: false; reason: EntryFailureReason }
 
 const ID = new RegExp(MANIFEST_ID_PATTERN)
+const CONTRIBUTION_ID = new RegExp(MANIFEST_CONTRIBUTION_ID_PATTERN)
+const CODICON = /^[a-z0-9-]+$/
 const SEMVER = new RegExp(MANIFEST_SEMVER_PATTERN)
 const RELATIVE_PAGE = new RegExp(MANIFEST_RELATIVE_PAGE_PATTERN)
 const RELATIVE_ASSET = new RegExp(MANIFEST_RELATIVE_ASSET_PATTERN)
@@ -435,6 +466,122 @@ function parseFileEditors(
   return editors
 }
 
+function parsePanels(
+  value: unknown,
+  manifestUrl: string,
+  manifestOrigin: string,
+  pluginRoot: string,
+): ManifestPanel[] | ManifestIssue {
+  if (!Array.isArray(value) || value.length > MANIFEST_MAX_PANELS) {
+    return issue('invalid-manifest', { field: '/contributes/panels' })
+  }
+  const panels: ManifestPanel[] = []
+  const ids = new Set<string>()
+  for (let index = 0; index < value.length; index += 1) {
+    const raw = value[index]
+    const base = pointer('contributes', 'panels', index)
+    if (!isPlainObject(raw)) return issue('invalid-manifest', { field: base })
+    const unknown = unknownKeys(raw, ['id', 'title', 'icon', 'location', 'entry'], base)
+    if (unknown) return unknown
+    if (typeof raw.id !== 'string' || !CONTRIBUTION_ID.test(raw.id)) {
+      return issue('invalid-manifest', { field: `${base}/id` })
+    }
+    if (ids.has(raw.id)) {
+      return issue('invalid-manifest', {
+        field: `${base}/id`,
+        message: 'A panel id may be declared only once.',
+      })
+    }
+    ids.add(raw.id)
+    if (!isStringInRange(raw.title, 1, MANIFEST_MAX_VIEW_TITLE)) {
+      return issue('invalid-manifest', { field: `${base}/title` })
+    }
+    if (
+      raw.icon !== undefined &&
+      (typeof raw.icon !== 'string' ||
+        !CODICON.test(raw.icon) ||
+        raw.icon.length > MANIFEST_MAX_ICON)
+    ) {
+      return issue('invalid-manifest', { field: `${base}/icon` })
+    }
+    if (
+      typeof raw.location !== 'string' ||
+      !(MANIFEST_PANEL_LOCATIONS as readonly string[]).includes(raw.location)
+    ) {
+      return issue('invalid-manifest', { field: `${base}/location` })
+    }
+    if (!hasOwn(raw, 'entry')) {
+      return issue('invalid-manifest', { field: `${base}/entry` })
+    }
+    const entry = resolvePluginEntry(raw.entry, manifestUrl, manifestOrigin, pluginRoot)
+    if (!entry.ok) {
+      return issue(
+        entry.reason === 'permission-denied' ? 'unsupported-origin' : 'invalid-manifest',
+        { field: `${base}/entry` },
+      )
+    }
+    panels.push({
+      id: raw.id,
+      title: raw.title,
+      ...(raw.icon === undefined ? {} : { icon: raw.icon }),
+      location: raw.location as ManifestPanelLocation,
+      entry: raw.entry as string,
+      entryUrl: entry.url,
+    })
+  }
+  return panels
+}
+
+function parseContentViews(
+  value: unknown,
+  manifestUrl: string,
+  manifestOrigin: string,
+  pluginRoot: string,
+): ManifestContentView[] | ManifestIssue {
+  if (!Array.isArray(value) || value.length > MANIFEST_MAX_CONTENT_VIEWS) {
+    return issue('invalid-manifest', { field: '/contributes/contentViews' })
+  }
+  const views: ManifestContentView[] = []
+  const ids = new Set<string>()
+  for (let index = 0; index < value.length; index += 1) {
+    const raw = value[index]
+    const base = pointer('contributes', 'contentViews', index)
+    if (!isPlainObject(raw)) return issue('invalid-manifest', { field: base })
+    const unknown = unknownKeys(raw, ['id', 'title', 'entry'], base)
+    if (unknown) return unknown
+    if (typeof raw.id !== 'string' || !CONTRIBUTION_ID.test(raw.id)) {
+      return issue('invalid-manifest', { field: `${base}/id` })
+    }
+    if (ids.has(raw.id)) {
+      return issue('invalid-manifest', {
+        field: `${base}/id`,
+        message: 'A content-view id may be declared only once.',
+      })
+    }
+    ids.add(raw.id)
+    if (!isStringInRange(raw.title, 1, MANIFEST_MAX_VIEW_TITLE)) {
+      return issue('invalid-manifest', { field: `${base}/title` })
+    }
+    if (!hasOwn(raw, 'entry')) {
+      return issue('invalid-manifest', { field: `${base}/entry` })
+    }
+    const entry = resolvePluginEntry(raw.entry, manifestUrl, manifestOrigin, pluginRoot)
+    if (!entry.ok) {
+      return issue(
+        entry.reason === 'permission-denied' ? 'unsupported-origin' : 'invalid-manifest',
+        { field: `${base}/entry` },
+      )
+    }
+    views.push({
+      id: raw.id,
+      title: raw.title,
+      entry: raw.entry as string,
+      entryUrl: entry.url,
+    })
+  }
+  return views
+}
+
 /** Validate one setting against its declared type and value limits. */
 function validSettingValue(value: unknown, type: ManifestSettingType): value is SettingValue {
   if (type === 'boolean') return typeof value === 'boolean'
@@ -627,12 +774,14 @@ export function validateManifest(
   if (!Array.isArray(permissions)) return { ok: false, error: permissions }
 
   let fileEditors: ManifestFileEditor[] = []
+  let panels: ManifestPanel[] = []
+  let contentViews: ManifestContentView[] = []
   let configuration: ManifestConfiguration | undefined
   if (hasOwn(value, 'contributes')) {
     if (!isPlainObject(value.contributes)) return invalid('/contributes')
     const contributesUnknown = unknownKeys(
       value.contributes,
-      ['fileEditors', 'configuration'],
+      ['fileEditors', 'panels', 'contentViews', 'configuration'],
       '/contributes',
     )
     if (contributesUnknown) return { ok: false, error: contributesUnknown }
@@ -645,6 +794,26 @@ export function validateManifest(
       )
       if (!Array.isArray(parsed)) return { ok: false, error: parsed }
       fileEditors = parsed
+    }
+    if (hasOwn(value.contributes, 'panels')) {
+      const parsed = parsePanels(
+        value.contributes.panels,
+        manifestUrl.href,
+        manifestUrl.origin,
+        controller.pluginRoot,
+      )
+      if (!Array.isArray(parsed)) return { ok: false, error: parsed }
+      panels = parsed
+    }
+    if (hasOwn(value.contributes, 'contentViews')) {
+      const parsed = parseContentViews(
+        value.contributes.contentViews,
+        manifestUrl.href,
+        manifestUrl.origin,
+        controller.pluginRoot,
+      )
+      if (!Array.isArray(parsed)) return { ok: false, error: parsed }
+      contentViews = parsed
     }
     if (hasOwn(value.contributes, 'configuration')) {
       const parsed = parseConfiguration(value.contributes.configuration)
@@ -675,6 +844,8 @@ export function validateManifest(
       engines: { exo: value.engines.exo },
       permissions,
       fileEditors,
+      panels,
+      contentViews,
       ...(configuration ? { configuration } : {}),
     },
   }

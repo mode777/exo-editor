@@ -94,6 +94,8 @@ function manifest(): PluginManifest {
         priority: 10,
       },
     ],
+    panels: [],
+    contentViews: [],
   }
 }
 

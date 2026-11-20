@@ -28,7 +28,11 @@ archived change design. The post-layer-10 change `plugin-local-events`
 (archived as `2026-11-20-plugin-local-events`) adds identity-scoped `local/`
 topics, the correlated `plugin/publish` acknowledgement,
 `capabilities.localEvents` and SDK `1.4.0`; its deployed verification is recorded
-in the archived change design. The parallel Stratofold provider track
+in the archived change design. The post-layer-10 change `plugin-view-surfaces`
+adds `contributes.panels`, `contributes.contentViews`, the `view` frame mode,
+`plugin/open-file`, `plugin/open-view`, `plugin/request-panel` and SDK `1.5.0`;
+its deployed verification is recorded in the change design and `ROADMAP.md`. The
+parallel Stratofold provider track
 (P1-P3) is archived and verified; it does not gate the numbered layers. The
 contracts are ratified, and the shell app (`apps/shell`) builds, tests and
 deploys to GitHub Pages through CI. Do not scaffold code ahead of the [roadmap](./ROADMAP.md) layer

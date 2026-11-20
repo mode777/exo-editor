@@ -211,3 +211,24 @@ Changes are only observed for open documents plus the shell's own writes; both
 providers are non-watchable, so an unopened file is not reported.
 
 No secrets, backend or build step are involved.
+
+## Panels and content views
+
+The manifest also declares a primary panel (`fixture-panel`), a secondary panel
+(`fixture-inspector`) and a content view (`fixture-tutorial`). The controller
+registers all three ids. The pages are dependency-free views that perform the
+`exo-mode=view` handshake and mirror `{ view, capabilities, settings,
+subscriptions, events, results, errors }` into `#observation` and the title.
+
+- `view-primary.html` is the hub: Publish local event, Subscribe theme, Open
+  `/notes.txt`, Toggle secondary panel, Open fixture content view and Open the
+  other plugin's view.
+- `view-secondary.html` can hide itself and open the content view.
+- `view-content.html` shows the read-only content view; the `payload` and
+  `openedBy` fields in `#observation` distinguish a panel open, a shell palette
+  open and a cross-plugin open.
+
+The other fixture manifest declares `other-tutorial` and uses
+`other-plugin.html` as its controller, so the cross-plugin open has a real target
+identity. A same-origin copy runs with `allow-scripts` only; `storage` in the
+view observation is therefore `unavailable`.

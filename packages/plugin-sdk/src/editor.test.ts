@@ -33,6 +33,9 @@ function init(overrides: Partial<EditorInit> = {}): EditorInit {
       filePicker: true,
       directoryListing: true,
       localEvents: true,
+      openFile: true,
+      openView: true,
+      requestPanel: true,
     },
     limits: { maxFileSize: 10 * 1024 * 1024, maxRequestBytes: 16 * 1024 * 1024 },
     ...overrides,
@@ -69,6 +72,9 @@ describe('editor client', () => {
       filePicker: true,
       directoryListing: true,
       localEvents: true,
+      openFile: true,
+      openView: true,
+      requestPanel: true,
     })
     expect(editor.settings).toEqual({ 'template.greeting': 'hello' })
     expect(transport.posted.filter((item) => item.type === 'plugin/request-file')).toHaveLength(0)
@@ -394,6 +400,9 @@ describe('editor client', () => {
         filePicker: true,
         directoryListing: true,
         localEvents: false,
+        openFile: true,
+        openView: true,
+        requestPanel: true,
       },
     })
     await expect(old.editor.publishLocal('local/state', {})).rejects.toMatchObject({
@@ -542,6 +551,9 @@ describe('editor client', () => {
         filePicker: true,
         directoryListing: true,
         localEvents: true,
+        openFile: true,
+        openView: true,
+        requestPanel: true,
       },
     })
     await expect(denied.editor.requestFiles()).rejects.toMatchObject({ code: 'permission-denied' })
@@ -632,6 +644,9 @@ describe('editor client', () => {
         filePicker: true,
         directoryListing: false,
         localEvents: true,
+        openFile: true,
+        openView: true,
+        requestPanel: true,
       },
     })
     await expect(old.editor.listDirectory('/')).rejects.toMatchObject({

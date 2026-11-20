@@ -29,6 +29,8 @@ function manifest(overrides: Partial<PluginManifest> = {}): PluginManifest {
         priority: 10,
       },
     ],
+    panels: [],
+    contentViews: [],
     ...overrides,
   }
 }
@@ -121,6 +123,64 @@ describe('consent dialog', () => {
     })
     const { container: rendered } = await render(frame)
     expect(rendered.textContent).toContain('Renders its own editor surface')
+  })
+
+  it('lists panels and content views with their placement', async () => {
+    const { container: rendered } = await render(
+      request({
+        panels: [
+          {
+            id: 'outline',
+            title: 'Outline',
+            icon: 'list-tree',
+            location: 'primary',
+            entry: 'views/outline.html',
+            entryUrl: 'https://plugins.example.com/monaco/views/outline.html',
+          },
+          {
+            id: 'inspector',
+            title: 'Inspector',
+            location: 'secondary',
+            entry: 'other.html',
+            entryUrl: 'https://plugins.example.com/monaco/other.html',
+          },
+        ],
+        contentViews: [
+          {
+            id: 'tutorial',
+            title: 'Tutorial',
+            entry: 'views/tutorial.html',
+            entryUrl: 'https://plugins.example.com/monaco/views/tutorial.html',
+          },
+        ],
+      }),
+    )
+    const text = rendered.textContent ?? ''
+    expect(text).toContain('Outline')
+    expect(text).toContain('activity-bar item')
+    expect(text).toContain('Inspector')
+    expect(text).toContain('Right side bar')
+    expect(text).toContain('Tutorial')
+    expect(text).toContain('Read-only tab')
+    expect(text).toContain('open workspace files and views')
+  })
+
+  it('says a read-only plugin cannot open workspace files', async () => {
+    const { container: rendered } = await render(
+      request({
+        permissions: [],
+        panels: [
+          {
+            id: 'outline',
+            title: 'Outline',
+            location: 'primary',
+            entry: 'views/outline.html',
+            entryUrl: 'https://plugins.example.com/monaco/views/outline.html',
+          },
+        ],
+      }),
+    )
+    expect(rendered.textContent).toContain('cannot open workspace files')
   })
 
   it('explains directory listing in plain language', async () => {

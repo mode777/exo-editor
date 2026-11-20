@@ -5,7 +5,12 @@ import {
   MANIFEST_MAX_DESCRIPTION,
   MANIFEST_HTTPS_URL_PATTERN,
   MANIFEST_ID_PATTERN,
+  MANIFEST_CONTRIBUTION_ID_PATTERN,
+  MANIFEST_MAX_CONTENT_VIEWS,
   MANIFEST_MAX_EDITORS,
+  MANIFEST_MAX_PANELS,
+  MANIFEST_MAX_VIEW_TITLE,
+  MANIFEST_PANEL_LOCATIONS,
   MANIFEST_MAX_ENUM_VALUES,
   MANIFEST_MAX_GLOB_LENGTH,
   MANIFEST_MAX_LABEL,
@@ -583,6 +588,133 @@ describe('manifest validation', () => {
     )
   })
 
+  it('accepts panels and content views and resolves their entries', () => {
+    const result = validate({
+      contributes: {
+        panels: [
+          {
+            id: 'outline',
+            title: 'Outline',
+            icon: 'list-tree',
+            location: 'primary',
+            entry: 'views/outline.html',
+          },
+          { id: 'inspector', title: 'Inspector', location: 'secondary', entry: 'other.html' },
+        ],
+        contentViews: [{ id: 'tutorial', title: 'Tutorial', entry: 'views/tutorial.html' }],
+      },
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.manifest.panels).toEqual([
+      {
+        id: 'outline',
+        title: 'Outline',
+        icon: 'list-tree',
+        location: 'primary',
+        entry: 'views/outline.html',
+        entryUrl: 'https://plugins.example.com/monaco/views/outline.html',
+      },
+      {
+        id: 'inspector',
+        title: 'Inspector',
+        location: 'secondary',
+        entry: 'other.html',
+        entryUrl: 'https://plugins.example.com/monaco/other.html',
+      },
+    ])
+    expect(result.manifest.contentViews).toEqual([
+      {
+        id: 'tutorial',
+        title: 'Tutorial',
+        entry: 'views/tutorial.html',
+        entryUrl: 'https://plugins.example.com/monaco/views/tutorial.html',
+      },
+    ])
+  })
+
+  it('accepts empty panel and content-view arrays', () => {
+    const result = validate({ contributes: { panels: [], contentViews: [] } })
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.manifest.panels).toEqual([])
+      expect(result.manifest.contentViews).toEqual([])
+    }
+  })
+
+  it('rejects invalid panel shapes', () => {
+    const valid = {
+      id: 'outline',
+      title: 'Outline',
+      location: 'primary',
+      entry: 'views/outline.html',
+    }
+    const cases: Array<[Record<string, unknown>, string]> = [
+      [{ ...valid, id: 'Outline' }, '/contributes/panels/0/id'],
+      [{ ...valid, title: '' }, '/contributes/panels/0/title'],
+      [{ ...valid, title: 'x'.repeat(MANIFEST_MAX_VIEW_TITLE + 1) }, '/contributes/panels/0/title'],
+      [{ ...valid, icon: 'List-Tree' }, '/contributes/panels/0/icon'],
+      [{ ...valid, location: 'bottom' }, '/contributes/panels/0/location'],
+      [{ ...valid, entry: 'views/outline.txt' }, '/contributes/panels/0/entry'],
+      [{ ...valid, location: undefined }, '/contributes/panels/0/location'],
+      [{ ...valid, extra: true }, '/contributes/panels/0/extra'],
+    ]
+    for (const [panel, field] of cases) {
+      expect(errorOf(validate({ contributes: { panels: [panel] } })).field).toBe(field)
+    }
+  })
+
+  it('rejects duplicate panel ids and the panel limit', () => {
+    const panel = { id: 'outline', title: 'Outline', location: 'primary', entry: 'outline.html' }
+    expect(errorOf(validate({ contributes: { panels: [panel, panel] } })).field).toBe(
+      '/contributes/panels/1/id',
+    )
+    const panels = Array.from({ length: MANIFEST_MAX_PANELS + 1 }, (_, index) => ({
+      id: `panel-${index}`,
+      title: `Panel ${index}`,
+      location: 'primary',
+      entry: 'panel.html',
+    }))
+    expect(errorOf(validate({ contributes: { panels } })).field).toBe('/contributes/panels')
+  })
+
+  it('rejects a panel entry outside the plugin root', () => {
+    const result = validate({
+      contributes: {
+        panels: [
+          { id: 'outline', title: 'Outline', location: 'primary', entry: '../outline.html' },
+        ],
+      },
+    })
+    expect(errorOf(result)).toMatchObject({ code: 'invalid-manifest' })
+  })
+
+  it('rejects invalid content-view shapes and limits', () => {
+    const valid = { id: 'tutorial', title: 'Tutorial', entry: 'views/tutorial.html' }
+    const cases: Array<[Record<string, unknown>, string]> = [
+      [{ ...valid, id: 'Tutorial' }, '/contributes/contentViews/0/id'],
+      [{ ...valid, title: '' }, '/contributes/contentViews/0/title'],
+      [{ ...valid, entry: 'views/tutorial.txt' }, '/contributes/contentViews/0/entry'],
+      [{ ...valid, icon: 'book' }, '/contributes/contentViews/0/icon'],
+      [{ ...valid, entry: undefined }, '/contributes/contentViews/0/entry'],
+    ]
+    for (const [view, field] of cases) {
+      expect(errorOf(validate({ contributes: { contentViews: [view] } })).field).toBe(field)
+    }
+    expect(
+      errorOf(validate({ contributes: { contentViews: [valid, { ...valid, title: 'Other' }] } }))
+        .field,
+    ).toBe('/contributes/contentViews/1/id')
+    const views = Array.from({ length: MANIFEST_MAX_CONTENT_VIEWS + 1 }, (_, index) => ({
+      id: `view-${index}`,
+      title: `View ${index}`,
+      entry: 'view.html',
+    }))
+    expect(errorOf(validate({ contributes: { contentViews: views } })).field).toBe(
+      '/contributes/contentViews',
+    )
+  })
+
   it('uses a supported final manifest URL', () => {
     expect(validate({}, 'http://localhost:5174/exo-manifest.json').ok).toBe(true)
     expect(errorOf(validate({}, 'http://plugins.example.com/exo-manifest.json'))).toMatchObject({
@@ -795,9 +927,32 @@ interface SchemaDefs {
     additionalProperties: boolean
     properties: {
       fileEditors: { maxItems: number; items: { $ref: string } }
+      panels: { maxItems: number; items: { $ref: string } }
+      contentViews: { maxItems: number; items: { $ref: string } }
       configuration: { $ref: string }
     }
   }
+  panel: {
+    additionalProperties: boolean
+    required: string[]
+    properties: {
+      id: { $ref: string }
+      title: { minLength: number; maxLength: number }
+      icon: { minLength: number; maxLength: number; pattern: string }
+      location: { enum: string[] }
+      entry: { $ref: string }
+    }
+  }
+  contentView: {
+    additionalProperties: boolean
+    required: string[]
+    properties: {
+      id: { $ref: string }
+      title: { minLength: number; maxLength: number }
+      entry: { $ref: string }
+    }
+  }
+  contributionId: { minLength: number; maxLength: number; pattern: string }
   configuration: {
     additionalProperties: boolean
     required: string[]
@@ -865,6 +1020,16 @@ describe('manifest schema parity', () => {
     expect(defs.contributes.additionalProperties).toBe(false)
     expect(defs.contributes.properties.configuration.$ref).toBe('#/$defs/configuration')
     expect(defs.contributes.properties.fileEditors.maxItems).toBe(MANIFEST_MAX_EDITORS)
+    expect(defs.contributes.properties.panels.maxItems).toBe(MANIFEST_MAX_PANELS)
+    expect(defs.contributes.properties.contentViews.maxItems).toBe(MANIFEST_MAX_CONTENT_VIEWS)
+    expect(defs.panel.required).toEqual(['id', 'title', 'location', 'entry'])
+    expect(defs.panel.properties.id.$ref).toBe('#/$defs/contributionId')
+    expect(defs.panel.properties.title.maxLength).toBe(MANIFEST_MAX_VIEW_TITLE)
+    expect(defs.panel.properties.location.enum).toEqual([...MANIFEST_PANEL_LOCATIONS])
+    expect(defs.panel.properties.icon.pattern).toBe('^[a-z0-9-]+$')
+    expect(defs.contentView.required).toEqual(['id', 'title', 'entry'])
+    expect(defs.contentView.properties.id.$ref).toBe('#/$defs/contributionId')
+    expect(defs.contributionId.pattern).toBe(MANIFEST_CONTRIBUTION_ID_PATTERN)
     expect(defs.configuration.additionalProperties).toBe(false)
     expect(defs.configuration.required).toEqual(['properties'])
     expect(defs.configuration.properties.properties.maxProperties).toBe(MANIFEST_MAX_SETTINGS)

@@ -113,6 +113,48 @@ export function ConsentDialog({ request, shellOrigin, onApprove, onDeny }: Conse
           )}
         </section>
 
+        <section className="exo-consent-section" aria-labelledby="exo-consent-panels">
+          <h3 id="exo-consent-panels">Panels it can add</h3>
+          {manifest.panels.length === 0 ? (
+            <p className="exo-settings-hint">This plugin adds no side-bar panels.</p>
+          ) : (
+            <ul className="exo-consent-list">
+              {manifest.panels.map((panel) => (
+                <li key={panel.id}>
+                  <strong>{panel.title}</strong> — <code>{panel.id}</code>
+                  <div className="exo-consent-page">
+                    {panel.location === 'primary'
+                      ? 'Left side bar, with an activity-bar item.'
+                      : 'Right side bar, opened from the view picker.'}
+                  </div>
+                  <div className="exo-consent-page">
+                    <code>{panel.entryUrl}</code>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section className="exo-consent-section" aria-labelledby="exo-consent-content-views">
+          <h3 id="exo-consent-content-views">Content views it can open</h3>
+          {manifest.contentViews.length === 0 ? (
+            <p className="exo-settings-hint">This plugin adds no content-view tabs.</p>
+          ) : (
+            <ul className="exo-consent-list">
+              {manifest.contentViews.map((view) => (
+                <li key={view.id}>
+                  <strong>{view.title}</strong> — <code>{view.id}</code>
+                  <div className="exo-consent-page">Read-only tab in the document area.</div>
+                  <div className="exo-consent-page">
+                    <code>{view.entryUrl}</code>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
         <section className="exo-consent-section" aria-labelledby="exo-consent-permissions">
           <h3 id="exo-consent-permissions">Permissions</h3>
           {manifest.permissions.length === 0 ? (
@@ -132,6 +174,15 @@ export function ConsentDialog({ request, shellOrigin, onApprove, onDeny }: Conse
               : 'This plugin cannot write to your workspace.'}
           </p>
         </section>
+
+        {(manifest.panels.length > 0 || manifest.contentViews.length > 0) && (
+          <p className="exo-settings-hint">
+            {manifest.permissions.includes('workspace:read') ||
+            manifest.permissions.includes('workspace:write')
+              ? 'When you invoke it, this plugin can ask the shell to open workspace files and views.'
+              : 'This plugin cannot open workspace files because it requests no read permission.'}
+          </p>
+        )}
 
         {sameOrigin && (
           <p className="exo-consent-warning" role="alert">

@@ -19,7 +19,18 @@ import { isReservedPath, normalizePath } from './paths'
 import { PluginConfigStore } from '../plugins/store'
 import { PluginHost } from '../plugins/host'
 import { HandlerPool } from '../plugins/handlers'
+import { ViewPool } from '../plugins/view-pool'
+import type {
+  IntentOutcome,
+  IntentSource,
+  OpenFileIntent,
+  OpenViewIntent,
+  PanelIntent,
+  PanelIntentOutcome,
+} from '../plugins/frame-session'
+import { shellCodeFor } from '../plugins/frame-session'
 import { FilePickerController } from '../plugins/file-picker'
+import type { FrameTransport } from '../plugins/frame'
 import { PluginSettingsStore, type PluginSettingsStorage } from '../plugins/settings'
 import { EventBus, FileChangeCoalescer, SelfWriteEcho, type ThemeName } from '../plugins/events'
 import { FolderWorkspaceProvider } from './providers/folder/provider'
@@ -38,14 +49,20 @@ import {
 } from './providers/stratofold/connection'
 import { StratofoldSource } from './providers/stratofold/source'
 import { stratofoldWorkspaceId } from './providers/stratofold/provider'
+import { useWorkbenchStore } from 'vscode-workbench'
 import {
   clearWorkspaceTabs,
+  closeContentTabsFor,
+  openContentViewTab,
   openFileTab,
   removeTabsUnder,
   setTabDirty,
   updateTabPath,
   activeDocumentPath,
 } from '../workbench/tabs'
+import { pluginViewId } from '../workbench/plugin-views'
+import type { ViewPluginInfo } from '../plugins/view-pool'
+import type { PluginManifest } from '../plugins/manifest'
 
 export type WorkspacePhase =
   'starting' | 'restoring' | 'no-workspace' | 'ready' | 'unsupported' | 'failed'
@@ -100,6 +117,9 @@ export interface WorkspaceRuntimeOptions {
   createSession?: (handle: WorkspaceHandle) => WorkspaceSession
   pluginHost?: PluginHost
   handlerPool?: HandlerPool
+  viewPool?: ViewPool
+  /** Frame transport for the default view pool; tests inject a fake. */
+  viewTransport?: FrameTransport
 }
 
 const INITIAL_SNAPSHOT: WorkspaceSnapshot = {
@@ -116,6 +136,7 @@ export class WorkspaceRuntime {
   readonly pluginConfig: PluginConfigStore
   readonly pluginHost: PluginHost
   readonly handlers: HandlerPool
+  readonly views: ViewPool
   /** The one event bus for the current workspace; shared by handler pools. */
   readonly events: EventBus
   readonly filePicker: FilePickerController
@@ -137,6 +158,7 @@ export class WorkspaceRuntime {
   private startPromise: Promise<void> | null = null
   private disposed = false
   private generationCount = 0
+  private contentInstance = 0
   private remote: RemoteWorkspaceSummary | null = null
   private remoteError: RemoteErrorSummary | null = null
 
@@ -170,12 +192,32 @@ export class WorkspaceRuntime {
         onSaveRequested: (path) => this.documents.saveFromPlugin(path),
         onRequestFiles: (request) => this.filePicker.request(request),
         isPickerOpen: () => this.filePicker.getSnapshot() !== null,
+        onOpenFile: (request, source) => this.openFileIntent(request, source),
+        onOpenView: (request, source) => this.openViewIntent(request, source),
+        onRequestPanel: (request, source) => this.requestPanelIntent(request, source),
+      })
+    this.views =
+      options.viewPool ??
+      new ViewPool({
+        ...(options.viewTransport === undefined ? {} : { transport: options.viewTransport }),
+        events: this.events,
+        onRequestFiles: (request) => this.filePicker.request(request),
+        onOpenFile: (request, source) => this.openFileIntent(request, source),
+        onOpenView: (request, source) => this.openViewIntent(request, source),
+        onRequestPanel: (request, source) => this.requestPanelIntent(request, source),
       })
     this.pluginSettings = new PluginSettingsStore({
       storage: options.pluginSettingsStorage,
-      onChange: (identity, values) => this.handlers.updateSettings(identity, values),
+      onChange: (identity, values) => {
+        if (!this.handlers.updateSettings(identity, values)) {
+          this.views.updateSettings(identity, values)
+        }
+      },
     })
     this.pluginHost.setHandlerLifecycle(this.handlers)
+    this.pluginHost.setViewLifecycle({
+      closeFor: (identity) => this.closeViewsFor(identity),
+    })
     this.fileChanges = new FileChangeCoalescer({
       publish: (payload) => {
         this.handlers.publish('workspace/file-changed', payload, { burst: true })
@@ -429,12 +471,168 @@ export class WorkspaceRuntime {
     for (const path of paths) this.documents.close(path)
   }
 
+  /** Dispose the frames behind tabs the workbench removed. */
+  closeTabs(tabs: Array<{ path?: string; contentView?: { key: string } }>): void {
+    const paths: WorkspacePath[] = []
+    for (const tab of tabs) {
+      if (tab.contentView) {
+        this.views.closeContent(tab.contentView.key, 'closed')
+        continue
+      }
+      if (tab.path) paths.push(tab.path)
+    }
+    if (paths.length > 0) this.closeDocuments(paths)
+  }
+
+  /** Show a plugin panel from the palette or a view picker. */
+  showPanel(viewId: string, location: 'primary' | 'secondary'): void {
+    const store = useWorkbenchStore.getState()
+    if (location === 'primary') store.showPrimaryView(viewId)
+    else store.showSecondaryView(viewId)
+  }
+
+  /** Open a content view from the shell palette or a "Show View" entry. */
+  openContentView(identity: string, viewId: string): void {
+    const record = this.pluginHost
+      .getSnapshot()
+      .records.find((entry) => entry.identity === identity && entry.phase === 'active')
+    if (!record?.identity || !record.manifest) return
+    const view = record.contentViews.find((entry) => entry.id === viewId)
+    if (!view) return
+    const plugin = viewPluginInfo(record)
+    this.contentInstance += 1
+    const instanceKey = `shell-${this.contentInstance}`
+    const opened = this.views.openContent({
+      plugin,
+      view: { id: view.id, title: view.title, entryUrl: view.entryUrl },
+      instanceKey,
+    })
+    if (!opened.ok) return
+    openContentViewTab({
+      key: opened.key,
+      title: view.title,
+      pluginName: plugin.pluginName,
+      identity: plugin.identity,
+      viewId: view.id,
+      instanceKey,
+    })
+  }
+
+  private async openFileIntent(
+    request: OpenFileIntent,
+    source: IntentSource,
+  ): Promise<IntentOutcome> {
+    if (!this.session) return { ok: false, code: 'internal' }
+    try {
+      const stat = await this.session.forPlugin(source.pluginId).stat(request.path)
+      if (stat.kind !== 'file') return { ok: false, code: 'not-a-file' }
+    } catch (error) {
+      return { ok: false, code: shellCodeFor(error) }
+    }
+    if (this.fileTabCount() >= 50) {
+      return {
+        ok: false,
+        code: 'rate-limited',
+        message: 'The workspace already has the maximum of 50 plugin-opened file tabs.',
+      }
+    }
+    this.openDocument(request.path)
+    return { ok: true }
+  }
+
+  private async openViewIntent(
+    request: OpenViewIntent,
+    source: IntentSource,
+  ): Promise<IntentOutcome> {
+    const snapshot = this.pluginHost.getSnapshot()
+    const record = request.pluginId
+      ? snapshot.records.find(
+          (entry) => entry.phase === 'active' && entry.manifest?.id === request.pluginId,
+        )
+      : snapshot.records.find(
+          (entry) => entry.phase === 'active' && entry.identity === source.identity,
+        )
+    if (!record?.identity || !record.manifest) return { ok: false, code: 'not-found' }
+    const view = record.contentViews.find((entry) => entry.id === request.viewId)
+    if (!view) return { ok: false, code: 'not-found' }
+    const plugin = viewPluginInfo(record)
+    this.contentInstance += 1
+    const instanceKey = request.instanceKey ?? `auto-${this.contentInstance}`
+    const opened = this.views.openContent({
+      plugin,
+      view: { id: view.id, title: view.title, entryUrl: view.entryUrl },
+      instanceKey,
+      ...(request.payload === undefined ? {} : { payload: request.payload }),
+      openedBy: {
+        pluginId: source.pluginId,
+        pluginName: source.pluginName,
+        origin: source.origin,
+      },
+    })
+    if (!opened.ok) {
+      return { ok: false, code: opened.code, message: opened.message }
+    }
+    if (!opened.existing) {
+      openContentViewTab({
+        key: opened.key,
+        title: view.title,
+        pluginName: plugin.pluginName,
+        identity: plugin.identity,
+        viewId: view.id,
+        instanceKey,
+      })
+    }
+    return { ok: true }
+  }
+
+  private async requestPanelIntent(
+    request: PanelIntent,
+    source: IntentSource,
+  ): Promise<PanelIntentOutcome> {
+    const record = this.pluginHost
+      .getSnapshot()
+      .records.find((entry) => entry.phase === 'active' && entry.identity === source.identity)
+    const panel = record?.panels.find((entry) => entry.id === request.panel)
+    if (!record?.identity || !panel) return { ok: false, code: 'not-found' }
+    const viewId = pluginViewId(record.identity, panel.id)
+    const store = useWorkbenchStore.getState()
+    const primary = panel.location === 'primary'
+    const isOpen = primary
+      ? store.primarySideBarVisible && store.activePrimaryView === viewId
+      : store.secondarySideBarVisible && store.activeSecondaryView === viewId
+    if (request.action === 'show') {
+      if (primary) store.showPrimaryView(viewId)
+      else store.showSecondaryView(viewId)
+      return { ok: true, open: true }
+    }
+    if (request.action === 'hide') {
+      if (isOpen) {
+        if (primary) store.togglePrimarySideBar(viewId)
+        else store.toggleSecondarySideBar(viewId)
+      }
+      return { ok: true, open: false }
+    }
+    if (primary) store.togglePrimarySideBar(viewId)
+    else store.toggleSecondarySideBar(viewId)
+    return { ok: true, open: !isOpen }
+  }
+
+  private closeViewsFor(identity: string): void {
+    this.views.closeFor(identity, 'plugin-removed')
+    closeContentTabsFor(identity)
+  }
+
+  private fileTabCount(): number {
+    return useWorkbenchStore.getState().tabs.filter((tab) => tab.kind === 'file').length
+  }
+
   async dispose(): Promise<void> {
     if (this.disposed) return
     this.disposed = true
     this.reservedDocumentHandler = null
     this.pluginHost.dispose()
     this.handlers.disposeTransport()
+    this.views.disposeTransport()
     this.pluginSettings.detach()
     this.pluginConfig.detach()
     await this.deactivate('close')
@@ -594,6 +792,12 @@ export class WorkspaceRuntime {
       workspaceName: handle.descriptor.name,
       settings: this.pluginSettings,
     })
+    this.views.attach({
+      session,
+      host: this.pluginHost,
+      workspaceName: handle.descriptor.name,
+      settings: this.pluginSettings,
+    })
   }
 
   private publishExternalChange(change: WorkspaceChange): void {
@@ -617,6 +821,7 @@ export class WorkspaceRuntime {
     this.filePicker.reset()
     this.handlers.publishWorkspaceClosed(reason)
     await this.handlers.detach()
+    await this.views.detach()
     this.events.reset()
     this.fileChanges.reset()
     this.echoes.reset()
@@ -685,6 +890,20 @@ function connectErrorSummary(error: unknown): RemoteErrorSummary {
   return {
     code: mapped.code,
     message: workspaceErrorMessage(mapped.code, mapped.path),
+  }
+}
+
+function viewPluginInfo(record: { identity?: string; manifest?: PluginManifest }): ViewPluginInfo {
+  if (!record.identity || !record.manifest) {
+    throw new Error('A view plugin needs an active identity and manifest.')
+  }
+  return {
+    identity: record.identity,
+    pluginId: record.manifest.id,
+    pluginName: record.manifest.name,
+    pluginVersion: record.manifest.version,
+    origin: record.manifest.manifestOrigin,
+    permissions: record.manifest.permissions,
   }
 }
 

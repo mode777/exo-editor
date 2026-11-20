@@ -53,6 +53,14 @@ the deployed URL below, not a local dev server or local build.
 12. **Switch workspaces.** Open a second folder, then switch back to the demo.
     No tab, plugin frame, handler or log entry from the previous visit remains;
     consent stays approved.
+13. **Open a plugin panel and content view.** Add the deployed plugin-host
+    fixture manifest (`/plugin-host-fixture/exo-manifest.json`) to a scratch
+    workspace, approve it, and reveal its primary and secondary panels. The
+    activity item and chrome name the plugin; the secondary picker switches
+    views without a new handshake. Open its content view: a read-only tab with no
+    Save or dirty state, a bounded payload, and a frame that is disposed when the
+    tab closes. A second plugin opens the same content view and receives
+    `openedBy`; it cannot read the target's state or events.
 
 ## Screenshots
 

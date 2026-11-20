@@ -804,6 +804,15 @@ returned `unsupported-topic`. The local gate passed with 742 shell tests and a
 157,056/159,000 js gzip budget; the 1,340-byte increase is recorded in
 [`docs/performance.md`](./docs/performance.md).
 
+**Follow-up (2026-11-20):** the post-layer-10 change `plugin-view-surfaces`
+adds `contributes.panels` and `contributes.contentViews`, the `view` frame mode,
+lazy panel mounting with retained frames, read-only content-view tabs, the
+`plugin/open-file`, `plugin/open-view` and `plugin/request-panel` intents, and
+SDK `1.5.0`; shell `0.3.0`. Panels and content views are listed in the first-grant
+consent prompt and deliberately excluded from the fingerprint. Its deployed
+verification is recorded in the change design and this paragraph after the
+deployed run.
+
 ---
 
 ## Deferred beyond v1

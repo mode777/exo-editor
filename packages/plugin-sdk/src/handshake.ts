@@ -6,9 +6,11 @@ import {
   READY_TIMEOUT_MS,
   type RegistrationInit,
   type ShellInit,
+  type ViewInit,
 } from './protocol'
 import { RegistrationClient } from './registration'
 import { EditorClient } from './editor'
+import { ViewClient } from './view'
 import type { PluginTransport } from './transport'
 
 export interface ConnectOptions {
@@ -34,7 +36,14 @@ export interface EditorConnection {
   close(): void
 }
 
-export type PluginConnection = RegistrationConnection | EditorConnection
+export interface ViewConnection {
+  mode: 'view'
+  init: ViewInit
+  view: ViewClient
+  close(): void
+}
+
+export type PluginConnection = RegistrationConnection | EditorConnection | ViewConnection
 
 function buildConnection(
   gate: MessageGate,
@@ -51,6 +60,14 @@ function buildConnection(
           ? {}
           : { clearTimeoutImpl: options.clearTimeoutImpl }),
       }),
+      close: () => gate.close(),
+    }
+  }
+  if (init.mode === 'view') {
+    return {
+      mode: 'view',
+      init,
+      view: new ViewClient(gate, init),
       close: () => gate.close(),
     }
   }
@@ -85,7 +102,7 @@ export function connectPlugin(options: ConnectOptions): Promise<PluginConnection
       reject(new ExoProtocolError('bootstrap', 'The plugin has no frame session id.'))
       return
     }
-    if (transport.mode !== 'register' && transport.mode !== 'editor') {
+    if (transport.mode !== 'register' && transport.mode !== 'editor' && transport.mode !== 'view') {
       reject(new ExoProtocolError('bootstrap', 'The plugin has no valid frame mode.'))
       return
     }

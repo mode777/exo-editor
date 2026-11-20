@@ -144,7 +144,7 @@ describe('SDK conformance against the shell', () => {
       label: 'Exo Template',
     })
     const ack = await connection.registration.complete()
-    expect(ack).toEqual({ accepted: ['**/*.template.txt'], rejected: [] })
+    expect(ack).toMatchObject({ accepted: ['**/*.template.txt'], rejected: [] })
     expect(shell.outcomes[0]).toMatchObject({ kind: 'active' })
     connection.close()
     shell.session.close()

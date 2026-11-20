@@ -19,6 +19,7 @@ function createHandlers(): ExoCommandHandlers {
     delete: vi.fn(),
     refreshExplorer: vi.fn(),
     collapseExplorer: vi.fn(),
+    selectSecondaryView: vi.fn(),
   }
 }
 

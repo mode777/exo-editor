@@ -90,6 +90,40 @@ Each `contributes.fileEditors` entry maps a glob to a handler page:
 A file editor contribution requires `workspace:read` or `workspace:write`.
 `workspace:write` implies read.
 
+## Panels and content views
+
+Besides file editors, a manifest can declare side-bar panels and read-only
+content-view tabs:
+
+```json
+"contributes": {
+  "panels": [
+    {
+      "id": "outline",
+      "title": "Outline",
+      "icon": "list-tree",
+      "location": "primary",
+      "entry": "views/outline.html"
+    }
+  ],
+  "contentViews": [
+    { "id": "tutorial", "title": "Tutorial", "entry": "views/tutorial.html" }
+  ]
+}
+```
+
+A `primary` panel adds an activity-bar item; a `secondary` panel appears in the
+right side bar through the shell's view picker. A content view opens as a
+read-only tab with no save or close prompt. Declare at most 8 panels and 16
+content views. The controller registers a subset by id with
+`registerPanel(id)` / `registerContentView(id)`. Panels mount on first reveal and
+stay hidden without disposal; content frames are created when their tab opens.
+
+Panels and content views are excluded from the consent fingerprint because they
+are user-invoked. A manifest that adds them should set `engines.exo` to a range
+that includes `0.3.0`, so older shells fail closed instead of rejecting the
+unknown field. See the [manifest contract](../contracts/plugin-manifest.md#32-panels-and-content-views).
+
 ## Permissions
 
 | Permission | What it allows |

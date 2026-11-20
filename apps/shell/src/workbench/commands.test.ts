@@ -9,6 +9,7 @@ const NO_WORKSPACE: CommandContext = {
   hasActiveDocument: false,
   hasEditorChoice: false,
   remote: false,
+  secondaryViewCount: 0,
 }
 
 function setup(context: CommandContext = NO_WORKSPACE) {
@@ -28,6 +29,7 @@ function setup(context: CommandContext = NO_WORKSPACE) {
     delete: vi.fn(),
     refreshExplorer: vi.fn(),
     collapseExplorer: vi.fn(),
+    selectSecondaryView: vi.fn(),
   }
   return {
     handlers,
@@ -36,6 +38,34 @@ function setup(context: CommandContext = NO_WORKSPACE) {
 }
 
 describe('exo command registry', () => {
+  it('lists and runs dynamic plugin view commands', () => {
+    const run = vi.fn()
+    const { handlers } = setup()
+    const registry = createExoCommandRegistry(
+      () => NO_WORKSPACE,
+      handlers,
+      () => [
+        {
+          id: 'exo.views.show.plugin:viewer:outline',
+          title: 'Show Outline',
+          category: 'Views · Viewer',
+          run,
+        },
+      ],
+    )
+    expect(registry.list()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'exo.views.show.plugin:viewer:outline',
+          title: 'Show Outline',
+          category: 'Views · Viewer',
+        }),
+      ]),
+    )
+    expect(registry.run('exo.views.show.plugin:viewer:outline')).toBe(true)
+    expect(run).toHaveBeenCalledOnce()
+  })
+
   it('exposes the workspace-free commands', () => {
     const { registry } = setup()
     const ids = registry.list().map((command) => command.id)
@@ -84,6 +114,7 @@ describe('exo command registry', () => {
       hasActiveDocument: false,
       hasEditorChoice: false,
       remote: false,
+      secondaryViewCount: 0,
     })
     const ids = writable.registry.list().map((command) => command.id)
     expect(ids).toEqual(
@@ -104,6 +135,7 @@ describe('exo command registry', () => {
       hasActiveDocument: true,
       hasEditorChoice: false,
       remote: false,
+      secondaryViewCount: 0,
     })
     const selectedIds = withSelection.registry.list().map((command) => command.id)
     expect(selectedIds).toEqual(
@@ -123,6 +155,7 @@ describe('exo command registry', () => {
       hasActiveDocument: false,
       hasEditorChoice: false,
       remote: false,
+      secondaryViewCount: 0,
     })
     expect(workspace.registry.run('exo.explorer.collapseAll')).toBe(true)
     expect(workspace.handlers.collapseExplorer).toHaveBeenCalledTimes(1)
@@ -136,6 +169,7 @@ describe('exo command registry', () => {
       hasActiveDocument: false,
       hasEditorChoice: false,
       remote: false,
+      secondaryViewCount: 0,
     })
     expect(readOnly.registry.list().map((command) => command.id)).toContain(
       'exo.workspace.restoreAccess',
@@ -148,6 +182,7 @@ describe('exo command registry', () => {
       hasActiveDocument: false,
       hasEditorChoice: false,
       remote: false,
+      secondaryViewCount: 0,
     })
     expect(writable.registry.list().map((command) => command.id)).not.toContain(
       'exo.workspace.restoreAccess',

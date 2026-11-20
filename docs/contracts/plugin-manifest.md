@@ -154,6 +154,24 @@ settings view fails with `conflict` rather than overwriting an external edit.
         "priority": 10,
         "rendering": "frame"
       }
+    ],
+    "panels": [
+      {
+        "id": "outline",
+        "title": "Outline",
+        "icon": "list-tree",
+        "location": "primary",
+        "entry": "views/outline.html"
+      },
+      {
+        "id": "inspector",
+        "title": "Inspector",
+        "location": "secondary",
+        "entry": "views/inspector.html"
+      }
+    ],
+    "contentViews": [
+      { "id": "tutorial", "title": "Tutorial", "entry": "views/tutorial.html" }
     ]
   }
 }
@@ -177,6 +195,8 @@ settings view fails with `conflict` rather than overwriting an external edit.
 | `runtime.entry` | string | yes | Relative HTML path to the controller document, loaded as a hidden registration iframe. No query, fragment or `..` segment. Must share the manifest's origin. Its directory is the plugin root: every other page the plugin loads must be a sibling or descendant of it. |
 | `permissions` | array | yes | Subset of `workspace:read`, `workspace:write`, `workspace:list`, `events:subscribe`. No duplicates. `workspace:write` and `workspace:list` require `workspace:read`. A `contributes.fileEditors` entry requires `workspace:read` or `workspace:write`; registrations from a plugin without either are rejected with `permission-denied`. `workspace:list` additionally allows one directory level per `plugin/request-list` and re-prompts an already-approved reader when added. |
 | `contributes.fileEditors` | array | no | Maximum 20. Each entry: `glob` (required), `entry` (required, relative HTML URL for the per-document iframe, inside the plugin root), `label` (required, 1-40 chars), `priority` (integer -100..100, default 0), `rendering` (`"hidden"` or `"frame"`, default `"hidden"`). Every editor entry uses the entry-resolution rules in section 4 and requires `workspace:read` or `workspace:write`. |
+| `contributes.panels` | array | no | Maximum 8 across both locations. Each entry: `id` (required, `^[a-z0-9][a-z0-9.-]{0,63}$`, unique among panels), `title` (required, 1-80 chars), `icon` (optional Codicon name, 1-40 chars, `^[a-z0-9-]+$`), `location` (`"primary"` or `"secondary"`), and `entry` (required, relative HTML page inside the plugin root). See section 3.2. |
+| `contributes.contentViews` | array | no | Maximum 16. Each entry: `id` (required, same id rule and unique among content views), `title` (required, 1-80 chars), and `entry` (required, relative HTML page inside the plugin root). A content view opens as a read-only tab. See section 3.2. |
 | `contributes.configuration` | object | no | Optional workspace settings declaration. `configuration.properties` is an object of at most 50 named settings, each with `type` (`boolean`, `string` or `number`), a required matching `default`, an optional `enum`, an optional `description`, and an optional `scope` that must be `workspace`. See section 3.1. |
 
 Unknown manifest fields are rejected at every level, like unknown `exo.json`
@@ -249,6 +269,63 @@ capability and never changes the sandbox or origin rules.
 The value is manifest metadata: no `plugin/register` message carries it, and the
 shell ignores a registration that tries to change it. A hidden-to-frame change
 re-prompts because frame rendering is included in the consent fingerprint below.
+
+### 3.2 Panels and content views
+
+`panels` and `contentViews` declare surfaces the shell may show after the
+controller registers them. They follow the same entry-resolution and plugin-root
+rules as editor entries: a relative HTML page beside or below the controller
+entry, on the manifest origin, with no query, fragment or `..` segment.
+
+```json
+{
+  "contributes": {
+    "panels": [
+      {
+        "id": "outline",
+        "title": "Outline",
+        "icon": "list-tree",
+        "location": "primary",
+        "entry": "views/outline.html"
+      }
+    ],
+    "contentViews": [
+      { "id": "tutorial", "title": "Tutorial", "entry": "views/tutorial.html" }
+    ]
+  }
+}
+```
+
+- A **panel** is a singleton view frame. A `primary` panel adds an activity-bar
+  item and a left-side-bar view. A `secondary` panel adds a right-side-bar view
+  reached through the shell's "Select View" picker and palette entries.
+- A **content view** opens as a read-only tab in the document area. It has no
+  file path, dirty state, Save action or close prompt. One frame belongs to one
+  open tab instance.
+- Up to 8 panels and 16 content views may be declared. The controller registers
+  a subset by id; an undeclared id is rejected with `not-declared`, a duplicate
+  collapses into one entry, and an id becomes active only after
+  `plugin/register-complete`.
+- Panels mount lazily on first reveal and are retained hidden while another view
+  is active; a never-revealed panel creates no iframe. Content-view frames are
+  created when their tab opens and are disposed when it closes, the plugin stops
+  or the workspace switches. At most 10 content-view tabs may be open per plugin.
+- A content view may receive a one-shot JSON payload of at most 64 KiB when a
+  frame opens it, plus `openedBy` when another plugin is the opener. The payload
+  is data, never file content, and there is no reverse channel.
+- Plugins may ask the shell to open a file, open a view or show/hide/toggle one
+  of their own panels through the correlated intents in
+  [`plugin-protocol.md`](./plugin-protocol.md). A frame must be visible and
+  active; a registration frame cannot use an intent.
+- The shell names the plugin in the activity-bar title, secondary picker and
+  content-view chrome, so a newly added surface cannot impersonate shell chrome.
+
+Panels and content views are user-invoked surfaces inside the already-approved
+root. They grant no autonomous data access and are **excluded from the consent
+fingerprint**; the first-grant dialog lists them and a later addition does not
+re-prompt. A manifest that adds these fields should declare `engines.exo` at or
+above the shell that supports them (0.3.0), so an older shell reports
+`incompatible-engine` rather than rejecting the unknown contribution.
 
 ### Glob rules
 
@@ -355,12 +432,15 @@ different origin is a different plugin.
 - Plugin `name`, `id`, `version`, `publisher.name` (verbatim, quoted).
 - The **exact origin** the manifest was loaded from: scheme, host and port.
 - The controller entry URL and the plugin root, plus each declared editor entry.
+- Each declared panel with its title and left/right location, and each declared
+  content view with its title and that it opens as a read-only tab.
 - Whether each editor renders its own frame or stays headless.
 - The requested permissions in plain language, including directory listing as
   permission to list folder contents and file names in the workspace, including
   files the plugin has not opened.
 - The declared file-editor glob patterns and labels.
 - Whether the plugin can write to the workspace.
+- Whether the plugin can ask to open files or views when the user invokes it.
 - Whether the plugin shares the shell origin. In that case the dialog states that
   it runs without storage access and cannot be isolated by origin.
 - A link to `homepage` when present.
@@ -387,19 +467,23 @@ fingerprint = "v1:" + hex(sha256(JSON.stringify({
 })))
 ```
 
-`name`, `description`, `version`, `icon`, `publisher` and individual page paths
-are excluded: they are display metadata or pages inside the already-approved
-root. The `rendering` flag is included only when it is `"frame"`, so existing
-hidden manifests keep their stored consent and a hidden-to-frame change
-re-prompts. Changing the origin, the approved root, a permission or a declared
-glob changes the fingerprint and re-prompts. Adding, removing or renaming a page
-inside the root does not, because the user approved the directory tree (D14).
-The input list is exhaustive: a new manifest field that changes what the plugin
-can do must be added to the fingerprint in the same change, or consent would
-silently cover behaviour the user never saw. `workspace:list` is a separate
-permission for this reason: a plugin that previously declared only
-`workspace:read` gains a different sorted permissions input when it adds listing,
-so it re-prompts, while a read-only plugin keeps its stored consent.
+`name`, `description`, `version`, `icon`, `publisher`, individual page paths,
+`contributes.configuration`, `contributes.panels` and `contributes.contentViews`
+are excluded: they are display metadata, user-edited shell state or
+user-invoked surfaces inside the already-approved root. The `rendering` flag is
+included only when it is `"frame"`, so existing hidden manifests keep their stored
+consent and a hidden-to-frame change re-prompts. Changing the origin, the approved
+root, a permission or a declared glob changes the fingerprint and re-prompts.
+Adding, removing or renaming a page inside the root does not, because the user
+approved the directory tree (D14). The input list is exhaustive: a new manifest
+field that changes what the plugin can do autonomously must be added to the
+fingerprint in the same change, or consent would silently cover behaviour the
+user never saw. Panels and content views only change what the user can invoke,
+so they are a deliberate exclusion, recorded in the security review.
+`workspace:list` is a separate permission for this reason: a plugin that
+previously declared only `workspace:read` gains a different sorted permissions
+input when it adds listing, so it re-prompts, while a read-only plugin keeps its
+stored consent.
 
 ### Storage
 

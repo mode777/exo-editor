@@ -9,7 +9,9 @@ recorded in [Deployed verification](#deployed-verification) after task 8.4.
 Exo owns these surfaces and checks them:
 
 - explorer (workspace header and its actions, tree, banners, context menu, inline rename)
-- document area (text editor, plugin frame surface, banners, actions)
+- document area (text editor, plugin frame surface, content-view chrome and placeholder, banners, actions)
+- plugin panels (side-bar header action and shell-owned placeholder)
+- secondary-view picker
 - settings dialog, including plugin settings, raw `exo.json` and the plugin log
 - consent dialog
 - workspace file picker (shell-owned plugin selection dialog)
@@ -46,6 +48,11 @@ npm test --workspace @exo/shell -- --run \
 - `src/document/FilePickerDialog.test.tsx` covers the picker's initial focus,
   arrow-key row navigation, Escape cancellation, bidi-isolated paths and
   reserved-entry filtering.
+- `src/workbench/SecondaryViewPicker.test.tsx` covers the secondary-view picker's
+  list, initial focus, Arrow Up/Down movement, Escape close and an axe scan.
+- `src/document/ContentViewSurface.test.tsx` covers the content-view chrome,
+  plugin name, placeholder accessible name and an axe scan of the shell-owned
+  nodes.
 
 `axe-core` cannot evaluate `color-contrast` in jsdom (no layout or canvas), so
 that rule is disabled in the test helper and covered by the token test instead.
@@ -109,6 +116,12 @@ Run against the deployed URL with the demo workspace from
   covered by the shell's a11y guarantees.
 - The visible handler frame is `aria-hidden` while hidden and focusable when
   shown; keyboard interaction inside it belongs to the plugin.
+- A panel or content-view iframe is positioned over a shell-owned placeholder
+  with an accessible region name. The frame's internal focus order and content
+  belong to the plugin; only the placeholder, titles, tabs and controls are
+  Exo-owned.
+- The activity bar is upstream chrome; Exo supplies panel items and includes the
+  plugin name in their titles, but does not patch its keyboard model.
 - Mobile and touch-only layouts are out of scope for v1.
 
 ## Deployed verification

@@ -43,6 +43,8 @@ function manifest(overrides: Partial<PluginManifest> = {}): PluginManifest {
         priority: 10,
       },
     ],
+    panels: [],
+    contentViews: [],
     ...overrides,
   }
 }
@@ -192,6 +194,34 @@ describe('consent fingerprint', () => {
       digest,
     )
     expect(configured).toBe(base)
+  })
+
+  it('ignores panels and content views', async () => {
+    const base = await computeFingerprint(manifest(), digest)
+    const withViews = await computeFingerprint(
+      manifest({
+        panels: [
+          {
+            id: 'outline',
+            title: 'Outline',
+            icon: 'list-tree',
+            location: 'primary',
+            entry: 'views/outline.html',
+            entryUrl: 'https://plugins.example.com/monaco/views/outline.html',
+          },
+        ],
+        contentViews: [
+          {
+            id: 'tutorial',
+            title: 'Tutorial',
+            entry: 'views/tutorial.html',
+            entryUrl: 'https://plugins.example.com/monaco/views/tutorial.html',
+          },
+        ],
+      }),
+      digest,
+    )
+    expect(withViews).toBe(base)
   })
 
   it('re-prompts when listing is added and keeps read-only consent stable', async () => {

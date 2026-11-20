@@ -16,6 +16,14 @@ import {
   type HandlerSaveCompletion,
   type HandlerSaveRequest,
 } from './handler'
+import type {
+  IntentOutcome,
+  IntentSource,
+  OpenFileIntent,
+  OpenViewIntent,
+  PanelIntent,
+  PanelIntentOutcome,
+} from './frame-session'
 import { hasWorkspaceRead } from './manifest'
 import { EventBus, type ShellEventTopic, type ThemeName } from './events'
 import type { PluginSettingsStore, SettingValues } from './settings'
@@ -72,6 +80,9 @@ export interface HandlerPoolOptions {
   onRequestFiles?: (request: FilePickerOpenRequest) => Promise<FilePickerOutcome>
   /** Whether another frame's picker is already open. */
   isPickerOpen?: () => boolean
+  onOpenFile?: (request: OpenFileIntent, source: IntentSource) => Promise<IntentOutcome>
+  onOpenView?: (request: OpenViewIntent, source: IntentSource) => Promise<IntentOutcome>
+  onRequestPanel?: (request: PanelIntent, source: IntentSource) => Promise<PanelIntentOutcome>
 }
 
 interface HandlerRecord {
@@ -127,6 +138,12 @@ export class HandlerPool {
   private readonly onRequestFiles:
     ((request: FilePickerOpenRequest) => Promise<FilePickerOutcome>) | undefined
   private readonly isPickerOpen: (() => boolean) | undefined
+  private readonly onOpenFile:
+    ((request: OpenFileIntent, source: IntentSource) => Promise<IntentOutcome>) | undefined
+  private readonly onOpenView:
+    ((request: OpenViewIntent, source: IntentSource) => Promise<IntentOutcome>) | undefined
+  private readonly onRequestPanel:
+    ((request: PanelIntent, source: IntentSource) => Promise<PanelIntentOutcome>) | undefined
   private readonly records = new Map<WorkspacePath, HandlerRecord>()
   private readonly surfaces = new Map<WorkspacePath, HTMLElement>()
   private readonly surfaceObservers = new Map<WorkspacePath, ResizeObserver>()
@@ -156,6 +173,9 @@ export class HandlerPool {
     this.onSaveRequested = options.onSaveRequested
     this.onRequestFiles = options.onRequestFiles
     this.isPickerOpen = options.isPickerOpen
+    this.onOpenFile = options.onOpenFile
+    this.onOpenView = options.onOpenView
+    this.onRequestPanel = options.onRequestPanel
     if (typeof window !== 'undefined') {
       window.addEventListener('resize', this.handleViewportResize)
     }
@@ -231,6 +251,12 @@ export class HandlerPool {
     }
 
     const capabilities = attached.session.capabilities()
+    const source: IntentSource = {
+      identity: input.candidate.identity,
+      pluginId: input.candidate.pluginId,
+      pluginName: input.candidate.pluginName,
+      origin: input.candidate.origin,
+    }
     let record: HandlerRecord | null = null
     const session = new HandlerSession({
       candidate: input.candidate,
@@ -272,6 +298,22 @@ export class HandlerPool {
       },
       onDirty: (dirty) => callbacks.onDirty(dirty),
       onVersion: (version) => callbacks.onVersion(version),
+      isVisible: () => this.surfaces.has(input.path),
+      onOpenFile: this.onOpenFile
+        ? (request) =>
+            this.onOpenFile?.(request, source) ??
+            Promise.resolve({ ok: false as const, code: 'unsupported-message' as const })
+        : undefined,
+      onOpenView: this.onOpenView
+        ? (request) =>
+            this.onOpenView?.(request, source) ??
+            Promise.resolve({ ok: false as const, code: 'unsupported-message' as const })
+        : undefined,
+      onRequestPanel: this.onRequestPanel
+        ? (request) =>
+            this.onRequestPanel?.(request, source) ??
+            Promise.resolve({ ok: false as const, code: 'unsupported-message' as const })
+        : undefined,
       onFailure: (failure) => {
         if (record && this.records.get(input.path) !== record) return
         this.dropSurface(input.path)
@@ -368,15 +410,23 @@ export class HandlerPool {
    * No live frame means there is nothing to notify; the next init carries the
    * values.
    */
-  updateSettings(identity: string, values: SettingValues): void {
+  updateSettings(identity: string, values: SettingValues): boolean {
     let pluginId: string | undefined
     for (const record of this.records.values()) {
       if (record.identity !== identity) continue
       pluginId = record.candidate.pluginId
       break
     }
-    if (!pluginId) return
+    if (!pluginId) return false
     this.events.publish('config/changed', { pluginId, values }, { target: identity })
+    return true
+  }
+
+  pluginIdFor(identity: string): string | undefined {
+    for (const record of this.records.values()) {
+      if (record.identity === identity) return record.candidate.pluginId
+    }
+    return undefined
   }
 
   save(path: WorkspacePath): Promise<HandlerSaveRequest> {

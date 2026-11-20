@@ -2,12 +2,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useWorkbenchStore } from 'vscode-workbench'
 import {
   PERSIST_KEY,
+  activeDocumentPath,
+  clearWorkspaceTabs,
+  closeContentTabsFor,
   configurePresetStore,
+  contentViewOf,
   installCloseGuard,
   isCloseGuardInstalled,
+  openContentViewTab,
   openFileTab,
+  removeTabsUnder,
   setTabDirty,
-  clearWorkspaceTabs,
   type CloseRequest,
 } from './tabs'
 
@@ -194,5 +199,52 @@ describe('dirty close guard', () => {
     useWorkbenchStore.getState().closeTab('/a.txt')
 
     expect(useWorkbenchStore.getState().tabs).toEqual([])
+  })
+})
+
+describe('content view tabs', () => {
+  beforeEach(() => {
+    clearWorkspaceTabs()
+  })
+
+  const info = {
+    key: 'content:https%3A%2F%2Fplugins.example.com::com.example.other:tutorial:k1',
+    title: 'Tutorial',
+    pluginName: 'Other Plugin',
+    identity: 'https://plugins.example.com::com.example.other',
+    viewId: 'tutorial',
+    instanceKey: 'k1',
+  }
+
+  it('opens a shell-owned read-only tab with no path', () => {
+    openContentViewTab(info)
+    const tab = useWorkbenchStore.getState().tabs[0]
+    expect(tab).toMatchObject({
+      id: info.key,
+      title: 'Tutorial — Other Plugin',
+      kind: 'content',
+    })
+    expect(tab?.path).toBeUndefined()
+    expect(contentViewOf(tab!)).toEqual(info)
+    expect(activeDocumentPath()).toBeNull()
+  })
+
+  it('keeps content tabs out of path operations', () => {
+    openContentViewTab(info)
+    openFileTab('/notes.txt')
+    removeTabsUnder('/')
+    expect(useWorkbenchStore.getState().tabs.map((tab) => tab.id)).toEqual([info.key])
+  })
+
+  it('closes only the removed plugin content tabs and picks a fallback tab', () => {
+    openContentViewTab(info)
+    openContentViewTab({ ...info, key: 'content:other:tutorial:k2', instanceKey: 'k2' })
+    openFileTab('/notes.txt')
+    const fileTab = useWorkbenchStore.getState().tabs.at(-1)
+    useWorkbenchStore.getState().activateTab(info.key)
+    closeContentTabsFor(info.identity)
+    const state = useWorkbenchStore.getState()
+    expect(state.tabs.map((tab) => tab.id)).toEqual([fileTab?.id])
+    expect(state.activeTabId).toBe(fileTab?.id)
   })
 })

@@ -1151,3 +1151,103 @@
   font: inherit;
   cursor: pointer;
 }
+
+.exo-view-surface {
+  display: flex;
+  flex: 1;
+  height: 100%;
+  min-height: 0;
+  width: 100%;
+  flex-direction: column;
+}
+
+.exo-view-placeholder {
+  flex: 1;
+  min-height: 120px;
+  width: 100%;
+}
+
+.exo-content-view {
+  background: var(--vscode-editor-background);
+}
+
+.exo-content-view-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--vscode-widget-border);
+  color: var(--vscode-foreground);
+  font-size: 12px;
+}
+
+.exo-content-view-header .exo-document-actions {
+  margin-top: 0;
+}
+
+.exo-content-view-plugin {
+  margin-left: 8px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.exo-view-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--vscode-widget-border);
+  background: var(--vscode-inputValidation-errorBackground, transparent);
+  color: var(--vscode-errorForeground);
+  font-size: 12px;
+}
+
+.exo-view-error button {
+  border: 1px solid var(--vscode-button-border, transparent);
+  padding: 3px 8px;
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.exo-view-missing {
+  padding: 20px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.exo-view-choice-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.exo-view-choice {
+  display: flex;
+  width: 100%;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px;
+  border: 1px solid var(--vscode-widget-border);
+  background: var(--vscode-editor-background);
+  color: var(--vscode-foreground);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.exo-view-choice:hover,
+.exo-view-choice:focus-visible {
+  background: var(--vscode-list-hoverBackground);
+}
+
+.exo-view-choice-plugin {
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
+}

@@ -18,15 +18,17 @@ enough to ship a plugin.
 
 | Artifact                                            | Version | Packaging                                        |
 | --------------------------------------------------- | ------- | ------------------------------------------------ |
-| `packages/plugin-sdk` (`@exo/plugin-sdk`)           | `1.4.0` | Private workspace package; no runtime dependency |
+| `packages/plugin-sdk` (`@exo/plugin-sdk`)           | `1.5.0` | Private workspace package; no runtime dependency |
 | `packages/plugin-template` (`@exo/plugin-template`) | `0.1.0` | Private workspace package; built static assets   |
 
 - The SDK MAJOR equals the protocol major it speaks. `PROTOCOL_VERSION` and
   `SDK_VERSION` are exported constants; a plugin must not hard-code the protocol
   number. `1.1.0` adds the additive `requestSave()` helper, `1.2.0` adds the
   additive `requestFiles()` helper, `1.3.0` adds the additive
-  `listDirectory()` helper and `1.4.0` adds the additive local-event helpers,
-  all without changing the protocol major.
+  `listDirectory()` helper, `1.4.0` adds the additive local-event helpers and
+  `1.5.0` adds the view client, panel/content-view registration and the
+  `openFile()`, `openView()` and `requestPanel()` helpers, all without changing
+  the protocol major.
 - The packages are not published in v1 (D12). Consumers in this repository use
   the workspace copy. A future publication adds a built `dist` and does not
   change the message protocol.
@@ -44,7 +46,7 @@ The browser adapter reads the fragment the shell puts on the frame URL:
 
 - `exo-host` must be an absolute `http` or `https` origin with no path, query,
   credentials or fragment. The adapter returns `url.origin`.
-- `exo-mode` must be `register` or `editor`.
+- `exo-mode` must be `register`, `editor` or `view`.
 - `exo-session` must be present and at most 256 characters.
 - A top-level page (`window.parent === window`) is refused: it is not embedded
   in the shell and has nothing to talk to.
@@ -89,6 +91,7 @@ until its timeout.
 type PluginConnection =
   | { mode: 'register'; init: RegistrationInit; registration: RegistrationClient; close(): void }
   | { mode: 'editor'; init: EditorInit; editor: EditorClient; close(): void }
+  | { mode: 'view'; init: ViewInit; view: ViewClient; close(): void }
 ```
 
 A protocol mismatch raises `ExoProtocolError` with code `unsupported-version`,
@@ -102,11 +105,16 @@ sent after the failure.
 
 ```text
 register({ glob, entry, label? })   -> one plugin/register
+registerPanel(id)                   -> one plugin/register with { panels: [id] }
+registerContentView(id)             -> one plugin/register with { contentViews: [id] }
 complete()                          -> one plugin/register-complete, then shell/register-ack
 ```
 
-- `complete()` resolves with `{ accepted: string[], rejected: RejectedContribution[] }`.
-  Each rejection carries its index, stable reason and optional message.
+- `complete()` resolves with
+  `{ accepted: string[], acceptedPanels: string[], acceptedContentViews: string[], rejected: RejectedContribution[] }`.
+  Each rejection carries its index, stable reason, optional `kind` and optional
+  message. An older shell's acknowledgement omits the two view arrays; the SDK
+  reports them as empty rather than failing the editor registrations.
 - A second `complete()` rejects locally as `protocol-violation` and sends no
   second message.
 - A registration call after completion rejects locally.
@@ -120,7 +128,8 @@ complete()                          -> one plugin/register-complete, then shell/
 
 ```ts
 editor.file // FileMetadata from shell/init, no content
-editor.capabilities // read, write, requestFiles, filePicker, directoryListing, localEvents
+editor.capabilities // read, write, requestFiles, filePicker, directoryListing, localEvents,
+                   // openFile, openView, requestPanel
 editor.limits // maxFileSize, maxRequestBytes
 editor.settings // resolved shell settings
 editor.readFile(path, 'utf8' | 'binary')
@@ -183,6 +192,69 @@ editor.onLocalEvent(topic, listener)
   marks the client closed and ignores later messages. Disposal is idempotent.
 - `shell/error` with no `replyTo` is delivered to `onError`; it does not close the
   connection. A throwing listener is contained.
+
+## 7.1 View client
+
+`ViewClient` is only available on a view-mode connection. It shares the read,
+listing, picker, event, navigation and disposal API with `EditorClient` and
+exposes no save or dirty methods.
+
+```ts
+view.view // ViewInitData from shell/init: kind, id, title, instanceId, location?, payload?, openedBy?
+view.capabilities // same shape as the editor capabilities
+view.limits // maxFileSize, maxRequestBytes
+view.settings // resolved shell settings
+view.readFile(path, 'utf8' | 'binary')
+view.requestFiles({ multiple?, directory? })
+view.listDirectory(path, { cursor? })
+view.openFile(path)
+view.openView({ pluginId?, viewId, instanceKey?, payload? })
+view.requestPanel(panel, 'show' | 'hide' | 'toggle')
+view.onDispose(listener)
+view.onError(listener)
+view.subscribe(topic)
+view.unsubscribe(topic)
+view.onEvent(topic, listener)
+view.publishLocal(topic, payload)
+view.subscribeLocal(topic)
+view.onLocalEvent(topic, listener)
+```
+
+- The view block is immutable for the connection lifetime; the SDK does not
+  fetch, rewrite or persist it. A content-view payload is exposed as data and is
+  never interpreted.
+- `readFile()` with a relative path is rejected locally with `permission-denied`;
+  a view has no document to resolve against. Use a `/`-rooted path.
+- `shell/dispose` rejects outstanding requests, sends `plugin/dispose-ack` once
+  and ignores later messages, exactly as for an editor.
+- An editor and a view frame from the same plugin receive the same support bits
+  and permission-derived capabilities.
+
+## 7.2 Navigation and panel helpers
+
+Both clients expose the same helpers:
+
+```ts
+openFile(path)                                  -> { ok: true }
+openView({ pluginId?, viewId, instanceKey?, payload? }) -> { ok: true }
+requestPanel(panel, action)                     -> { panel, open }
+```
+
+- Each call sends one correlated `plugin/open-file`, `plugin/open-view` or
+  `plugin/request-panel` and resolves from `shell/open-result` or
+  `shell/panel-result`. A shell error rejects with its stable code.
+- `openFile()` rejects locally with `unsupported-message` when
+  `capabilities.openFile` is false, with `permission-denied` when the manifest
+  lacks `workspace:read` or a view names a relative path, and sends nothing.
+- `openView()` rejects locally for an invalid view/plugin/instance shape, for a
+  payload over 64 KiB with `too-large` and a message naming the limit, and for a
+  missing `capabilities.openView` support bit. Omitting `pluginId` targets the
+  caller's own plugin.
+- `requestPanel()` rejects locally for an invalid panel id or action and for a
+  missing `capabilities.requestPanel` support bit. The shell accepts only the
+  caller's own registered panels.
+- An older shell omits the support bits; the helpers reject locally and send no
+  message, so a plugin can keep its previous UI.
 
 ## 8. Event client
 

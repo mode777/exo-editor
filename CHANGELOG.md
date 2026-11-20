@@ -3,6 +3,48 @@
 All notable changes to Exo Editor are recorded here. The version axes and the
 release process are in [`docs/releases.md`](./docs/releases.md).
 
+## [0.3.0] - 2026-11-20
+
+Additive post-release update: plugin panels, content views and navigation intents.
+
+### Added
+
+- `contributes.panels` (at most 8) for primary and secondary side-bar panels and
+  `contributes.contentViews` (at most 16) for read-only content tabs. Panels mount
+  lazily on first reveal and are retained hidden; content views open one frame per
+  tab instance with an optional 64 KiB JSON payload and `openedBy`.
+- The `view` frame mode and `shell/init.view`, sharing the handshake, sandbox,
+  read/list/picker/event path and disposal with editor frames. View frames have no
+  file block, dirty state or save path.
+- `plugin/open-file`, `plugin/open-view` and `plugin/request-panel`, with the
+  correlated `shell/open-result` and `shell/panel-result`, active/visible gating,
+  reserved-path checks, the 50 plugin-opened file tab cap and ten intents per
+  rolling second per frame.
+- `capabilities.openFile`, `capabilities.openView` and
+  `capabilities.requestPanel` in editor and view init; absence means an older
+  shell.
+- Primary panels add activity-bar items and left-side-bar views; secondary panels
+  are reached through the shell's Select View picker and palette entries. The
+  shell names the plugin in activity titles, the picker and content-view chrome.
+- `@exo/plugin-sdk` `1.5.0` with `ViewClient`, `registerPanel()`,
+  `registerContentView()`, `openFile()`, `openView()` and `requestPanel()`.
+- Panels and content views are displayed in the first-grant consent prompt and are
+  deliberately excluded from the consent fingerprint.
+
+### Compatibility
+
+- Shell: `0.3.0`
+- Protocol: `1`
+- Manifest schema: `1`
+- SDK: `1.5.0`
+
+### Breaking
+
+- None. The mode, init block, registration fields and messages are additive
+  within protocol major `1`. A plugin that adopts the new contribution fields must
+  declare an `engines.exo` range that includes `0.3.0`; an older shell reports
+  `incompatible-engine` rather than mounting a partial surface.
+
 ## [0.2.0] - 2026-11-20
 
 Additive post-release update: plugin-local events between the frames of one

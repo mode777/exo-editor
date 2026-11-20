@@ -10,6 +10,7 @@ checklist item performed manually against the deployed site.
 | Budget | Ceiling | Measurement |
 | --- | --- | --- |
 | Plugin frame startup | 2,000 ms | Open a matching file in the demo workspace, measure until the reference code plugin's Monaco surface is visible and focusable |
+| Plugin panel or content-view startup | 2,000 ms | Reveal a registered panel or open a content-view tab, measure from the user action until the view frame is visible over its placeholder |
 | 10k-entry directory listing | 3,000 ms total, 1,000 ms longest task | Expand a directory with 10,000 entries and measure until every row is painted |
 | 1 MiB file open | 1,000 ms | Shell text surface and reference code plugin, from activating the file to the editable surface |
 | 1 MiB file save | 1,000 ms | Shell text surface and reference code plugin, from Save to the shell's success state |
@@ -36,11 +37,13 @@ for software rendering on a shared verification host.
 1. Build and deploy the current `main`; record the deployed commit.
 2. Start `chrome-headless-shell` with remote debugging, open the deployed shell
    and mount the demo workspace through the OPFS stub.
-3. Warm up once: open and close a `.ts` file, expand the 10k directory and open
-   and save a 1 MiB file.
+3. Warm up once: open and close a `.ts` file, expand the 10k directory, open
+   and save a 1 MiB file, reveal a panel and open a content view.
 4. Run each measurement five times with the same setup; record every run. Use
    `performance.now()` from navigation or the action start, and
-   `PerformanceObserver` long-task entries for the listing.
+   `PerformanceObserver` long-task entries for the listing. For a panel or
+   content view, start at the activation/click and stop when the view iframe is
+   visible over its placeholder.
 5. Report the median and maximum. A run with a page error is discarded and
    repeated.
 6. Put the results in the table below with the date, deployed commit and browser
@@ -109,3 +112,12 @@ path and the SDK support bit add 1,340 gzip bytes over the previous build
 1,944 bytes of headroom; no dependency, font or vendored asset is added. Local
 delivery reuses the existing queue, schedule and rate machinery and does not
 change a runtime budget.
+
+The `plugin-view-surfaces` change raises the JS ceiling from 159,000 to 167,000
+gzip bytes. The view frame mode, the shared session base, the lazy panel and
+content-view pool, the navigation intents and the derived activity/secondary
+chrome add 6,357 gzip bytes over the previous ceiling (measured build: 165,357
+JS, 13,391 CSS). The 8,000-byte allowance keeps roughly 1,643 bytes of headroom;
+no dependency, font or vendored asset is added. Panels mount lazily and content
+views create a frame only when their tab opens, so the change adds no eager
+frame and does not alter the existing runtime budgets.

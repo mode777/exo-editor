@@ -37,19 +37,20 @@ shell/event         { topic: string, seq: number, from?: string, payload: unknow
 - `plugin/publish` is correlated: it carries a request id and the shell replies
   `shell/published` with the accepted topic and sequence. The reply means the
   shell accepted the event, not that a peer handled it.
-- `config/changed` is targeted: only the subscribed handler frames of the plugin
-  named in the payload receive it. A frame of another plugin receives neither the
-  event nor the values, even if it subscribes to the topic.
+- `config/changed` is targeted: only the subscribed handler and view frames of the
+  plugin named in the payload receive it. A frame of another plugin receives
+  neither the event nor the values, even if it subscribes to the topic.
 - Unknown topics are rejected with `unsupported-topic`; the shell does not
   wildcard-match topics. A shell topic sent through `plugin/publish` is rejected
   with `permission-denied` and does not advance that topic's sequence.
 - Subscriptions belong to a frame. They are not persisted and do not survive
   `shell/dispose`.
-- Only handler frames may subscribe or publish. Registration frames are too
-  short-lived; a plugin that needs events without an open document needs a
-  background frame, which is not part of v1. This is sufficient for the reference
-  editor: theme and file changes matter while a document is open, and a closed
-  document has nothing to render.
+- Only handler and view frames may subscribe or publish. A registration frame is
+  too short-lived and a view frame carries the same identity, permission, queue
+  and sequence rules as a handler. A plugin that needs events without any open
+  document or view still needs a background frame, which is not part of v1. A
+  panel is retained while it is registered, so it can act as the plugin's
+  event hub until the plugin stops or the workspace switches.
 
 ### Local topic rules
 
@@ -103,7 +104,7 @@ interface ShellEvent<T> {
 | `theme/changed` | `{ theme: 'dark' \| 'light' \| 'high-contrast' }` | The user changes the shell theme |
 | `workspace/file-changed` | `{ path, kind: 'created' \| 'changed' \| 'deleted' \| 'renamed', version? }` | A file in the workspace changes, including saves from other tabs |
 | `workspace/closed` | `{ reason: 'switch' \| 'close' }` | The workspace is being released; the last event a frame receives |
-| `config/changed` | `{ pluginId, values: Record<string, unknown> }` | A plugin's contributed settings change; only that plugin's subscribed handler frames receive it |
+| `config/changed` | `{ pluginId, values: Record<string, unknown> }` | A plugin's contributed settings change; only that plugin's subscribed handler and view frames receive it |
 
 Topic names are `<namespace>/<event>`, lowercase, `[a-z0-9-]` segments, maximum
 64 characters. New topics are added by changing this contract and the OpenSpec
@@ -118,9 +119,10 @@ plugin's local topic. `config/changed` remains the only targeted shell topic.
 
 `config/changed` carries the full new value map for the named plugin, not a
 delta. It requires `events:subscribe`, and the shell delivers it only to that
-plugin's live handler frames. A plugin without the permission, or with no open
-handler, gets the current values from `shell/init` the next time a frame mounts.
-Settings are shell-owned; no other plugin can read them through this topic.
+plugin's live handler and view frames. A plugin without the permission, or with
+no live frame, gets the current values from `shell/init` the next time a frame
+mounts. Settings are shell-owned; no other plugin can read them through this
+topic.
 
 ### `workspace/closed` ordering
 
@@ -211,5 +213,6 @@ without subscribing. `config/changed` is then incremental.
    would create a second token contract and couple plugins to the shell's
    palette. A token set can be proposed later as its own contract.
 3. A plugin with no matching open document has no handler frame and therefore no
-   subscription in v1. Background frames are out of scope until a later layer
+   subscription unless it has registered and revealed a panel, which is retained
+   as its event hub. Background frames remain out of scope until a later layer
    needs them.

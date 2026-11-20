@@ -39,6 +39,7 @@ describe('browser adapter', () => {
       mode: 'register',
       sessionId: 'session-1',
     })
+    expect(parseExoFragment(fragment({ 'exo-mode': 'view' })).mode).toBe('view')
   })
 
   it('rejects missing and invalid parameters', () => {

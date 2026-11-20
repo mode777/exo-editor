@@ -16,7 +16,14 @@ const REJECTION_REASONS: RegistrationRejectionReason[] = [
   'permission-denied',
   'invalid-glob',
   'invalid-contribution',
+  'target-not-registered',
 ]
+
+function parseStringList(value: unknown): string[] | null {
+  if (value === undefined) return []
+  if (!Array.isArray(value) || value.some((item) => typeof item !== 'string')) return null
+  return value as string[]
+}
 
 function parseAck(payload: unknown): RegistrationAck | null {
   if (!isPlainObject(payload)) return null
@@ -26,6 +33,9 @@ function parseAck(payload: unknown): RegistrationAck | null {
   ) {
     return null
   }
+  const acceptedPanels = parseStringList(payload.acceptedPanels)
+  const acceptedContentViews = parseStringList(payload.acceptedContentViews)
+  if (!acceptedPanels || !acceptedContentViews) return null
   if (!Array.isArray(payload.rejected)) return null
   const rejected: RejectedContribution[] = []
   for (const item of payload.rejected) {
@@ -40,13 +50,29 @@ function parseAck(payload: unknown): RegistrationAck | null {
       return null
     }
     if (item.message !== undefined && typeof item.message !== 'string') return null
+    if (
+      item.kind !== undefined &&
+      item.kind !== 'fileEditor' &&
+      item.kind !== 'panel' &&
+      item.kind !== 'contentView'
+    ) {
+      return null
+    }
     rejected.push({
       index: item.index,
       reason: item.reason as RegistrationRejectionReason,
+      ...(item.kind === undefined
+        ? {}
+        : { kind: item.kind as 'fileEditor' | 'panel' | 'contentView' }),
       ...(item.message === undefined ? {} : { message: item.message }),
     })
   }
-  return { accepted: payload.accepted as string[], rejected }
+  return {
+    accepted: payload.accepted as string[],
+    acceptedPanels,
+    acceptedContentViews,
+    rejected,
+  }
 }
 
 export interface RegistrationClientOptions {
@@ -111,6 +137,29 @@ export class RegistrationClient {
       ...(contribution.label === undefined ? {} : { label: contribution.label }),
     }
     this.gate.send('plugin/register', { fileEditors: [payload] })
+  }
+
+  /** Register a declared panel id; the host mounts it lazily on first reveal. */
+  registerPanel(id: string): void {
+    this.sendViewRegistration('panels', id)
+  }
+
+  /** Register a declared content-view id; the host opens it as a tab. */
+  registerContentView(id: string): void {
+    this.sendViewRegistration('contentViews', id)
+  }
+
+  private sendViewRegistration(kind: 'panels' | 'contentViews', id: string): void {
+    if (this.completed || this.completing) {
+      throw new ExoProtocolError(
+        'protocol-violation',
+        'Registration is already complete; contributions cannot be added.',
+      )
+    }
+    if (typeof id !== 'string' || id.length === 0 || id.length > 64) {
+      throw new ExoProtocolError('protocol-violation', 'A view id must be 1-64 characters.')
+    }
+    this.gate.send('plugin/register', { [kind]: [id] })
   }
 
   complete(): Promise<RegistrationAck> {

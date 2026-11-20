@@ -1,70 +1,22 @@
 import type { MessageGate } from './gate'
-import { parseShellError } from './init'
+import { FrameClient } from './client'
 import {
   ExoProtocolError,
-  MAX_IN_FLIGHT_REQUESTS,
-  MAX_LOCAL_EVENT_BYTES,
-  isEventTopic,
-  isLocalEventTopic,
   isPlainObject,
-  payloadTooLarge,
-  type BinaryFileContent,
-  type DisposeReason,
-  type EditorCapabilities,
   type EditorInit,
   type EditorLimits,
-  type EventPayloads,
-  type EventTopic,
   type FileChangedPayload,
-  type FileContent,
   type FileMetadata,
-  type FilePickerOptions,
-  type DirectoryPage,
-  type ListDirectoryOptions,
-  type LocalEvent,
-  type LocalEventTopic,
   type SaveContent,
   type SaveResult,
-  type SettingValues,
-  type ShellErrorPayload,
-  type ShellEvent,
-  type TextFileContent,
+  type ShellErrorCode,
 } from './protocol'
 
 export type SaveHandler = (request: { id: string }) => SaveContent | Promise<SaveContent>
 export type SaveResultListener = (result: SaveResult) => void
 export type FileChangedListener = (change: FileChangedPayload) => void
-export type DisposeListener = (reason: DisposeReason) => void
-export type ErrorListener = (error: ShellErrorPayload) => void
-export type EventListener<T extends EventTopic> = (event: ShellEvent<EventPayloads[T]>) => void
-
-interface PendingRequest {
-  resolve: (value: unknown) => void
-  reject: (error: ExoProtocolError) => void
-}
 
 const FILE_CHANGE_KINDS: FileChangedPayload['kind'][] = ['created', 'changed', 'deleted', 'renamed']
-
-const DISPOSE_REASONS: DisposeReason[] = ['closed', 'workspace-switch', 'plugin-removed', 'error']
-
-function errorOf(error: unknown): ExoProtocolError {
-  if (error instanceof ExoProtocolError) return error
-  return new ExoProtocolError('internal', 'The plugin operation failed.', { cause: error })
-}
-
-function parseTextOrBinary(
-  payload: unknown,
-): { path: string; version: string; text?: string; bytes?: ArrayBuffer } | null {
-  if (!isPlainObject(payload)) return null
-  if (typeof payload.path !== 'string' || typeof payload.version !== 'string') return null
-  if (typeof payload.text === 'string') {
-    return { path: payload.path, version: payload.version, text: payload.text }
-  }
-  if (payload.bytes instanceof ArrayBuffer) {
-    return { path: payload.path, version: payload.version, bytes: payload.bytes }
-  }
-  return null
-}
 
 function isSaveContent(value: unknown): value is SaveContent {
   if (!isPlainObject(value)) return false
@@ -81,53 +33,12 @@ function parseSaveResult(payload: unknown): SaveResult | null {
     return { ok: true, version: payload.version }
   }
   if (payload.ok !== false) return null
-  const error = parseShellError(payload)
-  if (!error) return null
+  if (typeof payload.code !== 'string') return null
+  if (payload.message !== undefined && typeof payload.message !== 'string') return null
   return {
     ok: false,
-    code: error.code,
-    ...(error.message === undefined ? {} : { message: error.message }),
-  }
-}
-
-function parseFileSelection(payload: unknown): string[] | null {
-  if (!isPlainObject(payload) || !Array.isArray(payload.paths)) return null
-  if (payload.paths.some((path) => typeof path !== 'string')) return null
-  return payload.paths as string[]
-}
-
-function parseDirectoryPage(payload: unknown): DirectoryPage | null {
-  if (!isPlainObject(payload) || !Array.isArray(payload.entries)) return null
-  if (
-    payload.nextCursor !== undefined &&
-    (typeof payload.nextCursor !== 'string' || payload.nextCursor.length === 0)
-  ) {
-    return null
-  }
-  const entries: DirectoryPage['entries'] = []
-  for (const item of payload.entries) {
-    if (!isPlainObject(item) || typeof item.path !== 'string' || item.path.length === 0) {
-      return null
-    }
-    const keys = Object.keys(item)
-    if (item.kind === 'file') {
-      if (keys.some((key) => key !== 'path' && key !== 'kind' && key !== 'size')) return null
-      if (typeof item.size !== 'number' || !Number.isFinite(item.size) || item.size < 0) {
-        return null
-      }
-      entries.push({ path: item.path, kind: 'file', size: item.size })
-      continue
-    }
-    if (item.kind === 'directory') {
-      if (keys.some((key) => key !== 'path' && key !== 'kind')) return null
-      entries.push({ path: item.path, kind: 'directory' })
-      continue
-    }
-    return null
-  }
-  return {
-    entries,
-    ...(payload.nextCursor === undefined ? {} : { nextCursor: payload.nextCursor }),
+    code: payload.code as ShellErrorCode,
+    ...(payload.message === undefined ? {} : { message: payload.message }),
   }
 }
 
@@ -148,43 +59,14 @@ function parseFileChanged(payload: unknown): FileChangedPayload | null {
   }
 }
 
-function parseEvent(payload: unknown): ShellEvent | null {
-  if (!isPlainObject(payload)) return null
-  if (typeof payload.topic !== 'string' || typeof payload.seq !== 'number') return null
-  if (payload.from !== undefined && typeof payload.from !== 'string') return null
-  if (!isEventTopic(payload.topic) && !isLocalEventTopic(payload.topic)) return null
-  return {
-    topic: payload.topic,
-    seq: payload.seq,
-    payload: payload.payload,
-    ...(payload.from === undefined ? {} : { from: payload.from }),
-  }
-}
-
-function parsePublished(payload: unknown): { topic: LocalEventTopic; seq: number } | null {
-  if (!isPlainObject(payload)) return null
-  if (!isLocalEventTopic(payload.topic) || typeof payload.seq !== 'number') return null
-  return { topic: payload.topic, seq: payload.seq }
-}
-
 /** One editor frame's protocol client. It never parses file content. */
-export class EditorClient {
-  private readonly gate: MessageGate
-  private readonly init: EditorInit
-  private readonly pending = new Map<string, PendingRequest>()
-  private readonly subscriptions = new Set<string>()
-  private readonly eventListeners = new Map<string, Set<(event: ShellEvent) => void>>()
-  private readonly fileChangedListeners = new Set<FileChangedListener>()
-  private readonly disposeListeners = new Set<DisposeListener>()
-  private readonly errorListeners = new Set<ErrorListener>()
+export class EditorClient extends FrameClient {
+  private readonly editorInit: EditorInit
   private readonly saveResultListeners = new Set<SaveResultListener>()
+  private readonly fileChangedListeners = new Set<FileChangedListener>()
   private readonly saveHandlers: SaveHandler[] = []
   private metadata: FileMetadata
   private liveSaveId: string | null = null
-  private pendingPickerId: string | null = null
-  private nextRequestId = 0
-  private isClosed = false
-  private disposed = false
 
   constructor(gate: MessageGate, init: EditorInit) {
     if ((init as { mode?: string }).mode !== 'editor') {
@@ -193,20 +75,10 @@ export class EditorClient {
         'An editor client requires an editor-mode initialization.',
       )
     }
-    this.gate = gate
-    this.init = init
+    super(gate, init)
+    this.editorInit = init
     this.metadata = { ...init.file }
 
-    gate.on('shell/file-content', (envelope) =>
-      this.handleContent(envelope.replyTo, envelope.payload),
-    )
-    gate.on('shell/files-selected', (envelope) =>
-      this.handleFileSelection(envelope.replyTo, envelope.payload),
-    )
-    gate.on('shell/list-result', (envelope) =>
-      this.handleListing(envelope.replyTo, envelope.payload),
-    )
-    gate.on('shell/error', (envelope) => this.handleError(envelope.replyTo, envelope.payload))
     gate.on('shell/request-save', (envelope) => {
       void this.handleSaveRequest(envelope.id)
     })
@@ -214,116 +86,27 @@ export class EditorClient {
       this.handleSaveResult(envelope.replyTo, envelope.payload),
     )
     gate.on('shell/file-changed', (envelope) => this.handleFileChanged(envelope.payload))
-    gate.on('shell/subscribed', (envelope) =>
-      this.handleSubscribed(envelope.replyTo, envelope.payload),
-    )
-    gate.on('shell/published', (envelope) =>
-      this.handlePublished(envelope.replyTo, envelope.payload),
-    )
-    gate.on('shell/event', (envelope) => this.handleEvent(envelope.payload))
-    gate.on('shell/dispose', (envelope) => this.handleDispose(envelope.payload))
   }
 
   get initialization(): EditorInit {
-    return this.init
+    return this.editorInit
   }
 
   get file(): FileMetadata {
     return this.metadata
   }
 
-  get capabilities(): EditorCapabilities {
-    return this.init.capabilities
+  get capabilities() {
+    return this.editorInit.capabilities
   }
 
   get limits(): EditorLimits {
-    return this.init.limits
-  }
-
-  get settings(): SettingValues {
-    return this.init.settings
-  }
-
-  get closed(): boolean {
-    return this.isClosed
-  }
-
-  readFile(path: string, encoding?: 'utf8'): Promise<TextFileContent>
-  readFile(path: string, encoding: 'binary'): Promise<BinaryFileContent>
-  readFile(path: string, encoding: 'utf8' | 'binary' = 'utf8'): Promise<FileContent> {
-    const id = this.nextId()
-    return this.request<FileContent>(id, 'plugin/request-file', { path, encoding })
-  }
-
-  /**
-   * Ask the shell to open its workspace file picker. Resolves with the selected
-   * `/`-rooted paths, or `[]` when the user cancels. The shell returns no
-   * content; read a selected path with `readFile`.
-   */
-  requestFiles(options: FilePickerOptions = {}): Promise<string[]> {
-    if (!this.init.capabilities.filePicker) {
-      return Promise.reject(
-        new ExoProtocolError(
-          'unsupported-message',
-          'This shell does not support the workspace file picker.',
-        ),
-      )
-    }
-    if (!this.init.capabilities.requestFiles) {
-      return Promise.reject(
-        new ExoProtocolError(
-          'permission-denied',
-          'The plugin does not have workspace read permission for the picker.',
-        ),
-      )
-    }
-    if (this.pendingPickerId !== null) {
-      return Promise.reject(
-        new ExoProtocolError('rate-limited', 'A file picker request is already pending.'),
-      )
-    }
-    const id = this.nextId()
-    this.pendingPickerId = id
-    return this.request<string[]>(id, 'plugin/request-files', {
-      multiple: options.multiple === true,
-      ...(options.directory === undefined ? {} : { directory: options.directory }),
-    }).finally(() => {
-      if (this.pendingPickerId === id) this.pendingPickerId = null
-    })
+    return this.editorInit.limits
   }
 
   setDirty(dirty: boolean): void {
-    if (this.isClosed) return
+    if (this.closed) return
     this.gate.send('plugin/dirty', { dirty })
-  }
-
-  /**
-   * List one workspace directory level. Resolves with a page of minimal entries
-   * and, when more remain, the opaque `nextCursor` to pass to the next call.
-   * The shell returns no content; read a listed file with `readFile`.
-   */
-  listDirectory(path: string, options: ListDirectoryOptions = {}): Promise<DirectoryPage> {
-    if (!this.init.capabilities.directoryListing) {
-      return Promise.reject(
-        new ExoProtocolError(
-          'unsupported-message',
-          'This shell does not support directory listing.',
-        ),
-      )
-    }
-    if (!this.init.permissions.includes('workspace:list')) {
-      return Promise.reject(
-        new ExoProtocolError(
-          'permission-denied',
-          'The plugin does not have workspace:list permission.',
-        ),
-      )
-    }
-    const id = this.nextId()
-    return this.request<DirectoryPage>(id, 'plugin/request-list', {
-      path,
-      ...(options.cursor === undefined ? {} : { cursor: options.cursor }),
-    })
   }
 
   /**
@@ -332,7 +115,7 @@ export class EditorClient {
    * `shell/request-save`, and the outcome arrives through `onSaveResult`.
    */
   requestSave(): void {
-    if (this.isClosed) return
+    if (this.closed) return
     this.gate.send('plugin/request-save')
   }
 
@@ -358,260 +141,12 @@ export class EditorClient {
     }
   }
 
-  onDispose(listener: DisposeListener): () => void {
-    this.disposeListeners.add(listener)
-    return () => {
-      this.disposeListeners.delete(listener)
-    }
-  }
-
-  onError(listener: ErrorListener): () => void {
-    this.errorListeners.add(listener)
-    return () => {
-      this.errorListeners.delete(listener)
-    }
-  }
-
-  subscribe(topic: EventTopic): Promise<{ topic: EventTopic; seq: number }> {
-    const id = this.nextId()
-    return this.request<{ topic: EventTopic; seq: number }>(id, 'plugin/subscribe', { topic }).then(
-      (result) => {
-        this.subscriptions.add(result.topic)
-        return result
-      },
-    )
-  }
-
-  unsubscribe(topic: EventTopic | LocalEventTopic): void {
-    if (this.isClosed) return
-    this.subscriptions.delete(topic)
-    this.eventListeners.delete(topic)
-    this.gate.send('plugin/unsubscribe', { topic })
-  }
-
-  /**
-   * Publish a plugin-local event to the other frames of this plugin. The call
-   * resolves when the shell has accepted the event (not when a peer handled it).
-   */
-  publishLocal(
-    topic: LocalEventTopic | EventTopic,
-    payload: unknown,
-  ): Promise<{ topic: LocalEventTopic; seq: number }> {
-    const preflight = this.localPreflight(topic)
-    if (preflight) return Promise.reject(preflight)
-    if (payloadTooLarge(payload, MAX_LOCAL_EVENT_BYTES)) {
-      return Promise.reject(
-        new ExoProtocolError(
-          'too-large',
-          `Local event payloads are limited to ${MAX_LOCAL_EVENT_BYTES} bytes.`,
-        ),
-      )
-    }
-    const id = this.nextId()
-    return this.request<{ topic: LocalEventTopic; seq: number }>(id, 'plugin/publish', {
-      topic,
-      payload,
-    })
-  }
-
-  /** Subscribe to a plugin-local topic; no history is replayed. */
-  subscribeLocal(
-    topic: LocalEventTopic | EventTopic,
-  ): Promise<{ topic: LocalEventTopic; seq: number }> {
-    const preflight = this.localPreflight(topic)
-    if (preflight) return Promise.reject(preflight)
-    const id = this.nextId()
-    return this.request<{ topic: string; seq: number }>(id, 'plugin/subscribe', { topic }).then(
-      (result) => {
-        this.subscriptions.add(topic)
-        return { topic: topic as LocalEventTopic, seq: result.seq }
-      },
-    )
-  }
-
-  /** Receive local events after `subscribeLocal`; the payload is not interpreted. */
-  onLocalEvent<T = unknown>(
-    topic: LocalEventTopic,
-    listener: (event: LocalEvent<T>) => void,
-  ): () => void {
-    let set = this.eventListeners.get(topic)
-    if (!set) {
-      set = new Set()
-      this.eventListeners.set(topic, set)
-    }
-    const wrapped = listener as unknown as (event: ShellEvent) => void
-    set.add(wrapped)
-    return () => {
-      const current = this.eventListeners.get(topic)
-      current?.delete(wrapped)
-    }
-  }
-
-  private localPreflight(topic: string): ExoProtocolError | null {
-    if (!this.init.capabilities.localEvents) {
-      return new ExoProtocolError(
-        'unsupported-message',
-        'This shell does not support plugin-local events.',
-      )
-    }
-    if (!this.init.permissions.includes('events:subscribe')) {
-      return new ExoProtocolError(
-        'permission-denied',
-        'The plugin does not have events:subscribe permission for local topics.',
-      )
-    }
-    if (isEventTopic(topic)) {
-      return new ExoProtocolError(
-        'permission-denied',
-        'Plugins cannot publish or subscribe to shell topics through the local API.',
-      )
-    }
-    if (!isLocalEventTopic(topic)) {
-      return new ExoProtocolError(
-        'unsupported-topic',
-        'A local topic must be local/<name> with a lowercase 1-64 character name.',
-      )
-    }
-    return null
-  }
-
-  onEvent<T extends EventTopic>(topic: T, listener: EventListener<T>): () => void {
-    let set = this.eventListeners.get(topic)
-    if (!set) {
-      set = new Set()
-      this.eventListeners.set(topic, set)
-    }
-    const wrapped = listener as (event: ShellEvent) => void
-    set.add(wrapped)
-    return () => {
-      const current = this.eventListeners.get(topic)
-      current?.delete(wrapped)
-    }
-  }
-
-  close(): void {
-    if (this.isClosed) return
-    this.isClosed = true
-    this.rejectPending()
-    this.gate.close()
-  }
-
-  private nextId(): string {
-    this.nextRequestId += 1
-    return `exo-${this.nextRequestId}`
-  }
-
-  private request<T>(id: string, type: string, payload: unknown): Promise<T> {
-    if (this.isClosed) {
-      return Promise.reject(new ExoProtocolError('closed', 'The editor frame is closed.'))
-    }
-    if (this.pending.size >= MAX_IN_FLIGHT_REQUESTS) {
-      return Promise.reject(
-        new ExoProtocolError('rate-limited', 'Too many in-flight plugin requests (maximum 64).'),
-      )
-    }
-    return new Promise<T>((resolve, reject) => {
-      this.pending.set(id, {
-        resolve: (value) => resolve(value as T),
-        reject,
-      })
-      try {
-        this.gate.send(type, payload, { id })
-      } catch (error) {
-        this.pending.delete(id)
-        reject(errorOf(error))
-      }
-    })
-  }
-
-  private settle(id: string | undefined, error?: ExoProtocolError, value?: unknown): void {
-    if (!id) return
-    const pending = this.pending.get(id)
-    if (!pending) return
-    this.pending.delete(id)
-    if (error) pending.reject(error)
-    else pending.resolve(value)
-  }
-
-  private rejectPending(): void {
-    const pending = [...this.pending.values()]
-    this.pending.clear()
-    for (const item of pending) {
-      item.reject(new ExoProtocolError('closed', 'The editor frame was disposed.'))
-    }
-  }
-
-  private handleContent(replyTo: string | undefined, payload: unknown): void {
-    const content = parseTextOrBinary(payload)
-    if (!content) {
-      this.settle(
-        replyTo,
-        new ExoProtocolError('protocol-violation', 'The shell sent invalid file content.'),
-      )
-      return
-    }
-    this.settle(replyTo, undefined, content)
-  }
-
-  private handleFileSelection(replyTo: string | undefined, payload: unknown): void {
-    const paths = parseFileSelection(payload)
-    if (!paths) {
-      this.settle(
-        replyTo,
-        new ExoProtocolError('protocol-violation', 'The shell sent an invalid file selection.'),
-      )
-      return
-    }
-    this.settle(replyTo, undefined, paths)
-  }
-
-  private handleListing(replyTo: string | undefined, payload: unknown): void {
-    const page = parseDirectoryPage(payload)
-    if (!page) {
-      this.settle(
-        replyTo,
-        new ExoProtocolError('protocol-violation', 'The shell sent an invalid directory page.'),
-      )
-      return
-    }
-    this.settle(replyTo, undefined, page)
-  }
-
-  private handleError(replyTo: string | undefined, payload: unknown): void {
-    const error = parseShellError(payload)
-    if (replyTo) {
-      if (!error) {
-        this.settle(
-          replyTo,
-          new ExoProtocolError('protocol-violation', 'The shell sent an invalid error payload.'),
-        )
-        return
-      }
-      this.settle(
-        replyTo,
-        new ExoProtocolError(error.code, error.message ?? `The shell returned ${error.code}.`),
-      )
-      return
-    }
-    if (error) this.emitError(error)
-  }
-
-  private emitError(error: ShellErrorPayload): void {
-    for (const listener of [...this.errorListeners]) {
-      try {
-        listener(error)
-      } catch {
-        // A listener must not break protocol dispatch.
-      }
-    }
-  }
-
   private async handleSaveRequest(id: string | undefined): Promise<void> {
     const handler = this.saveHandlers.at(-1)
-    if (this.isClosed || !id || !handler) return
+    if (this.closed || !id || !handler) return
     try {
       const content = await handler({ id })
-      if (this.isClosed || !isSaveContent(content)) return
+      if (this.closed || !isSaveContent(content)) return
       this.liveSaveId = id
       this.gate.send('plugin/save-content', content, { replyTo: id })
     } catch {
@@ -645,88 +180,5 @@ export class EditorClient {
         // A listener must not break later notifications.
       }
     }
-  }
-
-  private handleSubscribed(replyTo: string | undefined, payload: unknown): void {
-    if (!isPlainObject(payload) || typeof payload.topic !== 'string') {
-      this.settle(
-        replyTo,
-        new ExoProtocolError('protocol-violation', 'The shell sent an invalid subscription reply.'),
-      )
-      return
-    }
-    if (payload.code === 'unsupported-topic') {
-      this.settle(
-        replyTo,
-        new ExoProtocolError('unsupported-topic', `The shell does not support ${payload.topic}.`),
-      )
-      return
-    }
-    if (typeof payload.seq !== 'number') {
-      this.settle(
-        replyTo,
-        new ExoProtocolError(
-          'protocol-violation',
-          'The shell sent an invalid subscription sequence.',
-        ),
-      )
-      return
-    }
-    this.settle(replyTo, undefined, { topic: payload.topic as EventTopic, seq: payload.seq })
-  }
-
-  private handlePublished(replyTo: string | undefined, payload: unknown): void {
-    const published = parsePublished(payload)
-    if (!published) {
-      this.settle(
-        replyTo,
-        new ExoProtocolError('protocol-violation', 'The shell sent an invalid publish reply.'),
-      )
-      return
-    }
-    this.settle(replyTo, undefined, published)
-  }
-
-  private handleEvent(payload: unknown): void {
-    const event = parseEvent(payload)
-    if (!event) return
-    const listeners = this.eventListeners.get(event.topic)
-    if (listeners) {
-      for (const listener of [...listeners]) {
-        try {
-          listener(event)
-        } catch {
-          // One plugin listener must not stop later event delivery.
-        }
-      }
-    }
-  }
-
-  private handleDispose(payload: unknown): void {
-    if (this.isClosed) return
-    const reason =
-      isPlainObject(payload) &&
-      typeof payload.reason === 'string' &&
-      DISPOSE_REASONS.includes(payload.reason as DisposeReason)
-        ? (payload.reason as DisposeReason)
-        : 'closed'
-    if (!this.disposed) {
-      this.disposed = true
-      try {
-        this.gate.send('plugin/dispose-ack', {})
-      } catch {
-        // The frame may already be gone; disposal is still local and idempotent.
-      }
-    }
-    this.isClosed = true
-    this.rejectPending()
-    for (const listener of [...this.disposeListeners]) {
-      try {
-        listener(reason)
-      } catch {
-        // A listener must not break disposal.
-      }
-    }
-    this.gate.close()
   }
 }

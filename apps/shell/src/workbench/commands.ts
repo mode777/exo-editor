@@ -30,6 +30,8 @@ export interface CommandContext {
   hasEditorChoice: boolean
   /** The active workspace is a remote connection. */
   remote: boolean
+  /** Number of active secondary panels; the picker needs more than one. */
+  secondaryViewCount: number
 }
 
 export interface ExoCommandHandlers {
@@ -48,6 +50,7 @@ export interface ExoCommandHandlers {
   delete: () => void
   refreshExplorer: () => void
   collapseExplorer: () => void
+  selectSecondaryView: () => void
 }
 
 export function createExoCommands(handlers: ExoCommandHandlers): WorkbenchCommand[] {
@@ -115,6 +118,12 @@ export function createExoCommands(handlers: ExoCommandHandlers): WorkbenchComman
       run: handlers.collapseExplorer,
     },
     {
+      id: 'exo.views.selectSecondary',
+      title: 'Select Secondary View…',
+      category: 'View',
+      run: handlers.selectSecondaryView,
+    },
+    {
       id: 'exo.file.save',
       title: 'Save',
       category: 'File',
@@ -165,6 +174,7 @@ const AVAILABILITY: Record<string, (context: CommandContext) => boolean> = {
     context.hasWorkspace && context.writable && context.hasSelection,
   'exo.explorer.refresh': (context) => context.hasWorkspace,
   'exo.explorer.collapseAll': (context) => context.hasWorkspace,
+  'exo.views.selectSecondary': (context) => context.secondaryViewCount > 1,
   'exo.file.save': (context) => context.hasActiveDocument,
   'exo.file.openWith': (context) => context.hasActiveDocument && context.hasEditorChoice,
 }
@@ -177,18 +187,20 @@ const AVAILABILITY: Record<string, (context: CommandContext) => boolean> = {
 export function createExoCommandRegistry(
   getContext: () => CommandContext,
   handlers: ExoCommandHandlers,
+  getDynamicCommands: () => WorkbenchCommand[] = () => [],
 ): CommandRegistry {
   const commands = createExoCommands(handlers)
+  const all = () => [...commands, ...getDynamicCommands()]
   const isAvailable = (command: WorkbenchCommand, context: CommandContext) =>
     AVAILABILITY[command.id]?.(context) ?? true
 
   return {
     list(): CommandListItem[] {
       const context = getContext()
-      return commands.filter((command) => isAvailable(command, context))
+      return all().filter((command) => isAvailable(command, context))
     },
     run(id: string): boolean {
-      const command = commands.find((entry) => entry.id === id)
+      const command = all().find((entry) => entry.id === id)
       if (!command) return false
       if (!isAvailable(command, getContext())) return false
       command.run()

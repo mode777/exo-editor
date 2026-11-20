@@ -54,7 +54,7 @@ describe('registration client', () => {
       type: 'shell/register-ack',
       payload: { accepted: ['**/*.template.txt'], rejected: [] },
     })
-    await expect(result).resolves.toEqual({
+    await expect(result).resolves.toMatchObject({
       accepted: ['**/*.template.txt'],
       rejected: [],
     })
@@ -75,9 +75,48 @@ describe('registration client', () => {
         rejected: [{ index: 1, reason: 'not-declared', message: 'not in the manifest' }],
       },
     })
-    await expect(result).resolves.toEqual({
+    await expect(result).resolves.toMatchObject({
       accepted: ['**/*.template.txt'],
       rejected: [{ index: 1, reason: 'not-declared', message: 'not in the manifest' }],
+    })
+  })
+
+  it('registers panels and content views and parses the additive ack', async () => {
+    const { transport, registration } = await connect()
+    registration.registerPanel('outline')
+    registration.registerContentView('tutorial')
+    expect(transport.posted.filter((item) => item.type === 'plugin/register')).toHaveLength(2)
+    const result = registration.complete()
+    transport.emit({
+      exo: 1,
+      type: 'shell/register-ack',
+      payload: {
+        accepted: [],
+        acceptedPanels: ['outline'],
+        acceptedContentViews: ['tutorial'],
+        rejected: [{ index: 0, kind: 'panel', reason: 'not-declared' }],
+      },
+    })
+    await expect(result).resolves.toEqual({
+      accepted: [],
+      acceptedPanels: ['outline'],
+      acceptedContentViews: ['tutorial'],
+      rejected: [{ index: 0, kind: 'panel', reason: 'not-declared' }],
+    })
+  })
+
+  it('defaults the additive view lists for an older shell', async () => {
+    const { transport, registration } = await connect()
+    const result = registration.complete()
+    transport.emit({
+      exo: 1,
+      type: 'shell/register-ack',
+      payload: { accepted: ['**/*.template.txt'], rejected: [] },
+    })
+    await expect(result).resolves.toMatchObject({
+      accepted: ['**/*.template.txt'],
+      acceptedPanels: [],
+      acceptedContentViews: [],
     })
   })
 

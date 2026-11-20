@@ -8,13 +8,32 @@
     "name": "Exo"
   },
   "engines": {
-    "exo": ">=0.1.0"
+    "exo": ">=0.3.0"
   },
   "runtime": {
     "entry": "plugin.html"
   },
   "permissions": ["workspace:read", "workspace:write", "workspace:list", "events:subscribe"],
   "contributes": {
+    "panels": [
+      {
+        "id": "fixture-panel",
+        "title": "Fixture Panel",
+        "icon": "list-tree",
+        "location": "primary",
+        "entry": "view-primary.html"
+      },
+      {
+        "id": "fixture-inspector",
+        "title": "Fixture Inspector",
+        "icon": "inspect",
+        "location": "secondary",
+        "entry": "view-secondary.html"
+      }
+    ],
+    "contentViews": [
+      { "id": "fixture-tutorial", "title": "Fixture Tutorial", "entry": "view-content.html" }
+    ],
     "configuration": {
       "properties": {
         "fixture.greeting": {
