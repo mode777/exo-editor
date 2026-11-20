@@ -322,6 +322,11 @@
     const args = payload && payload.args ? payload.args : null
     state.commands.push({ id, command, args })
     console.log('EXO_EDITOR command', id, command, args)
+    if (command === 'fixture.timeout') {
+      // Deliberately never answer so the ten-second timeout is observable.
+      render()
+      return
+    }
     if (command === 'fixture.fail') {
       post('plugin/command-result', { ok: false, message: 'Fixture command failed' }, id)
     } else {

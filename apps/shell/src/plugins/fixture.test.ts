@@ -61,6 +61,12 @@ describe('deployed plugin fixture', () => {
         target: 'activeEditor',
         menus: ['commandPalette'],
       },
+      {
+        id: 'fixture.timeout',
+        title: 'Timeout Fixture Command',
+        target: 'activeEditor',
+        menus: ['commandPalette'],
+      },
     ])
     for (const page of [
       ...result.manifest.panels.map((panel) => panel.entry),

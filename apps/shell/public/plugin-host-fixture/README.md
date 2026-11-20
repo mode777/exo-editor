@@ -259,6 +259,8 @@ include the count in the document title. Manual checks:
    `command/fixture.inspect`.
 4. Run **Fail Fixture Command** from the palette. A plain-text status notice
    names the plugin, can be dismissed, and disappears after eight seconds.
-5. Disable the fixture in Settings. Every palette, explorer and action-row entry
+5. Run **Timeout Fixture Command**, wait ten seconds, and confirm a timeout
+   notice appears while the editor frame stays mounted.
+6. Disable the fixture in Settings. Every palette, explorer and action-row entry
    disappears; a stale palette entry performs no delivery and appears in the
    plugin log as `stale`.

@@ -70,6 +70,12 @@
         "title": "Fail Fixture Command",
         "target": "activeEditor",
         "menus": ["commandPalette"]
+      },
+      {
+        "id": "fixture.timeout",
+        "title": "Timeout Fixture Command",
+        "target": "activeEditor",
+        "menus": ["commandPalette"]
       }
     ],
     "configuration": {
