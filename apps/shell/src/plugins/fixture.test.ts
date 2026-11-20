@@ -68,6 +68,12 @@ describe('deployed plugin fixture', () => {
         menus: ['commandPalette'],
       },
       {
+        id: 'fixture.generator',
+        title: 'Open Fixture Generator',
+        target: { kind: 'contentView', id: 'fixture-generator' },
+        menus: ['commandPalette', 'explorer/context'],
+      },
+      {
         id: 'fixture.fail',
         title: 'Fail Fixture Command',
         target: 'activeEditor',
