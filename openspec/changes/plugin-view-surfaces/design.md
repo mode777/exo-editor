@@ -227,3 +227,51 @@ the permission and the 64 KiB payload limit, and map absence of a support bit to
 4. Verify the deployed shell with the reference fixture: primary panel, secondary
    panel, content view with a payload, cross-plugin open, and a hidden-frame
    denied intent.
+
+## Deployed verification (2026-11-20)
+
+Run against deployed commit `3f69504` (asset `index-BotyjZ52.js`) at
+`https://mode777.github.io/exo-editor/` with Chrome for Testing 131.0.6778.264,
+using an OPFS workspace mounted through a `showDirectoryPicker` stub and the
+deployed plugin-host fixture plus its second identity. The deployed shell,
+fixture pages and manifests were the real artifacts; no local dev server or
+local build was used.
+
+- Consent listed both panels and the content view as a read-only tab.
+- A panel created no iframe before its first reveal. On reveal it received
+  `mode: "view"`, a `view` block (`kind: "panel"`, id, title, location,
+  instanceId) and the intent/local-event support bits, with no file block. It
+  used `sandbox="allow-scripts"`, sat within 4 px of its placeholder and reused
+  the same frame session when hidden and re-shown.
+- `plugin/request-panel` returned `{ panel: "fixture-inspector", open: true }`
+  and made the secondary region visible. The "Select View" action listed both
+  secondary panels with their plugin names; focus entered the first option,
+  Arrow Down moved to the second and Escape closed the picker.
+- A same-plugin content view received `kind: "content"`, its 64 KiB payload and
+  `openedBy` with the opener plugin id, name and origin. The tab named the plugin
+  and had no shell text editor. The content frame opened `/notes.txt` and then
+  reused its session across a tab switch. While its tab was hidden, the same
+  intent was denied with `permission-denied` and opened no tab.
+- A cross-plugin content view opened the second plugin's `other-tutorial`,
+  received `openedBy` from the opener, received no local event from the opener
+  and had no reverse channel.
+- A 64 KiB payload string (131,072 bytes by the shell's size rule) returned
+  `too-large` with `Content-view payloads are limited to 65536 bytes.` and opened
+  no tab.
+- The command palette listed `Open Fixture Tutorial` and opened it with no
+  payload and a fresh instance key.
+- Closing a content tab removed its frame. Disabling the plugin removed its
+  activity item, panel/content frames and content tabs, and the plugin log kept
+  the view phases. Switching to a second workspace cleared the tabs and mounted
+  the new workspace.
+- No page error was recorded. Thirty-two view checks and nine teardown checks
+  passed.
+
+View startup measured on the same deployed shell: panel reveal median 28 / max
+140 ms and content-view open median 471 / max 494 ms against the 2,000 ms
+ceiling recorded in `docs/performance.md`.
+
+The local gate passed: 801 shell tests, 78 SDK tests, typecheck, lint, format,
+build, bundle budget 165,357/167,000 js and 13,391/14,000 css gzip bytes, CSP,
+custom elements, no-SDK, no-Monaco, the template and code-plugin builds,
+secret scan and `openspec validate --all`.

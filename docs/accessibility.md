@@ -137,6 +137,12 @@ same `showDirectoryPicker` stub as the layer 5-9 verification.
 - File picker (added 2026-11-18 at commit `a868f08`): the dialog opened from the
   visible fixture, focus entered the dialog, Arrow Down moved between rows,
   Escape closed it and the fixture recorded an empty selection. Result: pass.
+- Plugin view surfaces (added 2026-11-20 at commit `3f69504`): the activity item
+  was named `Fixture Panel — Exo Host Fixture`; the secondary "Select View"
+  action opened the picker, both options named their plugin, focus entered the
+  first option, Arrow Down moved to the second and Escape closed it; the
+  content-view placeholder exposed a region name and the tab named the plugin.
+  Result: pass.
 - Settings dialog: focus enters the dialog, twelve Tab presses stay inside it,
   and Escape closes it. Result: pass.
 - The automated axe and contrast suites above pass in the same run; the shell's

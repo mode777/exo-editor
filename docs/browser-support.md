@@ -8,7 +8,7 @@ its tests in the same change.
 
 | Browser | Folder-backed workspace | Remote workspace (Stratofold) | Plugin host | Evidence |
 | --- | --- | --- | --- | --- |
-| Chromium desktop (Chrome, Edge) - tested 131.0.6778.264 | Supported | Supported | Supported | Layers 2 and 4-9 deployed verification; P1-P3 remote verification; `docs/providers/stratofold.md` |
+| Chromium desktop (Chrome, Edge) - tested 131.0.6778.264 | Supported | Supported | Supported (editors, panels, content views) | Layers 2 and 4-10 deployed verification; P1-P3 remote verification; view surfaces at commit `3f69504`; `docs/providers/stratofold.md` |
 | Firefox desktop - current stable | Unsupported - explicit state | Supported for browsing, read, write and save; plugin host unverified | Unverified | Layer 2 deployed verification (explicit unsupported state); P1 deployed verification on Chromium and Firefox |
 | Safari desktop - current stable | Unsupported - explicit state | Unverified | Unverified | v1 non-goal; P1 records Safari as unverified |
 | Mobile browsers | Out of scope | Out of scope | Out of scope | v1 vision non-goal |
@@ -29,7 +29,9 @@ picker is unavailable.
   connection stays read-only.
 - The plugin host starts only after a workspace is ready. On Firefox with a
   remote workspace, the shell opens files and plugins are not separately
-  verified; the matrix says so instead of assuming parity.
+  verified; the matrix says so instead of assuming parity. Panels and content
+  views use the same host and sandbox, so their Firefox status follows the
+  unverified plugin-host entry rather than being claimed separately.
 - Safari and mobile are not claimed. If a user opens the shell there, folder
   workspaces show the unsupported state and remote workspaces are unverified.
 

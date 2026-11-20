@@ -809,9 +809,23 @@ adds `contributes.panels` and `contributes.contentViews`, the `view` frame mode,
 lazy panel mounting with retained frames, read-only content-view tabs, the
 `plugin/open-file`, `plugin/open-view` and `plugin/request-panel` intents, and
 SDK `1.5.0`; shell `0.3.0`. Panels and content views are listed in the first-grant
-consent prompt and deliberately excluded from the fingerprint. Its deployed
-verification is recorded in the change design and this paragraph after the
-deployed run.
+consent prompt and deliberately excluded from the fingerprint. Verified against
+deployed commit `3f69504` (asset `index-BotyjZ52.js`): consent listed the panels
+and content view; a panel created no frame until first reveal, used
+`sandbox="allow-scripts"`, matched its placeholder bounds and reused its session
+when re-shown; a secondary panel appeared through `request-panel`, the picker
+listed both panels with plugin names and supported arrow keys and Escape; a
+same-plugin content view carried its payload and `openedBy`, opened a file and
+reused its frame across tab switches; a hidden content frame was denied an
+intent and opened no tab; a cross-plugin content view received `openedBy` but no
+local event from the opener; a 64 KiB payload returned `too-large` with the limit
+and opened no tab; the palette opened a content view with no payload. Closing a
+content tab disposed its frame; disabling the plugin removed its activity item,
+frames and content tabs; switching workspaces cleared the tabs. The local gate
+passed with 801 shell tests and a 165,357/167,000 js gzip budget; the 6,357-byte
+increase is recorded in [`docs/performance.md`](./docs/performance.md). View
+startup measured on the deployed shell: panel reveal median 28 / max 140 ms and
+content-view open median 471 / max 494 ms against the 2,000 ms ceiling.
 
 ---
 

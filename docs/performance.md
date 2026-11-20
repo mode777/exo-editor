@@ -81,6 +81,24 @@ ms; the procedure's warm-up removes that one-time cost, and the five recorded
 runs are all below the ceiling. The raw runs are in the task evidence for
 `release-readiness`.
 
+### Plugin view surfaces (2026-11-20)
+
+Measured on the deployed shell at commit `3f69504` (asset
+`index-BotyjZ52.js`) on the same reference environment, five runs after one
+warm-up. The workspace was a scratch folder with the deployed plugin-host
+fixture and the view pages.
+
+| Budget | Median | Maximum | Ceiling | Result |
+| --- | --- | --- | --- | --- |
+| Panel reveal (retained frame) | 28 ms | 140 ms | 2,000 ms | Met |
+| Content-view open (palette) | 471 ms | 494 ms | 2,000 ms | Met |
+
+The panel measurement hides and re-shows the retained primary panel; the first
+cold mount is included in the earlier consent/registration interval and is
+covered by the no-lazy-frame check. The content-view measurement starts at the
+palette command and stops when the new content iframe is visible. Both are below
+the 2,000 ms ceiling with no accepted miss.
+
 ## Bundle budget
 
 The committed budget lives in `apps/shell/budget.json` and is measured before the

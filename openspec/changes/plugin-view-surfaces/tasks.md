@@ -54,8 +54,8 @@ Prerequisite: land `plugin-local-events` first so the runtime-owned event bus an
 ## 7. Fixture and deployed verification
 
 - [x] 7.1 Add a primary panel, a secondary panel and a content view to the plugin-host fixture, including a local-event hub and an `open-file`/`request-panel` check; verify the fixture test.
-- [ ] 7.2 Verify same-plugin and cross-plugin content views, the 64 KiB rejection message, a hidden-frame denial and the secondary picker on the deployed URL; record the commit and date.
-- [ ] 7.3 Run the full local gate from `AGENTS.md`, including lint, format, typecheck, unit tests, build, bundle budget, CSP, custom elements, no-SDK, no-Monaco and secrets checks.
+- [x] 7.2 Verify same-plugin and cross-plugin content views, the 64 KiB rejection message, a hidden-frame denial and the secondary picker on the deployed URL; record the commit and date.
+- [x] 7.3 Run the full local gate from `AGENTS.md`, including lint, format, typecheck, unit tests, build, bundle budget, CSP, custom elements, no-SDK, no-Monaco and secrets checks.
 
 ## Workflow follow-up
 
