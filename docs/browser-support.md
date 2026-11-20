@@ -8,7 +8,7 @@ its tests in the same change.
 
 | Browser | Folder-backed workspace | Remote workspace (Stratofold) | Plugin host | Evidence |
 | --- | --- | --- | --- | --- |
-| Chromium desktop (Chrome, Edge) - tested 131.0.6778.264 | Supported | Supported | Supported (editors, panels, content views) | Layers 2 and 4-10 deployed verification; P1-P3 remote verification; view surfaces at commit `3f69504`; `docs/providers/stratofold.md` |
+| Chromium desktop (Chrome, Edge) - tested 131.0.6778.264 | Supported | Supported | Supported | Layers 2 and 4-10 deployed verification (editors, panels and content views); P1-P3 remote verification; view surfaces at commit `3f69504`; `docs/providers/stratofold.md` |
 | Firefox desktop - current stable | Unsupported - explicit state | Supported for browsing, read, write and save; plugin host unverified | Unverified | Layer 2 deployed verification (explicit unsupported state); P1 deployed verification on Chromium and Firefox |
 | Safari desktop - current stable | Unsupported - explicit state | Unverified | Unverified | v1 non-goal; P1 records Safari as unverified |
 | Mobile browsers | Out of scope | Out of scope | Out of scope | v1 vision non-goal |
