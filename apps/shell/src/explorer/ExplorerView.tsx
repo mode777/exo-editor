@@ -564,7 +564,8 @@ function Explorer() {
             disabled={!writable}
             onClick={(event) => {
               event.stopPropagation()
-              templateCount > 0 ? setNewFileMenuOpen((open) => !open) : beginCreate('new-file')
+              if (templateCount > 0) setNewFileMenuOpen((open) => !open)
+              else beginCreate('new-file')
             }}
           />
           {newFileMenuOpen && (
