@@ -29,10 +29,21 @@
         "icon": "inspect",
         "location": "secondary",
         "entry": "view-secondary.html"
+      },
+      {
+        "id": "fixture-inspector-2",
+        "title": "Fixture Inspector 2",
+        "icon": "inspect",
+        "location": "secondary",
+        "entry": "view-secondary.html"
       }
     ],
     "contentViews": [
-      { "id": "fixture-tutorial", "title": "Fixture Tutorial", "entry": "view-content.html" }
+      {
+        "id": "fixture-tutorial",
+        "title": "Fixture Tutorial",
+        "entry": "view-content.html"
+      }
     ],
     "configuration": {
       "properties": {

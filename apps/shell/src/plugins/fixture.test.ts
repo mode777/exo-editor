@@ -32,6 +32,7 @@ describe('deployed plugin fixture', () => {
     expect(result.manifest.panels.map((panel) => panel.id)).toEqual([
       'fixture-panel',
       'fixture-inspector',
+      'fixture-inspector-2',
     ])
     expect(result.manifest.contentViews.map((view) => view.id)).toEqual(['fixture-tutorial'])
     for (const page of [
