@@ -828,7 +828,8 @@ increase is recorded in [`docs/performance.md`](./docs/performance.md). View
 startup measured on the deployed shell: panel reveal median 28 / max 140 ms and
 content-view open median 471 / max 494 ms against the 2,000 ms ceiling.
 
-**Follow-up (2026-11-20):** the post-layer-10 change `plugin-commands` adds
+**Follow-up (2026-11-20):** the post-layer-10 change `plugin-commands`
+(archived as `2026-11-20-plugin-commands`) adds
 `contributes.commands`, `plugin/register.commands`, the additive
 `acceptedCommands` acknowledgement, `target-not-registered`, the `shell/command`
 and `plugin/command-result` messages with their limits, shell-owned palette,

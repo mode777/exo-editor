@@ -33,7 +33,8 @@ in the archived change design. The post-layer-10 change `plugin-view-surfaces`
 `contributes.contentViews`, the `view` frame mode,
 `plugin/open-file`, `plugin/open-view`, `plugin/request-panel` and SDK `1.5.0`;
 its deployed verification is recorded in the change design and `ROADMAP.md`. The
-post-layer-10 change `plugin-commands` adds `contributes.commands`, the
+post-layer-10 change `plugin-commands` (archived as
+`2026-11-20-plugin-commands`) adds `contributes.commands`, the
 `shell/command` and `plugin/command-result` messages, shell-owned command
 surfaces and SDK `1.6.0`; its deployed verification is recorded in `ROADMAP.md`.
 The parallel Stratofold provider track
