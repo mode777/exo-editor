@@ -833,10 +833,25 @@ content-view open median 471 / max 494 ms against the 2,000 ms ceiling.
 `acceptedCommands` acknowledgement, `target-not-registered`, the `shell/command`
 and `plugin/command-result` messages with their limits, shell-owned palette,
 explorer and editor-action surfaces, and SDK `1.6.0`; shell `0.4.0`. Commands are
-user-invoked, run only in live frames of the same plugin, and are listed in the
-first-grant consent prompt but deliberately excluded from the fingerprint.
-Verification is recorded here after the change is pushed and exercised on the
-deployed shell.
+user-invoked, run only in live frames of the same plugin, are listed in the
+first-grant consent prompt and are deliberately excluded from the fingerprint.
+Verified against deployed commit `6fa641e` (asset `index-BowKZcSd.js`): the
+consent prompt listed all five fixture commands with targets and placements; the
+matching `*.txt` editor showed a shell-owned action row labelled with the plugin
+and a shell text document showed none; the palette and explorer menu attributed
+every entry to the plugin; Format reached the active editor with no arguments;
+Generate reached a lazily mounted primary panel with `{ path: "/notes.txt", kind:
+"file" }` and then `{ path: "/reports", kind: "directory" }`; Inspect opened one
+content-view tab and a second invocation reused its frame; Fail produced a
+dismissible plain-text notice and Timeout produced a notice after ten seconds
+while the editor frame stayed mounted; a captured menu entry invoked after the
+plugin was disabled recorded a `stale` log entry and delivered nothing; the
+palette dropped the disabled commands. The full local gate passed with 845 shell
+tests, 86 SDK tests and a 169,686/171,000 js gzip budget; the 4,329-byte increase
+is recorded in [`docs/performance.md`](./docs/performance.md). First-command
+panel mount measured median 33 / max 37 ms against the 2,000 ms ceiling. The
+command surfaces also passed the 200% zoom equivalent (640x400) with no clipping
+or horizontal overflow.
 
 ---
 

@@ -31,7 +31,7 @@ Prerequisite: land `plugin-view-surfaces` first. It supplies the view pool, view
 - [x] 4.2 Add active explorer commands to `ExplorerView` after a separator, capped at ten and labelled with the plugin name; verify file and directory args, keyboard invocation, Escape and the cap.
 - [x] 4.3 Render `editor/title` commands for the matching active editor in a shell-owned `role="toolbar"` row in `DocumentArea`; verify another plugin's action is hidden and the accessible name includes the plugin.
 - [x] 4.4 Add the shell-owned notice region for failure and timeout with `role="status"`, bounded text, auto-dismiss and a dismiss button; verify success is silent and the notice is workspace-scoped.
-- [ ] 4.5 Add the command-surface CSS and verify axe scans, focus order, 200% zoom and the palette, menu and toolbar keyboard paths.
+- [x] 4.5 Add the command-surface CSS and verify axe scans, focus order, 200% zoom and the palette, menu and toolbar keyboard paths.
 
 ## 5. SDK
 
@@ -45,13 +45,13 @@ Prerequisite: land `plugin-view-surfaces` first. It supplies the view pool, view
 - [x] 6.1 Update `docs/contracts/plugin-manifest.md`, `docs/contracts/plugin-protocol.md` and `docs/contracts/plugin-sdk.md` with the command shape, targets, menus, registration, messages, limits, support bit and versioning.
 - [x] 6.2 Update the author guide with a command example, target selection, when to use a panel rather than a long-running result, and the `engines.exo` range needed for an older shell.
 - [x] 6.3 Update `docs/security-review.md` with the command surface, attribution, non-fingerprint decision, args rule and stale-entry control; verify each new control has a test that fails when removed.
-- [ ] 6.4 Update `docs/accessibility.md`, `docs/performance.md` and `docs/walkthrough.md` with the palette, menu and toolbar script, the first-command panel-mount measurement and the deployed acceptance path.
+- [x] 6.4 Update `docs/accessibility.md`, `docs/performance.md` and `docs/walkthrough.md` with the palette, menu and toolbar script, the first-command panel-mount measurement and the deployed acceptance path.
 - [x] 6.5 Add the `CHANGELOG.md` entry naming shell `0.4.0`, protocol `1`, schema `1` and SDK `1.6.0`, the `ROADMAP.md` follow-up and verify the changelog test.
 
 ## 7. Fixture and deployed verification
 
 - [x] 7.1 Add fixture commands for an active-editor action, a panel action with explorer args, a content-view action and a failing command; verify the fixture unit test and the host fixture README steps.
-- [ ] 7.2 Verify palette attribution, the matching and non-matching editor action row, explorer file and directory args, lazy panel mount, content-view tab reuse, failure and timeout notices, stale entries and plugin disable on the deployed URL; record the commit and date.
+- [x] 7.2 Verify palette attribution, the matching and non-matching editor action row, explorer file and directory args, lazy panel mount, content-view tab reuse, failure and timeout notices, stale entries and plugin disable on the deployed URL; record the commit and date.
 - [x] 7.3 Run the full local gate from `AGENTS.md`, including lint, format, typecheck, unit tests, build, bundle budget, CSP, custom elements, no-SDK, no-Monaco and secrets checks, plus `openspec validate --all`.
 
 ## Workflow follow-up

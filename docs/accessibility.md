@@ -138,6 +138,9 @@ Run against the deployed URL with the demo workspace from
   Exo-owned.
 - The activity bar is upstream chrome; Exo supplies panel items and includes the
   plugin name in their titles, but does not patch its keyboard model.
+- The upstream command palette and its keyboard model are excluded from the
+  shell's automated scans; the plugin command entries it renders are shell-owned
+  and attributable, and the manual script covers the palette path.
 - Mobile and touch-only layouts are out of scope for v1.
 
 ## Deployed verification

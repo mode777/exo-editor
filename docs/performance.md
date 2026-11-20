@@ -99,14 +99,23 @@ covered by the no-lazy-frame check. The content-view measurement starts at the
 palette command and stops when the new content iframe is visible. Both are below
 the 2,000 ms ceiling with no accepted miss.
 
-### Plugin commands (local build, 2026-11-20)
+### Plugin commands (2026-11-20)
+
+Measured on the deployed shell at commit `6fa641e` (asset
+`index-BowKZcSd.js`) on the reference environment, five runs after one warm-up.
+The workspace was a scratch folder with the deployed plugin-host fixture. The
+measurement starts at the explorer context-menu activation of **Generate Fixture
+Report** and stops when the first-revealed primary panel is active and its frame
+has recorded the command.
+
+| Budget | Median | Maximum | Ceiling | Result |
+| --- | --- | --- | --- | --- |
+| First-command panel mount | 33 ms | 37 ms | 2,000 ms | Met |
 
 The production build adds 4,329 gzip bytes over the view-surfaces measurement:
-169,686 js against a 171,000 limit and 13,531 css against 14,000. The increase is
-the command registry, invocation controller, palette/menu/toolbar surfaces and
-notice region. The deployed first-command panel-mount measurement is recorded
-with the deployed verification before archiving; the budget is the 2,000 ms
-plugin frame startup ceiling.
+169,686 js against the raised 171,000 limit and 13,531 css against 14,000. The
+increase is the command registry, invocation controller, palette/menu/toolbar
+surfaces and notice region.
 
 ## Bundle budget
 
