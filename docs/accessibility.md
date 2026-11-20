@@ -164,9 +164,12 @@ surface checks below were repeated on 2026-11-20 against commit `3f69504`.
 - File picker (added 2026-11-18 at commit `a868f08`): the dialog opened from the
   visible fixture, focus entered the dialog, Arrow Down moved between rows,
   Escape closed it and the fixture recorded an empty selection. Result: pass.
-- New-file Save As dialog: not yet verified against the deployed shell in a
-  browser; the unit and axe suites are the only recorded evidence for this
-  surface.
+- New-file Save As dialog (added 2026-11-20 at commit `bc8270a`): the dialog
+  opened from the explorer and the generator view, focus started in the name
+  field, folder buttons and the name were keyboard reachable, the path and size
+  were announced, the text preview and binary label were present, and Escape
+  cancelled without writing. Result: pass. The axe suite also covers the
+  rendered dialog.
 - Plugin view surfaces (added 2026-11-20 at commit `3f69504`): the activity item
   was named `Fixture Panel — Exo Host Fixture`; the secondary "Select View"
   action opened the picker, both options named their plugin, focus entered the

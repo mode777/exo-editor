@@ -190,3 +190,35 @@ than being written by the text surface.
    and the plugin keeps its existing behavior. A manifest with `newFiles` sets an
    `engines.exo` range that includes `0.5.0`.
 5. Rollback is a redeploy; no persisted state or schema migration is involved.
+
+## Deployed verification
+
+Verified on 2026-11-20 against deployed commit `bc8270a`
+(`https://mode777.github.io/exo-editor/`) with `chrome-headless-shell`
+131.0.6778.264 at 1280x800. The workspace was an OPFS directory exposed through
+a `showDirectoryPicker` stub and declared by a seeded `exo.json`; the deployed
+plugin-host fixture provided the templates and generator view. The browser run
+recorded zero page errors and these results:
+
+- The explorer New File menu listed Empty File, the plugin group and both
+  templates; the palette entries and the dialog named the plugin.
+- The text template pre-filled `fixture-template.txt` in the selected folder,
+  showed the text preview and focused the name field; Create wrote the exact
+  bytes (`Hello from the fixture template\n`), opened the tab and refreshed the
+  explorer.
+- Re-creating the same name reported `/fixture-template.txt already exists.`,
+  kept the dialog open and preserved the original bytes.
+- The binary template showed a byte size and the binary label and wrote
+  `00 01 02 ff`.
+- Escape closed the dialog with no file created.
+- `fixture-generator` created `generated.txt` and `generated.bin` through
+  `plugin/request-new-file` with exact content, replied with the path and
+  version, and did not open a tab (tab count stayed 4).
+- The 8 MiB probe was rejected with `too-large` and
+  `Generated files are limited to 8388608 bytes; this request is 8388609 bytes.`,
+  and no dialog opened.
+
+The earlier local gate passed with 894 shell tests, 95 SDK tests, 4 template
+tests, lint, format, typecheck, the bundle budget (173,554/176,000 JS and
+13,794/14,000 CSS gzip bytes), CSP, custom elements, no-SDK, no-Monaco and
+secret checks; `openspec validate --all` passes.

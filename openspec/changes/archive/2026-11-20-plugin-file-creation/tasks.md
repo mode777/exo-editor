@@ -50,7 +50,7 @@ Prerequisite: land `plugin-local-events` and `plugin-view-surfaces` first.
 ## 7. Fixture and deployed verification
 
 - [x] 7.1 Add a text template and a binary template to the plugin fixture and a generator content view that calls `requestNewFile` with a small image; verify the fixture test.
-- [ ] 7.2 Verify template creation, runtime creation, cancellation, an existing-name collision, a binary result and the 8 MiB rejection message on the deployed URL; record the commit and date.
+- [x] 7.2 Verify template creation, runtime creation, cancellation, an existing-name collision, a binary result and the 8 MiB rejection message on the deployed URL; record the commit and date.
 - [x] 7.3 Run the full local gate from `AGENTS.md`, including lint, format, typecheck, unit tests, build, bundle budget, CSP, custom elements, no-SDK, no-Monaco and secrets checks.
 
 ## Workflow follow-up

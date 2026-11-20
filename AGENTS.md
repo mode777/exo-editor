@@ -37,6 +37,11 @@ post-layer-10 change `plugin-commands` (archived as
 `2026-11-20-plugin-commands`) adds `contributes.commands`, the
 `shell/command` and `plugin/command-result` messages, shell-owned command
 surfaces and SDK `1.6.0`; its deployed verification is recorded in `ROADMAP.md`.
+The post-layer-10 change `plugin-file-creation` (archived as
+`2026-11-20-plugin-file-creation`) adds `contributes.newFiles`, the shell-owned
+Save As dialog, `plugin/request-new-file` / `shell/new-file-result`, the
+create-only `WriteOptions.createOnly` path and SDK `1.7.0`; its deployed
+verification is recorded in the archived change design and `ROADMAP.md`.
 The parallel Stratofold provider track
 (P1-P3) is archived and verified; it does not gate the numbered layers. The
 contracts are ratified, and the shell app (`apps/shell`) builds, tests and

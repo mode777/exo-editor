@@ -861,8 +861,15 @@ or horizontal overflow.
 and SDK `1.7.0`; shell `0.5.0`. Templates and runtime requests share one
 controller and one create-only write. The memory provider is atomic; the folder
 and Stratofold providers pre-check and document the residual check-to-write race
-because neither exposes a target-absent conditional create. Deployed verification
-is recorded with the change once the browser pass is complete.
+because neither exposes a target-absent conditional create. Verified against deployed commit `bc8270a` on 2026-11-20 with
+`chrome-headless-shell` 131: the explorer menu and consent named the plugin,
+the text template wrote exact bytes and refreshed the explorer, a collision kept
+the dialog open and preserved content, the binary template wrote `00 01 02 ff`,
+Escape wrote nothing, the generator view created text and bytes with no automatic
+tab, and an 8 MiB probe returned `too-large` with the actual size and limit and
+opened no dialog. The local gate passed with 894 shell tests, 95 SDK tests and
+4 template tests; the measured bundle was 173,554/176,000 js and
+13,794/14,000 css gzip bytes.
 
 ---
 
