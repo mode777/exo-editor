@@ -24,7 +24,11 @@ verification is also recorded in the change design. The post-layer-10 change
 `2026-11-20-explorer-workspace-header`) adds the explorer workspace header with
 New File, New Folder, Refresh and Collapse Folders icon actions, and expands
 directories on a single click; its deployed verification is recorded in the
-archived change design. The parallel Stratofold provider track
+archived change design. The post-layer-10 change `plugin-local-events`
+(archived as `2026-11-20-plugin-local-events`) adds identity-scoped `local/`
+topics, the correlated `plugin/publish` acknowledgement,
+`capabilities.localEvents` and SDK `1.4.0`; its deployed verification is recorded
+in the archived change design. The parallel Stratofold provider track
 (P1-P3) is archived and verified; it does not gate the numbered layers. The
 contracts are ratified, and the shell app (`apps/shell`) builds, tests and
 deploys to GitHub Pages through CI. Do not scaffold code ahead of the [roadmap](./ROADMAP.md) layer
