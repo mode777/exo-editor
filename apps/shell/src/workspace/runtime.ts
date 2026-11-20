@@ -187,6 +187,11 @@ export class WorkspaceRuntime {
       onCreated: (path, kind) => {
         this.refreshExplorer()
         if (kind === 'template') this.openDocument(path)
+        // The dialog closes in the same tick as the write; refresh again once
+        // the tab/snapshot updates settle so the new entry is always visible.
+        setTimeout(() => {
+          if (!this.disposed) this.refreshExplorer()
+        }, 0)
       },
       onLog: (event) =>
         this.pluginHost.logHandler(event.identity, event.phase, event.code, event.message),
