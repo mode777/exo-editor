@@ -44,6 +44,7 @@ function manifest(overrides: Partial<PluginManifest> = {}): PluginManifest {
     ],
     panels: [],
     contentViews: [],
+    commands: [],
     ...overrides,
   }
 }
@@ -448,6 +449,171 @@ describe('registration session', () => {
     }
     expect(error?.code).toBe('protocol-violation')
     expect(postedType(context.frame, 'shell/register-ack')).toBeUndefined()
+  })
+
+  const commandManifest = () =>
+    manifest({
+      panels: [
+        {
+          id: 'reports',
+          title: 'Reports',
+          location: 'primary',
+          entry: 'reports.html',
+          entryUrl: 'https://plugins.example.com/monaco/reports.html',
+        },
+      ],
+      contentViews: [
+        {
+          id: 'report',
+          title: 'Report',
+          entry: 'report.html',
+          entryUrl: 'https://plugins.example.com/monaco/report.html',
+        },
+      ],
+      commands: [
+        { id: 'format', title: 'Format', target: 'activeEditor', menus: ['commandPalette'] },
+        {
+          id: 'generate',
+          title: 'Generate',
+          target: { kind: 'panel', id: 'reports' },
+          menus: ['commandPalette', 'explorer/context'],
+        },
+        {
+          id: 'inspect',
+          title: 'Inspect',
+          target: { kind: 'contentView', id: 'report' },
+          menus: ['commandPalette'],
+        },
+      ],
+    })
+
+  it('registers a declared command subset in arrival order and deduplicates ids', () => {
+    const context = start({ manifest: commandManifest() })
+    ready(context)
+    context.frame.emit(
+      {
+        exo: 1,
+        type: 'plugin/register',
+        payload: {
+          panels: ['reports'],
+          contentViews: ['report'],
+          commands: ['inspect', 'format', 'inspect'],
+        },
+      },
+      context.manifest.manifestOrigin,
+    )
+    complete(context)
+    const ack = postedType(context.frame, 'shell/register-ack')?.payload as {
+      acceptedCommands: string[]
+      rejected: unknown[]
+    }
+    expect(ack.acceptedCommands).toEqual(['inspect', 'format'])
+    expect(ack.rejected).toEqual([])
+    const outcome = context.outcomes[0]
+    expect(outcome.kind).toBe('active')
+    if (outcome.kind !== 'active') return
+    const registrationOrders = outcome.commands.map((command) => command.registrationOrder)
+    expect(outcome.commands.map((command) => command.id)).toEqual(['inspect', 'format'])
+    expect(registrationOrders[0]).toBeLessThan(registrationOrders[1] as number)
+  })
+
+  it('rejects undeclared and malformed command registrations', () => {
+    const context = start({ manifest: commandManifest() })
+    ready(context)
+    context.frame.emit(
+      {
+        exo: 1,
+        type: 'plugin/register',
+        payload: { commands: ['missing', 42, 'format', 'format'] },
+      },
+      context.manifest.manifestOrigin,
+    )
+    complete(context)
+    const ack = postedType(context.frame, 'shell/register-ack')?.payload as {
+      acceptedCommands: string[]
+      rejected: unknown[]
+    }
+    expect(ack.acceptedCommands).toEqual(['format'])
+    expect(ack.rejected).toEqual([
+      { index: 0, kind: 'command', reason: 'not-declared' },
+      { index: 1, kind: 'command', reason: 'invalid-contribution' },
+    ])
+  })
+
+  it('rejects a command whose panel target was not registered', () => {
+    const context = start({ manifest: commandManifest() })
+    ready(context)
+    context.frame.emit(
+      {
+        exo: 1,
+        type: 'plugin/register',
+        payload: { commands: ['generate', 'format'] },
+      },
+      context.manifest.manifestOrigin,
+    )
+    complete(context)
+    const ack = postedType(context.frame, 'shell/register-ack')?.payload as {
+      acceptedCommands: string[]
+      rejected: Array<{ index: number; kind?: string; reason: string }>
+    }
+    expect(ack.acceptedCommands).toEqual(['format'])
+    expect(ack.rejected).toEqual([
+      {
+        index: 0,
+        kind: 'command',
+        reason: 'target-not-registered',
+        message: 'Command target reports is not registered.',
+      },
+    ])
+    const outcome = context.outcomes[0]
+    expect(outcome.kind).toBe('active')
+    if (outcome.kind === 'active') {
+      expect(outcome.commands.map((command) => command.id)).toEqual(['format'])
+    }
+  })
+
+  it('accepts a target registered before or after its command in the same session', () => {
+    for (const order of ['panel-first', 'command-first'] as const) {
+      const context = start({ manifest: commandManifest() })
+      ready(context)
+      const payload = order === 'panel-first' ? { panels: ['reports'] } : { commands: ['generate'] }
+      context.frame.emit(
+        { exo: 1, type: 'plugin/register', payload },
+        context.manifest.manifestOrigin,
+      )
+      context.frame.emit(
+        {
+          exo: 1,
+          type: 'plugin/register',
+          payload: order === 'panel-first' ? { commands: ['generate'] } : { panels: ['reports'] },
+        },
+        context.manifest.manifestOrigin,
+      )
+      complete(context)
+      const ack = postedType(context.frame, 'shell/register-ack')?.payload as {
+        acceptedCommands: string[]
+        rejected: unknown[]
+      }
+      expect(ack.acceptedCommands).toEqual(['generate'])
+      expect(ack.rejected).toEqual([])
+      expect(context.outcomes[0].kind).toBe('active')
+    }
+  })
+
+  it('rejects a command result in the registration phase as a protocol violation', () => {
+    const context = start({ manifest: commandManifest() })
+    ready(context)
+    context.frame.emit(
+      {
+        exo: 1,
+        type: 'plugin/command-result',
+        replyTo: 'cmd-1',
+        payload: { ok: true },
+      },
+      context.manifest.manifestOrigin,
+    )
+    const error = postedType(context.frame, 'shell/error')?.payload as { code?: string }
+    expect(error?.code).toBe('protocol-violation')
   })
 
   it('rejects editor contributions from a plugin without read permission', () => {

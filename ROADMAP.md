@@ -828,6 +828,16 @@ increase is recorded in [`docs/performance.md`](./docs/performance.md). View
 startup measured on the deployed shell: panel reveal median 28 / max 140 ms and
 content-view open median 471 / max 494 ms against the 2,000 ms ceiling.
 
+**Follow-up (2026-11-20):** the post-layer-10 change `plugin-commands` adds
+`contributes.commands`, `plugin/register.commands`, the additive
+`acceptedCommands` acknowledgement, `target-not-registered`, the `shell/command`
+and `plugin/command-result` messages with their limits, shell-owned palette,
+explorer and editor-action surfaces, and SDK `1.6.0`; shell `0.4.0`. Commands are
+user-invoked, run only in live frames of the same plugin, and are listed in the
+first-grant consent prompt but deliberately excluded from the fingerprint.
+Verification is recorded here after the change is pushed and exercised on the
+deployed shell.
+
 ---
 
 ## Deferred beyond v1

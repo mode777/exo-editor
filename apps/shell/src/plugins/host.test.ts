@@ -412,6 +412,104 @@ describe('plugin host', () => {
     host.dispose()
   })
 
+  it('activates commands only on completion and removes them on stop', async () => {
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse(
+        manifestJson({
+          contributes: {
+            fileEditors: [],
+            panels: [
+              {
+                id: 'reports',
+                title: 'Reports',
+                location: 'primary',
+                entry: 'views/reports.html',
+              },
+            ],
+            commands: [
+              {
+                id: 'format',
+                title: 'Format Document',
+                target: 'activeEditor',
+                menus: ['commandPalette', 'editor/title'],
+              },
+              {
+                id: 'generate',
+                title: 'Generate Report',
+                target: { kind: 'panel', id: 'reports' },
+                menus: ['commandPalette', 'explorer/context'],
+              },
+            ],
+          },
+        }),
+        MANIFEST_URL,
+      ),
+    )
+    const { host, transport, config } = createHost(fetchImpl)
+    config.setEntries(entries(MANIFEST_URL))
+    await waitForRecord(host, MANIFEST_URL, 'awaiting-consent')
+    host.approveConsent(host.getSnapshot().consentRequest?.identity ?? '')
+    await vi.waitFor(() => {
+      expect(transport.frames.length).toBeGreaterThan(0)
+    })
+    const frame = transport.frames[0]
+    if (!frame) throw new Error('Frame not found')
+    ready(frame, 'https://plugins.example.com')
+    frame.emit(
+      {
+        exo: 1,
+        type: 'plugin/register',
+        payload: { panels: ['reports'], commands: ['format', 'generate'] },
+      },
+      'https://plugins.example.com',
+    )
+    expect(host.getSnapshot().records[0]?.phase).toBe('registering')
+    expect(host.listCommands()).toEqual([])
+
+    frame.emit(
+      { exo: 1, type: 'plugin/register-complete', payload: {} },
+      'https://plugins.example.com',
+    )
+    await waitForRecord(host, MANIFEST_URL, 'active')
+    const identity = 'https://plugins.example.com::com.example.monaco'
+    const record = host.getSnapshot().records[0]
+    expect(record?.commands.map((command) => command.id)).toEqual(['format', 'generate'])
+    expect(record?.commands[1]?.target).toEqual({ kind: 'panel', id: 'reports' })
+    expect(host.listCommands().map((item) => [item.identity, item.command.id])).toEqual([
+      [identity, 'format'],
+      [identity, 'generate'],
+    ])
+    expect(host.findCommand(identity, 'generate')?.command.menus).toEqual([
+      'commandPalette',
+      'explorer/context',
+    ])
+
+    config.setEntries([{ index: 0, manifest: MANIFEST_URL, enabled: false }])
+    await waitForRecord(host, MANIFEST_URL, 'disabled')
+    expect(host.listCommands()).toEqual([])
+    expect(host.getSnapshot().records[0]?.commands).toEqual([])
+    expect(host.findCommand(identity, 'format')).toBeUndefined()
+    host.dispose()
+  })
+
+  it('caps the plugin log at 200 entries and keeps the newest', () => {
+    const { host } = createHost()
+    for (let index = 0; index < 205; index += 1) {
+      host.logCommand(
+        'https://plugins.example.com::com.example.monaco',
+        'command',
+        'invoked',
+        `c${index}`,
+      )
+    }
+    const log = host.getSnapshot().log
+    expect(log).toHaveLength(200)
+    expect(log[0]?.message).toBe('c5')
+    expect(log.at(-1)?.message).toBe('c204')
+    expect(log.every((entry) => entry.phase === 'command')).toBe(true)
+    host.dispose()
+  })
+
   it('skips the prompt when a matching fingerprint is persisted', async () => {
     const storage = new MemoryStorage()
     const consentStore = new ConsentStore({ storage })

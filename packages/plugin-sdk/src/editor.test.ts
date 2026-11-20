@@ -36,6 +36,7 @@ function init(overrides: Partial<EditorInit> = {}): EditorInit {
       openFile: true,
       openView: true,
       requestPanel: true,
+      commands: true,
     },
     limits: { maxFileSize: 10 * 1024 * 1024, maxRequestBytes: 16 * 1024 * 1024 },
     ...overrides,
@@ -75,6 +76,7 @@ describe('editor client', () => {
       openFile: true,
       openView: true,
       requestPanel: true,
+      commands: true,
     })
     expect(editor.settings).toEqual({ 'template.greeting': 'hello' })
     expect(transport.posted.filter((item) => item.type === 'plugin/request-file')).toHaveLength(0)
@@ -403,6 +405,7 @@ describe('editor client', () => {
         openFile: true,
         openView: true,
         requestPanel: true,
+        commands: true,
       },
     })
     await expect(old.editor.publishLocal('local/state', {})).rejects.toMatchObject({
@@ -554,6 +557,7 @@ describe('editor client', () => {
         openFile: true,
         openView: true,
         requestPanel: true,
+        commands: true,
       },
     })
     await expect(denied.editor.requestFiles()).rejects.toMatchObject({ code: 'permission-denied' })
@@ -647,6 +651,7 @@ describe('editor client', () => {
         openFile: true,
         openView: true,
         requestPanel: true,
+        commands: true,
       },
     })
     await expect(old.editor.listDirectory('/')).rejects.toMatchObject({

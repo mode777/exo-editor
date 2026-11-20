@@ -66,6 +66,102 @@ describe('exo command registry', () => {
     expect(run).toHaveBeenCalledOnce()
   })
 
+  it('lists plugin commands under a synthetic id and plugin-attributed category', () => {
+    const invoke = vi.fn()
+    const { handlers } = setup()
+    const registry = createExoCommandRegistry(
+      () => NO_WORKSPACE,
+      handlers,
+      () => [],
+      {
+        list: () => [
+          {
+            identity: 'https://plugins.example.com::com.example.test',
+            commandId: 'format',
+            title: 'Format Document',
+            category: 'Example Plugin · Editing',
+            inPalette: true,
+          },
+          {
+            identity: 'https://plugins.example.com::com.example.test',
+            commandId: 'explorer-only',
+            title: 'Explorer Only',
+            category: 'Example Plugin',
+            inPalette: false,
+          },
+        ],
+        invoke,
+      },
+    )
+    const listed = registry.list().filter((command) => command.id.startsWith('exo.plugin.'))
+    expect(listed).toEqual([
+      expect.objectContaining({
+        id: 'exo.plugin.https%3A%2F%2Fplugins.example.com%3A%3Acom.example.test.format',
+        title: 'Format Document',
+        category: 'Example Plugin · Editing',
+      }),
+    ])
+    expect(registry.run(listed[0]?.id ?? '')).toBe(true)
+    expect(invoke).toHaveBeenCalledWith('https://plugins.example.com::com.example.test', 'format')
+  })
+
+  it('keeps a shell command and a same-named plugin command separate', () => {
+    const invoke = vi.fn()
+    const { handlers } = setup()
+    const registry = createExoCommandRegistry(
+      () => NO_WORKSPACE,
+      handlers,
+      () => [],
+      {
+        list: () => [
+          {
+            identity: 'https://plugins.example.com::com.example.test',
+            commandId: 'exo.settings.open',
+            title: 'Open Settings',
+            category: 'Example Plugin',
+            inPalette: true,
+          },
+        ],
+        invoke,
+      },
+    )
+    const ids = registry.list().map((command) => command.id)
+    expect(ids).toContain('exo.settings.open')
+    expect(ids).toContain(
+      'exo.plugin.https%3A%2F%2Fplugins.example.com%3A%3Acom.example.test.exo.settings.open',
+    )
+    expect(registry.run('exo.settings.open')).toBe(true)
+    expect(invoke).not.toHaveBeenCalled()
+  })
+
+  it('records a stale palette invocation instead of silently dropping it', () => {
+    const invoke = vi.fn()
+    const { handlers } = setup()
+    const registry = createExoCommandRegistry(
+      () => NO_WORKSPACE,
+      handlers,
+      () => [],
+      {
+        list: () => [
+          {
+            identity: 'https://plugins.example.com::com.example.test',
+            commandId: 'format',
+            title: 'Format Document',
+            category: 'Example Plugin',
+            inPalette: true,
+          },
+        ],
+        invoke,
+      },
+    )
+    const id = registry.list().find((command) => command.id.startsWith('exo.plugin.'))?.id ?? ''
+    expect(registry.run(id)).toBe(true)
+    // A later list without the command still routes the known id to the controller,
+    // which records the stale invocation in the plugin log.
+    expect(registry.run(id)).toBe(true)
+    expect(invoke).toHaveBeenCalledTimes(2)
+  })
+
   it('exposes the workspace-free commands', () => {
     const { registry } = setup()
     const ids = registry.list().map((command) => command.id)

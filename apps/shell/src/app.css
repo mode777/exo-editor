@@ -500,6 +500,67 @@
   cursor: pointer;
 }
 
+.exo-document-actions-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--vscode-widget-border);
+  background: var(--vscode-editorWidget-background);
+}
+
+.exo-menu-separator {
+  height: 1px;
+  margin: 4px 2px;
+  background: var(--vscode-menu-separatorBackground, var(--vscode-widget-border));
+}
+
+.exo-menu-attribution {
+  color: var(--vscode-descriptionForeground);
+}
+
+.exo-command-notices {
+  position: fixed;
+  right: 16px;
+  bottom: 36px;
+  z-index: 1100;
+  display: flex;
+  max-width: min(420px, calc(100vw - 32px));
+  flex-direction: column;
+  gap: 6px;
+}
+
+.exo-command-notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--vscode-widget-border);
+  background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  color: var(--vscode-foreground);
+  box-shadow: 0 4px 12px var(--vscode-widget-shadow);
+  font-size: 12px;
+}
+
+.exo-command-notice-text {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+
+.exo-command-notice-dismiss {
+  border: 0;
+  padding: 2px 6px;
+  background: transparent;
+  color: var(--vscode-textLink-foreground);
+  font: inherit;
+  cursor: pointer;
+}
+
+.exo-command-notice-dismiss:hover,
+.exo-command-notice-dismiss:focus-visible {
+  text-decoration: underline;
+}
+
 .exo-document-actions {
   display: flex;
   gap: 8px;

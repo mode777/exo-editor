@@ -31,6 +31,7 @@ function manifest(overrides: Partial<PluginManifest> = {}): PluginManifest {
     ],
     panels: [],
     contentViews: [],
+    commands: [],
     ...overrides,
   }
 }
@@ -191,6 +192,43 @@ describe('consent dialog', () => {
     expect(text).toContain('workspace:list')
     expect(text).toContain('List folder contents and file names in the workspace')
     expect(text).toContain('including files it has not opened')
+  })
+
+  it('lists commands with their target and placements', async () => {
+    const { container: rendered } = await render(
+      request({
+        panels: [
+          {
+            id: 'outline',
+            title: 'Outline',
+            location: 'primary',
+            entry: 'views/outline.html',
+            entryUrl: 'https://plugins.example.com/monaco/views/outline.html',
+          },
+        ],
+        commands: [
+          {
+            id: 'format',
+            title: 'Format Document',
+            target: 'activeEditor',
+            menus: ['commandPalette', 'editor/title'],
+          },
+          {
+            id: 'generate',
+            title: 'Generate Outline',
+            target: { kind: 'panel', id: 'outline' },
+            menus: ['commandPalette', 'explorer/context'],
+          },
+        ],
+      }),
+    )
+    const text = rendered.textContent ?? ''
+    expect(text).toContain('Format Document')
+    expect(text).toContain('Acts on the active editor')
+    expect(text).toContain('the command palette, the editor action row')
+    expect(text).toContain('Generate Outline')
+    expect(text).toContain('the panel “Outline”')
+    expect(text).toContain('the explorer context menu')
   })
 
   it('warns when the plugin shares the shell origin', async () => {

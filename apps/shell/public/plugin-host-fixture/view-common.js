@@ -15,6 +15,7 @@
     subscriptions: [],
     events: [],
     results: [],
+    commands: [],
     errors: [],
     storage: 'unavailable',
     disposed: 'pending',
@@ -31,7 +32,7 @@
   function render() {
     if (observation) observation.textContent = JSON.stringify(state)
     const kind = state.view ? state.view.kind : 'view'
-    document.title = `Exo fixture ${kind} ${state.phase} events:${state.events.length} results:${state.results.length}`
+    document.title = `Exo fixture ${kind} ${state.phase} events:${state.events.length} results:${state.results.length} commands:${state.commands.length}`
   }
 
   function post(type, payload, id, replyTo) {
@@ -134,6 +135,14 @@
     }
     if (data.type === 'shell/event') {
       state.events.push(data.payload)
+      render()
+      return
+    }
+    if (data.type === 'shell/command') {
+      const command = data.payload && data.payload.command
+      const args = data.payload && data.payload.args ? data.payload.args : null
+      state.commands.push({ id: data.id, command, args })
+      post('plugin/command-result', { ok: true }, data.id)
       render()
       return
     }

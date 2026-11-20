@@ -80,6 +80,7 @@ function recordFor(manifest: PluginManifest, identity: string, index: number): P
       ...view,
       registrationOrder: order,
     })),
+    commands: [],
   }
 }
 

@@ -124,6 +124,49 @@ are user-invoked. A manifest that adds them should set `engines.exo` to a range
 that includes `0.3.0`, so older shells fail closed instead of rejecting the
 unknown field. See the [manifest contract](../contracts/plugin-manifest.md#32-panels-and-content-views).
 
+## Commands
+
+A command is an action the user starts from the palette, the explorer context
+menu or the editor action row. It runs in a frame the plugin already owns:
+
+```json
+"contributes": {
+  "panels": [
+    { "id": "reports", "title": "Reports", "location": "primary", "entry": "reports.html" }
+  ],
+  "commands": [
+    {
+      "id": "format",
+      "title": "Format Document",
+      "category": "Editing",
+      "target": "activeEditor",
+      "menus": ["commandPalette", "editor/title"]
+    },
+    {
+      "id": "generate",
+      "title": "Generate Report",
+      "target": { "kind": "panel", "id": "reports" },
+      "menus": ["commandPalette", "explorer/context"]
+    }
+  ]
+}
+```
+
+Targets are `activeEditor`, one of your panels or one of your content views. A
+view target must be declared in the same manifest and registered in the same
+session, or registration rejects the command with `target-not-registered`.
+`editor/title` requires an `activeEditor` target; `explorer/context` requires a
+panel or content-view target; the palette is the default. Declare at most 32
+commands.
+
+An explorer invocation carries `{ path, kind }` for the selected entry; palette
+and editor-title invocations carry no arguments. Long work belongs in a panel
+that reports its own progress: a command result must arrive within ten seconds.
+Commands are excluded from the consent fingerprint and named after your plugin
+on every surface. Set `engines.exo` to a range that includes `0.4.0`, so an older
+shell fails with `incompatible-engine` instead of rejecting the unknown field.
+See the [manifest contract](../contracts/plugin-manifest.md#33-commands).
+
 ## Permissions
 
 | Permission | What it allows |

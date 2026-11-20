@@ -95,6 +95,23 @@ The frame must be visible and active, and a view must use a `/`-rooted path for
 only addresses the caller's own registered panels. See the
 [protocol contract](../contracts/plugin-protocol.md#56-navigation-and-panel-intents).
 
+## Commands
+
+The shell delivers a user-invoked command to a live frame of your plugin:
+
+```text
+shell/command          { command, args?: { path, kind } }   // carries an id
+plugin/command-result  { ok: true } | { ok: false, message? } // replyTo = that id
+```
+
+An editor action goes to the active document's handler; a panel or content-view
+command reveals or opens that surface first. Explorer invocations carry the
+selected path and kind. Answer every invocation within ten seconds with exactly
+one result; the shell logs a timeout and keeps the frame mounted. The shell
+allows one in-flight invocation per command, five per plugin and a five-second
+cooldown. See the
+[protocol contract](../contracts/plugin-protocol.md#561-commands).
+
 ## Events
 
 If the manifest has `events:subscribe`, the handler can subscribe to the v1

@@ -132,6 +132,10 @@ function capabilitiesAt(value: Record<string, unknown>, path: string): EditorCap
       capabilities.requestPanel === undefined
         ? false
         : booleanAt(capabilities, 'requestPanel', `${path}.capabilities`),
+    commands:
+      capabilities.commands === undefined
+        ? false
+        : booleanAt(capabilities, 'commands', `${path}.capabilities`),
   }
 }
 

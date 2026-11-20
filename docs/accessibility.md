@@ -53,6 +53,12 @@ npm test --workspace @exo/shell -- --run \
 - `src/document/ContentViewSurface.test.tsx` covers the content-view chrome,
   plugin name, placeholder accessible name and an axe scan of the shell-owned
   nodes.
+- `src/document/DocumentArea.commands.test.tsx` covers the plugin action row:
+  the matching plugin's commands only, an accessible name that includes the
+  plugin, and an axe scan. `src/explorer/ExplorerView.commands.test.tsx` covers
+  the explorer context menu, plugin attribution, the ten-entry cap, Escape and
+  an axe scan. `src/workbench/CommandNotices.test.tsx` covers the bounded
+  plain-text notice, manual dismissal and auto-dismiss.
 
 `axe-core` cannot evaluate `color-contrast` in jsdom (no layout or canvas), so
 that rule is disabled in the test helper and covered by the token test instead.
@@ -105,6 +111,16 @@ Run against the deployed URL with the demo workspace from
 9. With a screen reader (VoiceOver on macOS, NVDA on Windows), repeat steps 2-4
    and confirm the tree announces name, level, expanded and selected state, and
    dialogs announce their title and initial control.
+10. With the deployed fixture active, open a `*.txt` file. Tab reaches the
+    document action row; the button name includes the command and the plugin.
+    Run it with Enter and confirm focus stays in the document area and no notice
+    appears. Open the explorer context menu with the keyboard (Context Menu key or
+    Shift+F10), use Arrow Up/Down between entries, Escape to close without
+    invoking, and run an explorer command; confirm the menu names the plugin.
+    Run the failing command from the palette and confirm the `role="status"`
+    notice is announced, the Dismiss button is reachable and the notice also
+    disappears after the timeout. At 200% zoom, the action row wraps without
+    clipping and the palette, menu and toolbar remain keyboard reachable.
 
 ## Known limitations
 

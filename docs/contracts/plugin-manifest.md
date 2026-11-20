@@ -197,6 +197,7 @@ settings view fails with `conflict` rather than overwriting an external edit.
 | `contributes.fileEditors` | array | no | Maximum 20. Each entry: `glob` (required), `entry` (required, relative HTML URL for the per-document iframe, inside the plugin root), `label` (required, 1-40 chars), `priority` (integer -100..100, default 0), `rendering` (`"hidden"` or `"frame"`, default `"hidden"`). Every editor entry uses the entry-resolution rules in section 4 and requires `workspace:read` or `workspace:write`. |
 | `contributes.panels` | array | no | Maximum 8 across both locations. Each entry: `id` (required, `^[a-z0-9][a-z0-9.-]{0,63}$`, unique among panels), `title` (required, 1-80 chars), `icon` (optional Codicon name, 1-40 chars, `^[a-z0-9-]+$`), `location` (`"primary"` or `"secondary"`), and `entry` (required, relative HTML page inside the plugin root). See section 3.2. |
 | `contributes.contentViews` | array | no | Maximum 16. Each entry: `id` (required, same id rule and unique among content views), `title` (required, 1-80 chars), and `entry` (required, relative HTML page inside the plugin root). A content view opens as a read-only tab. See section 3.2. |
+| `contributes.commands` | array | no | Maximum 32. Each entry: `id` (required, same id rule and unique among commands), `title` (required, 1-40 chars), optional `category` (1-40 chars), a `target` (`"activeEditor"`, `{ "kind": "panel", "id" }` or `{ "kind": "contentView", "id" }`), and optional `menus` (subset of `commandPalette`, `explorer/context`, `editor/title`; default `["commandPalette"]`). See section 3.3. |
 | `contributes.configuration` | object | no | Optional workspace settings declaration. `configuration.properties` is an object of at most 50 named settings, each with `type` (`boolean`, `string` or `number`), a required matching `default`, an optional `enum`, an optional `description`, and an optional `scope` that must be `workspace`. See section 3.1. |
 
 Unknown manifest fields are rejected at every level, like unknown `exo.json`
@@ -320,12 +321,69 @@ entry, on the manifest origin, with no query, fragment or `..` segment.
 - The shell names the plugin in the activity-bar title, secondary picker and
   content-view chrome, so a newly added surface cannot impersonate shell chrome.
 
-Panels and content views are user-invoked surfaces inside the already-approved
-root. They grant no autonomous data access and are **excluded from the consent
-fingerprint**; the first-grant dialog lists them and a later addition does not
-re-prompt. A manifest that adds these fields should declare `engines.exo` at or
-above the shell that supports them (0.3.0), so an older shell reports
+Panels, content views and commands are user-invoked surfaces inside the
+already-approved root. They grant no autonomous data access and are **excluded
+from the consent fingerprint**; the first-grant dialog lists them and a later
+addition does not re-prompt. A manifest that adds panels or content views should
+declare `engines.exo` at or above the shell that supports them (0.3.0), and one
+that adds commands at or above 0.4.0, so an older shell reports
 `incompatible-engine` rather than rejecting the unknown contribution.
+
+### 3.3 Commands
+
+A command is a user-invoked action that runs inside a live frame of the same
+plugin. It never creates a frame, and the registration frame is not a valid
+target. A command's target decides where the shell delivers it:
+
+- `"activeEditor"` — the handler frame of the active document, and only while
+  that document is handled by the same plugin identity.
+- `{ "kind": "panel", "id": "reports" }` — the plugin's own panel. The shell
+  reveals and lazily mounts the panel before delivery.
+- `{ "kind": "contentView", "id": "report" }` — the plugin's own content view.
+  The shell opens or focuses one tab keyed by `command/<commandId>`.
+
+```json
+{
+  "contributes": {
+    "panels": [
+      { "id": "reports", "title": "Reports", "location": "primary", "entry": "reports.html" }
+    ],
+    "commands": [
+      {
+        "id": "format",
+        "title": "Format Document",
+        "category": "Editing",
+        "target": "activeEditor",
+        "menus": ["commandPalette", "editor/title"]
+      },
+      {
+        "id": "generate",
+        "title": "Generate Report",
+        "target": { "kind": "panel", "id": "reports" },
+        "menus": ["commandPalette", "explorer/context"]
+      }
+    ]
+  }
+}
+```
+
+- A view target must name a panel or content view declared in the same manifest.
+  At `plugin/register-complete` the shell also requires the target to have been
+  registered in that session; otherwise the command is rejected with
+  `target-not-registered` and appears in no surface.
+- `menus` restricts placement. `editor/title` requires an `activeEditor` target
+  and `explorer/context` requires a panel or content-view target. The command
+  palette is the default and accepts any target.
+- Commands activate only after `plugin/register-complete`; the controller
+  registers a subset by id. The shell caps a manifest at 32 commands and a
+  plugin at five concurrent invocations, one in-flight invocation per command and
+  a five-second cooldown per command. Results time out after ten seconds.
+- The shell derives invocation arguments. An explorer invocation carries
+  `{ path, kind }` for the selected entry; palette and editor-title invocations
+  carry none. No file content, handle, `File` or `Blob` is forwarded, and the
+  target frame's existing permissions are the ceiling.
+- Every surface names the contributing plugin. The palette id is shell-owned and
+  synthetic, so a plugin command cannot shadow a shell command id.
 
 ### Glob rules
 
@@ -434,6 +492,9 @@ different origin is a different plugin.
 - The controller entry URL and the plugin root, plus each declared editor entry.
 - Each declared panel with its title and left/right location, and each declared
   content view with its title and that it opens as a read-only tab.
+- Each declared command with its title, whether it acts on the active editor, a
+  panel or a content view, and where it can appear (palette, explorer context
+  menu, editor action row).
 - Whether each editor renders its own frame or stays headless.
 - The requested permissions in plain language, including directory listing as
   permission to list folder contents and file names in the workspace, including
@@ -468,9 +529,9 @@ fingerprint = "v1:" + hex(sha256(JSON.stringify({
 ```
 
 `name`, `description`, `version`, `icon`, `publisher`, individual page paths,
-`contributes.configuration`, `contributes.panels` and `contributes.contentViews`
-are excluded: they are display metadata, user-edited shell state or
-user-invoked surfaces inside the already-approved root. The `rendering` flag is
+`contributes.configuration`, `contributes.panels`, `contributes.contentViews`
+and `contributes.commands` are excluded: they are display metadata, user-edited
+shell state or user-invoked surfaces inside the already-approved root. The `rendering` flag is
 included only when it is `"frame"`, so existing hidden manifests keep their stored
 consent and a hidden-to-frame change re-prompts. Changing the origin, the approved
 root, a permission or a declared glob changes the fingerprint and re-prompts.
@@ -478,8 +539,8 @@ Adding, removing or renaming a page inside the root does not, because the user
 approved the directory tree (D14). The input list is exhaustive: a new manifest
 field that changes what the plugin can do autonomously must be added to the
 fingerprint in the same change, or consent would silently cover behaviour the
-user never saw. Panels and content views only change what the user can invoke,
-so they are a deliberate exclusion, recorded in the security review.
+user never saw. Panels, content views and commands only change what the user can
+invoke, so they are a deliberate exclusion, recorded in the security review.
 `workspace:list` is a separate permission for this reason: a plugin that
 previously declared only `workspace:read` gains a different sorted permissions
 input when it adds listing, so it re-prompts, while a read-only plugin keeps its

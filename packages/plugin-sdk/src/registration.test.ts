@@ -64,6 +64,42 @@ describe('registration client', () => {
     ).toHaveLength(1)
   })
 
+  it('registers a command and exposes acceptedCommands, including an older ack', async () => {
+    const { transport, registration } = await connect()
+    registration.registerCommand('format')
+    expect(transport.last('plugin/register')?.payload).toEqual({ commands: ['format'] })
+    const result = registration.complete()
+    transport.emit({
+      exo: 1,
+      type: 'shell/register-ack',
+      payload: {
+        accepted: [],
+        acceptedCommands: ['format'],
+        rejected: [{ index: 0, kind: 'command', reason: 'target-not-registered' }],
+      },
+    })
+    await expect(result).resolves.toMatchObject({
+      acceptedCommands: ['format'],
+      rejected: [{ kind: 'command', reason: 'target-not-registered' }],
+    })
+  })
+
+  it('defaults acceptedCommands to empty on an older acknowledgement', async () => {
+    const { transport, registration } = await connect()
+    const result = registration.complete()
+    transport.emit({
+      exo: 1,
+      type: 'shell/register-ack',
+      payload: { accepted: ['**/*.template.txt'], rejected: [] },
+    })
+    await expect(result).resolves.toMatchObject({
+      accepted: ['**/*.template.txt'],
+      acceptedCommands: [],
+      acceptedPanels: [],
+      acceptedContentViews: [],
+    })
+  })
+
   it('preserves accepted and rejected contributions', async () => {
     const { transport, registration } = await connect()
     const result = registration.complete()
@@ -101,6 +137,7 @@ describe('registration client', () => {
       accepted: [],
       acceptedPanels: ['outline'],
       acceptedContentViews: ['tutorial'],
+      acceptedCommands: [],
       rejected: [{ index: 0, kind: 'panel', reason: 'not-declared' }],
     })
   })

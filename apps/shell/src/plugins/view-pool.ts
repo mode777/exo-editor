@@ -400,6 +400,47 @@ export class ViewPool {
     return this.records.get(key)?.session ?? undefined
   }
 
+  /** Wait for a revealed panel's frame to become active. */
+  waitForPanel(identity: string, panelId: string, timeoutMs = 5_000): Promise<ViewSession | null> {
+    return this.waitForSession(panelKey(identity, panelId), timeoutMs)
+  }
+
+  /** Wait for an opened content-view frame to become active. */
+  waitForContent(key: string, timeoutMs = 5_000): Promise<ViewSession | null> {
+    return this.waitForSession(key, timeoutMs)
+  }
+
+  private waitForSession(key: string, timeoutMs: number): Promise<ViewSession | null> {
+    const current = this.records.get(key)
+    if (current?.session?.active) return Promise.resolve(current.session)
+    if (!current || current.handle.phase === 'failed' || current.handle.phase === 'closed') {
+      return Promise.resolve(null)
+    }
+    return new Promise<ViewSession | null>((resolve) => {
+      let settled = false
+      let timer: ReturnType<typeof setTimeout> | null = null
+      let off: () => void = () => undefined
+      const finish = (session: ViewSession | null) => {
+        if (settled) return
+        settled = true
+        if (timer !== null) (this.clearTimeoutImpl ?? clearTimeout)(timer)
+        off()
+        resolve(session)
+      }
+      off = this.subscribe(() => {
+        const record = this.records.get(key)
+        if (record?.session?.active) {
+          finish(record.session)
+          return
+        }
+        if (!record || record.handle.phase === 'failed' || record.handle.phase === 'closed') {
+          finish(null)
+        }
+      })
+      timer = (this.setTimeoutImpl ?? setTimeout)(() => finish(null), timeoutMs)
+    })
+  }
+
   disposeTransport(): void {
     if (typeof window !== 'undefined') {
       window.removeEventListener('resize', this.handleViewportResize)

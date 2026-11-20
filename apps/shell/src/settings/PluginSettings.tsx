@@ -63,6 +63,11 @@ function IssueList({ issues }: { issues: PluginConfigIssue[] }) {
   )
 }
 
+function commandTargetLabel(command: PluginHostRecord['commands'][number]): string {
+  if (command.target === 'activeEditor') return 'active editor'
+  return `${command.target.kind === 'panel' ? 'panel' : 'content view'} ${command.target.id}`
+}
+
 function phaseText(record: PluginHostRecord | undefined): string {
   if (!record) return 'Not loaded yet'
   switch (record.phase) {
@@ -81,6 +86,7 @@ function phaseText(record: PluginHostRecord | undefined): string {
         ...record.registrations.map((editor) => editor.label),
         ...record.panels.map((panel) => panel.title),
         ...record.contentViews.map((view) => view.title),
+        ...record.commands.map((command) => command.title),
       ]
       return labels.length === 0 ? 'Active (no contributions)' : `Active — ${labels.join(', ')}`
     }
@@ -147,6 +153,16 @@ export function RuntimeRow({
           Content views:{' '}
           {record.contentViews.map((view) => (
             <code key={view.id}>{view.title}</code>
+          ))}
+        </p>
+      )}
+      {record.commands.length > 0 && (
+        <p className="exo-plugin-commands">
+          Commands:{' '}
+          {record.commands.map((command) => (
+            <code key={command.id}>
+              {command.title} ({commandTargetLabel(command)})
+            </code>
           ))}
         </p>
       )}

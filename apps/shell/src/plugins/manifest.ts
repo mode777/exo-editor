@@ -14,7 +14,9 @@ export const MANIFEST_TIMEOUT_MS = 5000
 export const MANIFEST_MAX_EDITORS = 20
 export const MANIFEST_MAX_PANELS = 8
 export const MANIFEST_MAX_CONTENT_VIEWS = 16
+export const MANIFEST_MAX_COMMANDS = 32
 export const MANIFEST_MAX_VIEW_TITLE = 80
+export const MANIFEST_MAX_COMMAND_TITLE = 40
 export const MANIFEST_MAX_ICON = 40
 export const MANIFEST_MAX_GLOB_LENGTH = 200
 export const MANIFEST_MAX_NAME = 80
@@ -49,11 +51,17 @@ export const PLUGIN_PERMISSIONS = [
 export const MANIFEST_SETTING_TYPES = ['boolean', 'string', 'number'] as const
 export const MANIFEST_RENDERINGS = ['hidden', 'frame'] as const
 export const MANIFEST_PANEL_LOCATIONS = ['primary', 'secondary'] as const
+export const MANIFEST_COMMAND_MENUS = [
+  'commandPalette',
+  'explorer/context',
+  'editor/title',
+] as const
 
 export type PluginPermission = (typeof PLUGIN_PERMISSIONS)[number]
 export type ManifestSettingType = (typeof MANIFEST_SETTING_TYPES)[number]
 export type ManifestRendering = (typeof MANIFEST_RENDERINGS)[number]
 export type ManifestPanelLocation = (typeof MANIFEST_PANEL_LOCATIONS)[number]
+export type ManifestCommandMenu = (typeof MANIFEST_COMMAND_MENUS)[number]
 export type SettingValue = boolean | string | number
 
 /** `workspace:write` implies read, so either permission grants reads. */
@@ -149,6 +157,17 @@ export interface ManifestSetting {
   scope: 'workspace'
 }
 
+export type ManifestCommandTarget =
+  'activeEditor' | { kind: 'panel'; id: string } | { kind: 'contentView'; id: string }
+
+export interface ManifestCommand {
+  id: string
+  title: string
+  category?: string
+  target: ManifestCommandTarget
+  menus: ManifestCommandMenu[]
+}
+
 export interface ManifestConfiguration {
   properties: Record<string, ManifestSetting>
 }
@@ -173,6 +192,7 @@ export interface PluginManifest {
   fileEditors: ManifestFileEditor[]
   panels: ManifestPanel[]
   contentViews: ManifestContentView[]
+  commands: ManifestCommand[]
   configuration?: ManifestConfiguration
 }
 
@@ -654,6 +674,134 @@ function parseSetting(value: unknown, base: string): ManifestSetting | ManifestI
   }
 }
 
+function parseCommandTarget(
+  value: unknown,
+  base: string,
+  panelIds: Set<string>,
+  contentViewIds: Set<string>,
+): ManifestCommandTarget | ManifestIssue {
+  if (value === 'activeEditor') return 'activeEditor'
+  if (!isPlainObject(value)) return issue('invalid-manifest', { field: `${base}/target` })
+  const unknown = unknownKeys(value, ['kind', 'id'], `${base}/target`)
+  if (unknown) return unknown
+  if (typeof value.id !== 'string' || !CONTRIBUTION_ID.test(value.id)) {
+    return issue('invalid-manifest', { field: `${base}/target/id` })
+  }
+  if (value.kind === 'panel') {
+    if (!panelIds.has(value.id)) {
+      return issue('invalid-manifest', {
+        field: `${base}/target/id`,
+        message: `Command target panel "${value.id}" is not declared.`,
+      })
+    }
+    return { kind: 'panel', id: value.id }
+  }
+  if (value.kind === 'contentView') {
+    if (!contentViewIds.has(value.id)) {
+      return issue('invalid-manifest', {
+        field: `${base}/target/id`,
+        message: `Command target content view "${value.id}" is not declared.`,
+      })
+    }
+    return { kind: 'contentView', id: value.id }
+  }
+  return issue('invalid-manifest', { field: `${base}/target/kind` })
+}
+
+function parseCommandMenus(
+  value: unknown,
+  base: string,
+  target: ManifestCommandTarget,
+): ManifestCommandMenu[] | ManifestIssue {
+  if (!Array.isArray(value) || value.length > MANIFEST_COMMAND_MENUS.length) {
+    return issue('invalid-manifest', { field: `${base}/menus` })
+  }
+  const menus: ManifestCommandMenu[] = []
+  for (const item of value) {
+    if (
+      typeof item !== 'string' ||
+      !(MANIFEST_COMMAND_MENUS as readonly string[]).includes(item) ||
+      menus.includes(item as ManifestCommandMenu)
+    ) {
+      return issue('invalid-manifest', { field: `${base}/menus` })
+    }
+    menus.push(item as ManifestCommandMenu)
+  }
+  const isViewTarget = target !== 'activeEditor'
+  if (menus.includes('editor/title') && target !== 'activeEditor') {
+    return issue('invalid-manifest', {
+      field: `${base}/menus`,
+      message: 'editor/title requires an activeEditor target.',
+    })
+  }
+  if (menus.includes('explorer/context') && !isViewTarget) {
+    return issue('invalid-manifest', {
+      field: `${base}/menus`,
+      message: 'explorer/context requires a panel or content-view target.',
+    })
+  }
+  return menus
+}
+
+function parseCommands(
+  value: unknown,
+  panels: ManifestPanel[],
+  contentViews: ManifestContentView[],
+): ManifestCommand[] | ManifestIssue {
+  if (!Array.isArray(value) || value.length > MANIFEST_MAX_COMMANDS) {
+    return issue('invalid-manifest', { field: '/contributes/commands' })
+  }
+  const commands: ManifestCommand[] = []
+  const ids = new Set<string>()
+  const panelIds = new Set(panels.map((panel) => panel.id))
+  const contentViewIds = new Set(contentViews.map((view) => view.id))
+  for (let index = 0; index < value.length; index += 1) {
+    const raw = value[index]
+    const base = pointer('contributes', 'commands', index)
+    if (!isPlainObject(raw)) return issue('invalid-manifest', { field: base })
+    const unknown = unknownKeys(raw, ['id', 'title', 'category', 'target', 'menus'], base)
+    if (unknown) return unknown
+    if (typeof raw.id !== 'string' || !CONTRIBUTION_ID.test(raw.id)) {
+      return issue('invalid-manifest', { field: `${base}/id` })
+    }
+    if (ids.has(raw.id)) {
+      return issue('invalid-manifest', {
+        field: `${base}/id`,
+        message: 'A command id may be declared only once.',
+      })
+    }
+    ids.add(raw.id)
+    if (!isStringInRange(raw.title, 1, MANIFEST_MAX_COMMAND_TITLE)) {
+      return issue('invalid-manifest', { field: `${base}/title` })
+    }
+    if (
+      raw.category !== undefined &&
+      !isStringInRange(raw.category, 1, MANIFEST_MAX_COMMAND_TITLE)
+    ) {
+      return issue('invalid-manifest', { field: `${base}/category` })
+    }
+    if (!hasOwn(raw, 'target')) {
+      return issue('invalid-manifest', { field: `${base}/target` })
+    }
+    const target = parseCommandTarget(raw.target, base, panelIds, contentViewIds)
+    if (typeof target !== 'string' && 'code' in target) return target
+    let menus: ManifestCommandMenu[] = ['commandPalette']
+    if (hasOwn(raw, 'menus')) {
+      const parsed = parseCommandMenus(raw.menus, base, target)
+      if ('code' in parsed) return parsed
+      menus = parsed
+    }
+    commands.push({
+      id: raw.id,
+      title: raw.title,
+      ...(typeof raw.category === 'string' ? { category: raw.category } : {}),
+      target,
+      menus,
+    })
+  }
+  return commands
+}
+
 function parseConfiguration(value: unknown): ManifestConfiguration | ManifestIssue {
   const base = '/contributes/configuration'
   if (!isPlainObject(value)) return issue('invalid-manifest', { field: base })
@@ -776,12 +924,13 @@ export function validateManifest(
   let fileEditors: ManifestFileEditor[] = []
   let panels: ManifestPanel[] = []
   let contentViews: ManifestContentView[] = []
+  let commands: ManifestCommand[] = []
   let configuration: ManifestConfiguration | undefined
   if (hasOwn(value, 'contributes')) {
     if (!isPlainObject(value.contributes)) return invalid('/contributes')
     const contributesUnknown = unknownKeys(
       value.contributes,
-      ['fileEditors', 'panels', 'contentViews', 'configuration'],
+      ['fileEditors', 'panels', 'contentViews', 'commands', 'configuration'],
       '/contributes',
     )
     if (contributesUnknown) return { ok: false, error: contributesUnknown }
@@ -820,6 +969,11 @@ export function validateManifest(
       if ('code' in parsed) return { ok: false, error: parsed }
       configuration = parsed
     }
+    if (hasOwn(value.contributes, 'commands')) {
+      const parsed = parseCommands(value.contributes.commands, panels, contentViews)
+      if (!Array.isArray(parsed)) return { ok: false, error: parsed }
+      commands = parsed
+    }
   }
 
   return {
@@ -846,6 +1000,7 @@ export function validateManifest(
       fileEditors,
       panels,
       contentViews,
+      commands,
       ...(configuration ? { configuration } : {}),
     },
   }

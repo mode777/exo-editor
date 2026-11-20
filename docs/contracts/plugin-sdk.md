@@ -18,7 +18,7 @@ enough to ship a plugin.
 
 | Artifact                                            | Version | Packaging                                        |
 | --------------------------------------------------- | ------- | ------------------------------------------------ |
-| `packages/plugin-sdk` (`@exo/plugin-sdk`)           | `1.5.0` | Private workspace package; no runtime dependency |
+| `packages/plugin-sdk` (`@exo/plugin-sdk`)           | `1.6.0` | Private workspace package; no runtime dependency |
 | `packages/plugin-template` (`@exo/plugin-template`) | `0.1.0` | Private workspace package; built static assets   |
 
 - The SDK MAJOR equals the protocol major it speaks. `PROTOCOL_VERSION` and
@@ -27,8 +27,9 @@ enough to ship a plugin.
   additive `requestFiles()` helper, `1.3.0` adds the additive
   `listDirectory()` helper, `1.4.0` adds the additive local-event helpers and
   `1.5.0` adds the view client, panel/content-view registration and the
-  `openFile()`, `openView()` and `requestPanel()` helpers, all without changing
-  the protocol major.
+  `openFile()`, `openView()` and `requestPanel()` helpers, and `1.6.0` adds
+  command registration, `onCommand()` and the command support bit, all without
+  changing the protocol major.
 - The packages are not published in v1 (D12). Consumers in this repository use
   the workspace copy. A future publication adds a built `dist` and does not
   change the message protocol.
@@ -107,14 +108,15 @@ sent after the failure.
 register({ glob, entry, label? })   -> one plugin/register
 registerPanel(id)                   -> one plugin/register with { panels: [id] }
 registerContentView(id)             -> one plugin/register with { contentViews: [id] }
+registerCommand(id)                 -> one plugin/register with { commands: [id] }
 complete()                          -> one plugin/register-complete, then shell/register-ack
 ```
 
 - `complete()` resolves with
-  `{ accepted: string[], acceptedPanels: string[], acceptedContentViews: string[], rejected: RejectedContribution[] }`.
+  `{ accepted: string[], acceptedPanels: string[], acceptedContentViews: string[], acceptedCommands: string[], rejected: RejectedContribution[] }`.
   Each rejection carries its index, stable reason, optional `kind` and optional
-  message. An older shell's acknowledgement omits the two view arrays; the SDK
-  reports them as empty rather than failing the editor registrations.
+  message. An older shell's acknowledgement omits the view and command arrays;
+  the SDK reports them as empty rather than failing the editor registrations.
 - A second `complete()` rejects locally as `protocol-violation` and sends no
   second message.
 - A registration call after completion rejects locally.
@@ -129,7 +131,7 @@ complete()                          -> one plugin/register-complete, then shell/
 ```ts
 editor.file // FileMetadata from shell/init, no content
 editor.capabilities // read, write, requestFiles, filePicker, directoryListing, localEvents,
-                   // openFile, openView, requestPanel
+                   // openFile, openView, requestPanel, commands
 editor.limits // maxFileSize, maxRequestBytes
 editor.settings // resolved shell settings
 editor.readFile(path, 'utf8' | 'binary')
@@ -140,6 +142,7 @@ editor.requestSave()
 editor.onSaveRequest(handler)
 editor.onSaveResult(listener)
 editor.onFileChanged(listener)
+editor.onCommand(handler)
 editor.onDispose(listener)
 editor.onError(listener)
 editor.subscribe(topic)
@@ -210,6 +213,7 @@ view.listDirectory(path, { cursor? })
 view.openFile(path)
 view.openView({ pluginId?, viewId, instanceKey?, payload? })
 view.requestPanel(panel, 'show' | 'hide' | 'toggle')
+view.onCommand(handler)
 view.onDispose(listener)
 view.onError(listener)
 view.subscribe(topic)
@@ -256,6 +260,28 @@ requestPanel(panel, action)                     -> { panel, open }
 - An older shell omits the support bits; the helpers reject locally and send no
   message, so a plugin can keep its previous UI.
 
+## 7.3 Command handler
+
+Both clients expose one handler for shell-delivered commands:
+
+```ts
+onCommand(handler) -> unsubscribe
+handler({ command, args? }) -> void | { ok: true } | { ok: false, message? }
+```
+
+- Each incoming `shell/command` is answered automatically with exactly one
+  `plugin/command-result` whose `replyTo` is the invocation id. A resolved
+  promise or `void` return is success; a thrown error or `{ ok: false }` sends a
+  bounded failure message of at most 200 characters.
+- `args` is `{ path, kind }` only for an explorer invocation. The handler receives
+  it unchanged and never receives file content.
+- Up to ten commands that arrive before a handler is attached are queued and
+  dispatched when it is attached; the eleventh is answered with a failure so the
+  shell's timeout cannot hang. Messages after disposal are ignored.
+- `supportsCommands` reports `capabilities.commands`, which is false when an
+  older shell omits the bit. The SDK sends no command-related message on its own;
+  a plugin can keep its previous UI when the bit is false.
+
 ## 8. Event client
 
 - `subscribe(topic)` sends `plugin/subscribe` and resolves `{ topic, seq }` from
@@ -300,6 +326,9 @@ requestPanel(panel, action)                     -> { panel, open }
   an existing method or the meaning of a shell topic. A shell that predates them
   omits `capabilities.localEvents`; the SDK treats absence as false and rejects
   local calls locally.
+- Command registration and `onCommand()` are an additive minor (`1.6.0`). A shell
+  that predates them omits `capabilities.commands`; the SDK treats absence as
+  false and never fabricates a command result.
 - A deprecated SDK export remains functional for the rest of the current major,
   carries an `@deprecated` note with its replacement and is removed only at the
   next major.

@@ -3,10 +3,7 @@
   "$id": "urn:exo:schema:v1",
   "title": "Exo workspace and plugin manifests (v1)",
   "description": "Shared shape for exo.json and exo-manifest.json. Semantic rules that JSON Schema cannot express - duplicate manifest URLs, origin equality, plugin-root containment, engine compatibility and consent - are enforced by the validator and specified in docs/contracts/plugin-manifest.md.",
-  "oneOf": [
-    { "$ref": "#/$defs/exoFile" },
-    { "$ref": "#/$defs/exoManifest" }
-  ],
+  "oneOf": [{ "$ref": "#/$defs/exoFile" }, { "$ref": "#/$defs/exoManifest" }],
   "$defs": {
     "httpsUrl": {
       "type": "string",
@@ -124,6 +121,55 @@
         "entry": { "$ref": "#/$defs/relativePage" }
       }
     },
+    "commandTarget": {
+      "oneOf": [
+        { "const": "activeEditor" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "id"],
+          "properties": {
+            "kind": { "const": "panel" },
+            "id": { "$ref": "#/$defs/contributionId" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "id"],
+          "properties": {
+            "kind": { "const": "contentView" },
+            "id": { "$ref": "#/$defs/contributionId" }
+          }
+        }
+      ]
+    },
+    "command": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "target"],
+      "properties": {
+        "id": { "$ref": "#/$defs/contributionId" },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "category": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "target": { "$ref": "#/$defs/commandTarget" },
+        "menus": {
+          "type": "array",
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": { "enum": ["commandPalette", "explorer/context", "editor/title"] },
+          "$comment": "editor/title requires an activeEditor target and explorer/context requires a panel or content-view target; the validator enforces the pairing."
+        }
+      }
+    },
     "settingKey": {
       "type": "string",
       "minLength": 1,
@@ -197,6 +243,11 @@
           "maxItems": 16,
           "items": { "$ref": "#/$defs/contentView" }
         },
+        "commands": {
+          "type": "array",
+          "maxItems": 32,
+          "items": { "$ref": "#/$defs/command" }
+        },
         "configuration": { "$ref": "#/$defs/configuration" }
       }
     },
@@ -251,10 +302,7 @@
           "maxLength": 256
         },
         "icon": {
-          "oneOf": [
-            { "$ref": "#/$defs/httpsUrl" },
-            { "$ref": "#/$defs/relativeAsset" }
-          ]
+          "oneOf": [{ "$ref": "#/$defs/httpsUrl" }, { "$ref": "#/$defs/relativeAsset" }]
         },
         "engines": {
           "type": "object",

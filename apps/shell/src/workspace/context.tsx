@@ -5,6 +5,7 @@ import type { PluginConfigSnapshot } from '../plugins/store'
 import type { PluginHostSnapshot } from '../plugins/host'
 import type { ViewHandle } from '../plugins/view-pool'
 import type { PluginSettingsSnapshot } from '../plugins/settings'
+import type { CommandControllerSnapshot } from '../plugins/commands'
 import type { FilePickerView } from '../plugins/file-picker'
 import type { WorkspaceRuntime, WorkspaceSnapshot } from './runtime'
 
@@ -72,6 +73,15 @@ export function useViewPoolSnapshot(): ViewHandle[] {
     runtime.views.subscribe,
     runtime.views.getSnapshot,
     runtime.views.getSnapshot,
+  )
+}
+
+export function useCommandNotices(): CommandControllerSnapshot {
+  const runtime = useWorkspaceRuntime()
+  return useSyncExternalStore(
+    runtime.commands.subscribe,
+    runtime.commands.getSnapshot,
+    runtime.commands.getSnapshot,
   )
 }
 

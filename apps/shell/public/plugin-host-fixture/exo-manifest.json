@@ -2,13 +2,13 @@
   "schemaVersion": 1,
   "id": "com.example.exo.fixture",
   "name": "Exo Host Fixture",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "A stub plugin used to verify the Exo plugin host and file editors.",
   "publisher": {
     "name": "Exo"
   },
   "engines": {
-    "exo": ">=0.3.0"
+    "exo": ">=0.4.0"
   },
   "runtime": {
     "entry": "plugin.html"
@@ -43,6 +43,33 @@
         "id": "fixture-tutorial",
         "title": "Fixture Tutorial",
         "entry": "view-content.html"
+      }
+    ],
+    "commands": [
+      {
+        "id": "fixture.format",
+        "title": "Format Fixture",
+        "category": "Fixture",
+        "target": "activeEditor",
+        "menus": ["commandPalette", "editor/title"]
+      },
+      {
+        "id": "fixture.generate",
+        "title": "Generate Fixture Report",
+        "target": { "kind": "panel", "id": "fixture-panel" },
+        "menus": ["commandPalette", "explorer/context"]
+      },
+      {
+        "id": "fixture.inspect",
+        "title": "Inspect Fixture View",
+        "target": { "kind": "contentView", "id": "fixture-tutorial" },
+        "menus": ["commandPalette"]
+      },
+      {
+        "id": "fixture.fail",
+        "title": "Fail Fixture Command",
+        "target": "activeEditor",
+        "menus": ["commandPalette"]
       }
     ],
     "configuration": {

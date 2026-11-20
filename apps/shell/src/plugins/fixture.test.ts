@@ -15,7 +15,7 @@ describe('deployed plugin fixture', () => {
     const result = validateManifest(
       JSON.parse(raw) as unknown,
       'https://mode777.github.io/exo-editor/plugin-host-fixture/exo-manifest.json',
-      '0.3.0',
+      '0.4.0',
     )
     expect(result.ok).toBe(true)
     if (!result.ok) return
@@ -35,6 +35,33 @@ describe('deployed plugin fixture', () => {
       'fixture-inspector-2',
     ])
     expect(result.manifest.contentViews.map((view) => view.id)).toEqual(['fixture-tutorial'])
+    expect(result.manifest.commands).toEqual([
+      {
+        id: 'fixture.format',
+        title: 'Format Fixture',
+        category: 'Fixture',
+        target: 'activeEditor',
+        menus: ['commandPalette', 'editor/title'],
+      },
+      {
+        id: 'fixture.generate',
+        title: 'Generate Fixture Report',
+        target: { kind: 'panel', id: 'fixture-panel' },
+        menus: ['commandPalette', 'explorer/context'],
+      },
+      {
+        id: 'fixture.inspect',
+        title: 'Inspect Fixture View',
+        target: { kind: 'contentView', id: 'fixture-tutorial' },
+        menus: ['commandPalette'],
+      },
+      {
+        id: 'fixture.fail',
+        title: 'Fail Fixture Command',
+        target: 'activeEditor',
+        menus: ['commandPalette'],
+      },
+    ])
     for (const page of [
       ...result.manifest.panels.map((panel) => panel.entry),
       ...result.manifest.contentViews.map((view) => view.entry),
@@ -72,6 +99,7 @@ describe('deployed plugin fixture', () => {
         fileEditors: Array<{ glob: string; entry: string }>
         panels: Array<{ id: string }>
         contentViews: Array<{ id: string }>
+        commands: Array<{ id: string }>
       }
     }
     const controller = readFileSync(resolve(fixtureDir, 'plugin.html'), 'utf8')
@@ -85,6 +113,9 @@ describe('deployed plugin fixture', () => {
     for (const view of manifest.contributes.contentViews) {
       expect(controller).toContain(`'${view.id}'`)
     }
+    for (const command of manifest.contributes.commands) {
+      expect(controller).toContain(`'${command.id}'`)
+    }
   })
 
   it('declares a second identity for cross-plugin local-event and view checks', () => {
@@ -92,7 +123,7 @@ describe('deployed plugin fixture', () => {
     const result = validateManifest(
       JSON.parse(raw) as unknown,
       'https://mode777.github.io/exo-editor/plugin-host-fixture/other-manifest.json',
-      '0.3.0',
+      '0.4.0',
     )
     expect(result.ok).toBe(true)
     if (!result.ok) return

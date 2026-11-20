@@ -3,6 +3,48 @@
 All notable changes to Exo Editor are recorded here. The version axes and the
 release process are in [`docs/releases.md`](./docs/releases.md).
 
+## [0.4.0] - 2026-11-20
+
+Additive post-release update: plugin commands in shell-owned surfaces.
+
+### Added
+
+- `contributes.commands` (at most 32) with `id`, `title`, optional `category`,
+  a target (`activeEditor`, a declared panel or a declared content view) and
+  optional `menus` (`commandPalette`, `explorer/context`, `editor/title`).
+  `editor/title` requires an `activeEditor` target and `explorer/context`
+  requires a panel or content-view target.
+- `plugin/register.commands`, additive `acceptedCommands` in
+  `shell/register-ack`, and `target-not-registered` at
+  `plugin/register-complete` when a command's view target was not registered in
+  the same session.
+- `shell/command` and `plugin/command-result`, with shell-derived
+  `{ path, kind }` arguments for explorer invocations, a ten-second result
+  timeout, one in-flight invocation per command, five concurrent invocations per
+  plugin, a five-second cooldown and a 200-character plain-text failure notice.
+- Shell-owned palette entries with synthetic ids, explorer context entries and
+  an editor action row, all attributed to the plugin by name.
+- `capabilities.commands` in editor and view init; absence means an older shell.
+- `@exo/plugin-sdk` `1.6.0` with `registerCommand()`, `onCommand()` on editor and
+  view clients, the ten-message early queue and automatic success and failure
+  results.
+- Commands are listed in the first-grant consent prompt and are deliberately
+  excluded from the consent fingerprint.
+
+### Compatibility
+
+- Shell: `0.4.0`
+- Protocol: `1`
+- Manifest schema: `1`
+- SDK: `1.6.0`
+
+### Breaking
+
+- None. The manifest field, registration field, messages, capability and SDK
+  helpers are additive within protocol major `1`. A plugin that adopts the field
+  must declare an `engines.exo` range that includes `0.4.0`; an older shell
+  reports `incompatible-engine` rather than mounting a partial surface.
+
 ## [0.3.0] - 2026-11-20
 
 Additive post-release update: plugin panels, content views and navigation intents.

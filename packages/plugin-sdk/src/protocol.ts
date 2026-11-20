@@ -5,7 +5,7 @@
  */
 
 export const PROTOCOL_VERSION = '1'
-export const SDK_VERSION = '1.5.0'
+export const SDK_VERSION = '1.6.0'
 
 export const READY_TIMEOUT_MS = 10_000
 export const REGISTRATION_TIMEOUT_MS = 10_000
@@ -104,6 +104,8 @@ export interface EditorCapabilities {
   openView: boolean
   /** Shell support bit for `plugin/request-panel`. */
   requestPanel: boolean
+  /** Shell support bit for `shell/command`; absent on older shells. */
+  commands: boolean
 }
 
 export type ViewCapabilities = EditorCapabilities
@@ -211,7 +213,7 @@ export type RegistrationRejectionReason =
 export interface RejectedContribution {
   index: number
   reason: RegistrationRejectionReason
-  kind?: 'fileEditor' | 'panel' | 'contentView'
+  kind?: 'fileEditor' | 'panel' | 'contentView' | 'command'
   message?: string
 }
 
@@ -219,7 +221,30 @@ export interface RegistrationAck {
   accepted: string[]
   acceptedPanels: string[]
   acceptedContentViews: string[]
+  acceptedCommands: string[]
   rejected: RejectedContribution[]
+}
+
+export interface CommandArgs {
+  path: string
+  kind: 'file' | 'directory'
+}
+
+export interface CommandInvocation {
+  /** The registered command id. */
+  command: string
+  args?: CommandArgs
+}
+
+export type CommandHandlerResult = void | { ok: true } | { ok: false; message?: string }
+
+export type CommandHandler = (
+  invocation: CommandInvocation,
+) => CommandHandlerResult | Promise<CommandHandlerResult>
+
+export interface CommandResult {
+  ok: boolean
+  message?: string
 }
 
 export interface OpenViewOptions {

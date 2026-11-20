@@ -45,6 +45,7 @@ function manifest(overrides: Partial<PluginManifest> = {}): PluginManifest {
     ],
     panels: [],
     contentViews: [],
+    commands: [],
     ...overrides,
   }
 }
@@ -222,6 +223,34 @@ describe('consent fingerprint', () => {
       digest,
     )
     expect(withViews).toBe(base)
+  })
+
+  it('ignores commands and keeps an existing consent record valid', async () => {
+    const base = await computeFingerprint(manifest(), digest)
+    const command = {
+      id: 'format',
+      title: 'Format Document',
+      target: 'activeEditor' as const,
+      menus: ['commandPalette' as const],
+    }
+    const withCommand = await computeFingerprint(manifest({ commands: [command] }), digest)
+    expect(withCommand).toBe(base)
+    expect(
+      await computeFingerprint(
+        manifest({
+          commands: [{ ...command, id: 'other', title: 'Other', target: 'activeEditor' }],
+        }),
+        digest,
+      ),
+    ).toBe(base)
+    expect(await computeFingerprint(manifest({ commands: [] }), digest)).toBe(base)
+
+    const storage = new FakeStorage()
+    const store = new ConsentStore({ storage })
+    expect(store.grant({ ...record, fingerprint: base })).toBe(true)
+    const stored = store.get(record.manifestOrigin, record.pluginId)
+    expect(stored).toMatchObject({ fingerprint: base })
+    expect(stored?.version).toBe(record.version)
   })
 
   it('re-prompts when listing is added and keeps read-only consent stable', async () => {

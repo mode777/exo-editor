@@ -63,6 +63,7 @@ function record(): PluginHostRecord {
       ...view,
       registrationOrder: order,
     })),
+    commands: [],
   }
 }
 

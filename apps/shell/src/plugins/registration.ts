@@ -2,6 +2,7 @@ import { compileGlob } from './glob'
 import {
   hasWorkspaceRead,
   resolvePluginEntry,
+  type ManifestCommand,
   type ManifestContentView,
   type ManifestFileEditor,
   type ManifestPanel,
@@ -64,13 +65,22 @@ export interface RegisteredContentView extends ManifestContentView {
   registrationOrder: number
 }
 
+export interface RegisteredCommand extends ManifestCommand {
+  /** Arrival order within this plugin, starting at zero. */
+  registrationOrder: number
+}
+
 export type RegistrationRejectionReason =
-  'not-declared' | 'permission-denied' | 'invalid-glob' | 'invalid-contribution'
+  | 'not-declared'
+  | 'permission-denied'
+  | 'invalid-glob'
+  | 'invalid-contribution'
+  | 'target-not-registered'
 
 export interface RejectedContribution {
   index: number
   reason: RegistrationRejectionReason
-  kind?: 'fileEditor' | 'panel' | 'contentView'
+  kind?: 'fileEditor' | 'panel' | 'contentView' | 'command'
   message?: string
 }
 
@@ -78,6 +88,7 @@ export interface RegistrationAck {
   accepted: string[]
   acceptedPanels: string[]
   acceptedContentViews: string[]
+  acceptedCommands: string[]
   rejected: RejectedContribution[]
 }
 
@@ -87,6 +98,7 @@ export type RegistrationOutcome =
       editors: RegisteredEditor[]
       panels: RegisteredPanel[]
       contentViews: RegisteredContentView[]
+      commands: RegisteredCommand[]
       ack: RegistrationAck
     }
   | { kind: 'failed'; code: RegistrationErrorCode; phase: RegistrationPhase; message?: string }
@@ -126,6 +138,10 @@ function manifestContentViewFor(
   return manifest.contentViews.find((view) => view.id === id)
 }
 
+function manifestCommandFor(manifest: PluginManifest, id: string): ManifestCommand | undefined {
+  return manifest.commands.find((command) => command.id === id)
+}
+
 /**
  * One controller frame's registration lifetime. The outcome is delivered once;
  * the frame is removed after the acknowledgement delay. All state changes are
@@ -157,6 +173,10 @@ export class RegistrationSession {
   private readonly pending = new Map<string, RegisteredEditor>()
   private readonly pendingPanels = new Map<string, RegisteredPanel>()
   private readonly pendingContentViews = new Map<string, RegisteredContentView>()
+  private readonly pendingCommands = new Map<
+    string,
+    { command: ManifestCommand; index: number; registrationOrder: number }
+  >()
   private readonly rejected: RejectedContribution[] = []
 
   constructor(options: RegistrationSessionOptions) {
@@ -211,6 +231,7 @@ export class RegistrationSession {
     this.pending.clear()
     this.pendingPanels.clear()
     this.pendingContentViews.clear()
+    this.pendingCommands.clear()
     this.frame?.close()
   }
 
@@ -241,6 +262,7 @@ export class RegistrationSession {
     this.pending.clear()
     this.pendingPanels.clear()
     this.pendingContentViews.clear()
+    this.pendingCommands.clear()
     this.frame?.close()
     this.options.onOutcome({ kind: 'failed', code, phase, message })
   }
@@ -304,6 +326,7 @@ export class RegistrationSession {
       case 'plugin/unsubscribe':
       case 'plugin/publish':
       case 'plugin/dispose-ack':
+      case 'plugin/command-result':
         this.violation(envelope)
         return
       default:
@@ -444,6 +467,33 @@ export class RegistrationSession {
         this.registrationOrder += 1
       }
     }
+
+    if (payload.commands !== undefined) {
+      if (!Array.isArray(payload.commands)) {
+        this.violation(envelope)
+        return
+      }
+      for (const raw of payload.commands) {
+        const index = this.contributionIndex
+        this.contributionIndex += 1
+        if (typeof raw !== 'string') {
+          this.rejected.push({ index, kind: 'command', reason: 'invalid-contribution' })
+          continue
+        }
+        const declared = manifestCommandFor(this.options.manifest, raw)
+        if (!declared) {
+          this.rejected.push({ index, kind: 'command', reason: 'not-declared' })
+          continue
+        }
+        if (this.pendingCommands.has(raw)) continue
+        this.pendingCommands.set(raw, {
+          command: declared,
+          index,
+          registrationOrder: this.registrationOrder,
+        })
+        this.registrationOrder += 1
+      }
+    }
   }
 
   private validateContribution(
@@ -518,10 +568,35 @@ export class RegistrationSession {
     const editors = [...this.pending.values()]
     const panels = [...this.pendingPanels.values()]
     const contentViews = [...this.pendingContentViews.values()]
+    const commands: RegisteredCommand[] = []
+    for (const entry of this.pendingCommands.values()) {
+      const target = entry.command.target
+      const targetRegistered =
+        target === 'activeEditor'
+          ? true
+          : target.kind === 'panel'
+            ? this.pendingPanels.has(target.id)
+            : this.pendingContentViews.has(target.id)
+      if (!targetRegistered) {
+        this.rejected.push({
+          index: entry.index,
+          kind: 'command',
+          reason: 'target-not-registered',
+          message:
+            target === 'activeEditor'
+              ? undefined
+              : `Command target ${target.id} is not registered.`,
+        })
+        continue
+      }
+      commands.push({ ...entry.command, registrationOrder: entry.registrationOrder })
+    }
+    this.rejected.sort((left, right) => left.index - right.index)
     const ack: RegistrationAck = {
       accepted: editors.map((editor) => editor.glob),
       acceptedPanels: panels.map((panel) => panel.id),
       acceptedContentViews: contentViews.map((view) => view.id),
+      acceptedCommands: commands.map((command) => command.id),
       rejected: this.rejected,
     }
     this.phase = 'complete'
@@ -530,6 +605,6 @@ export class RegistrationSession {
     this.closeTimer = this.setTimeoutImpl(() => {
       this.close()
     }, ACK_CLOSE_DELAY_MS)
-    this.options.onOutcome({ kind: 'active', editors, panels, contentViews, ack })
+    this.options.onOutcome({ kind: 'active', editors, panels, contentViews, commands, ack })
   }
 }

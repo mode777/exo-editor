@@ -32,6 +32,7 @@ import { shellCodeFor } from '../plugins/frame-session'
 import { FilePickerController } from '../plugins/file-picker'
 import type { FrameTransport } from '../plugins/frame'
 import { PluginSettingsStore, type PluginSettingsStorage } from '../plugins/settings'
+import { PluginCommandController, type CommandTargetSession } from '../plugins/commands'
 import { EventBus, FileChangeCoalescer, SelfWriteEcho, type ThemeName } from '../plugins/events'
 import { FolderWorkspaceProvider } from './providers/folder/provider'
 import { IndexedDbHandleStore, type HandleStore } from './providers/folder/handle-store'
@@ -62,6 +63,7 @@ import {
 } from '../workbench/tabs'
 import { pluginViewId } from '../workbench/plugin-views'
 import type { ViewPluginInfo } from '../plugins/view-pool'
+import { contentViewKey } from '../plugins/view-pool'
 import type { PluginManifest } from '../plugins/manifest'
 
 export type WorkspacePhase =
@@ -141,6 +143,7 @@ export class WorkspaceRuntime {
   readonly events: EventBus
   readonly filePicker: FilePickerController
   readonly pluginSettings: PluginSettingsStore
+  readonly commands: PluginCommandController
 
   private readonly fileChanges: FileChangeCoalescer
   private readonly echoes: SelfWriteEcho
@@ -217,6 +220,13 @@ export class WorkspaceRuntime {
     this.pluginHost.setHandlerLifecycle(this.handlers)
     this.pluginHost.setViewLifecycle({
       closeFor: (identity) => this.closeViewsFor(identity),
+    })
+    this.commands = new PluginCommandController({
+      host: this.pluginHost,
+      activeEditor: (identity) => this.activeEditorTarget(identity),
+      revealPanel: (identity, panelId) => this.revealCommandPanel(identity, panelId),
+      openContentView: (identity, viewId, instanceKey) =>
+        this.openCommandContentView(identity, viewId, instanceKey),
     })
     this.fileChanges = new FileChangeCoalescer({
       publish: (payload) => {
@@ -493,29 +503,74 @@ export class WorkspaceRuntime {
 
   /** Open a content view from the shell palette or a "Show View" entry. */
   openContentView(identity: string, viewId: string): void {
+    this.contentInstance += 1
+    void this.openContentViewWithKey(identity, viewId, `shell-${this.contentInstance}`)
+  }
+
+  private openContentViewWithKey(identity: string, viewId: string, instanceKey: string): boolean {
     const record = this.pluginHost
       .getSnapshot()
       .records.find((entry) => entry.identity === identity && entry.phase === 'active')
-    if (!record?.identity || !record.manifest) return
+    if (!record?.identity || !record.manifest) return false
     const view = record.contentViews.find((entry) => entry.id === viewId)
-    if (!view) return
+    if (!view) return false
     const plugin = viewPluginInfo(record)
-    this.contentInstance += 1
-    const instanceKey = `shell-${this.contentInstance}`
     const opened = this.views.openContent({
       plugin,
       view: { id: view.id, title: view.title, entryUrl: view.entryUrl },
       instanceKey,
     })
-    if (!opened.ok) return
-    openContentViewTab({
-      key: opened.key,
-      title: view.title,
-      pluginName: plugin.pluginName,
-      identity: plugin.identity,
-      viewId: view.id,
-      instanceKey,
-    })
+    if (!opened.ok) return false
+    if (opened.existing) {
+      useWorkbenchStore.getState().activateTab(opened.key)
+    } else {
+      openContentViewTab({
+        key: opened.key,
+        title: view.title,
+        pluginName: plugin.pluginName,
+        identity: plugin.identity,
+        viewId: view.id,
+        instanceKey,
+      })
+    }
+    return true
+  }
+
+  private activeEditorTarget(identity: string): CommandTargetSession | null {
+    const path = activeDocumentPath()
+    if (!path) return null
+    const document = this.documents.get(path)
+    if (
+      document?.surface !== 'plugin' ||
+      document.pluginPhase !== 'active' ||
+      document.editor?.identity !== identity
+    ) {
+      return null
+    }
+    return this.handlers.get(path) ?? null
+  }
+
+  private async revealCommandPanel(
+    identity: string,
+    panelId: string,
+  ): Promise<CommandTargetSession | null> {
+    const record = this.pluginHost
+      .getSnapshot()
+      .records.find((entry) => entry.identity === identity && entry.phase === 'active')
+    const panel = record?.panels.find((entry) => entry.id === panelId)
+    if (!record?.identity || !panel) return null
+    this.showPanel(pluginViewId(record.identity, panel.id), panel.location)
+    return this.views.waitForPanel(record.identity, panel.id)
+  }
+
+  private async openCommandContentView(
+    identity: string,
+    viewId: string,
+    instanceKey: string,
+  ): Promise<CommandTargetSession | null> {
+    if (!this.openContentViewWithKey(identity, viewId, instanceKey)) return null
+    const key = contentViewKey(identity, viewId, instanceKey)
+    return this.views.waitForContent(key)
   }
 
   private async openFileIntent(
@@ -630,6 +685,7 @@ export class WorkspaceRuntime {
     if (this.disposed) return
     this.disposed = true
     this.reservedDocumentHandler = null
+    this.commands.reset()
     this.pluginHost.dispose()
     this.handlers.disposeTransport()
     this.views.disposeTransport()
@@ -819,6 +875,7 @@ export class WorkspaceRuntime {
 
   private async deactivate(reason: 'switch' | 'close' = 'switch'): Promise<void> {
     this.filePicker.reset()
+    this.commands.reset()
     this.handlers.publishWorkspaceClosed(reason)
     await this.handlers.detach()
     await this.views.detach()

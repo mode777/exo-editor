@@ -1,5 +1,6 @@
 import type { MessageGate } from './gate'
 import { parseShellError } from './init'
+import { CommandClient } from './command'
 import {
   ExoProtocolError,
   MAX_IN_FLIGHT_REQUESTS,
@@ -28,6 +29,7 @@ import {
   type ShellEvent,
   type ShellInit,
   type TextFileContent,
+  type CommandHandler,
 } from './protocol'
 
 export type DisposeListener = (reason: DisposeReason) => void
@@ -144,6 +146,7 @@ export class FrameClient {
   protected readonly eventListeners = new Map<string, Set<(event: ShellEvent) => void>>()
   protected readonly disposeListeners = new Set<DisposeListener>()
   protected readonly errorListeners = new Set<ErrorListener>()
+  private readonly commandClient: CommandClient
   protected nextRequestId = 0
   protected isClosed = false
   protected disposed = false
@@ -152,6 +155,7 @@ export class FrameClient {
   constructor(gate: MessageGate, init: ShellInit) {
     this.gate = gate
     this.init = init
+    this.commandClient = new CommandClient(gate)
 
     gate.on('shell/file-content', (envelope) =>
       this.handleContent(envelope.replyTo, envelope.payload),
@@ -197,6 +201,20 @@ export class FrameClient {
 
   get closed(): boolean {
     return this.isClosed
+  }
+
+  /** Whether this shell delivers `shell/command`; absence on an older shell is false. */
+  get supportsCommands(): boolean {
+    return this.capabilities.commands
+  }
+
+  /**
+   * Attach the one command handler. Every invocation is answered automatically;
+   * a thrown error or `{ ok: false }` becomes a bounded failure result.
+   */
+  onCommand(handler: CommandHandler): () => void {
+    if (this.isClosed) return () => undefined
+    return this.commandClient.onCommand(handler)
   }
 
   readFile(path: string, encoding?: 'utf8'): Promise<TextFileContent>
@@ -473,6 +491,7 @@ export class FrameClient {
     if (this.isClosed) return
     this.isClosed = true
     this.rejectPending()
+    this.commandClient.dispose()
     this.gate.close()
   }
 
@@ -711,6 +730,7 @@ export class FrameClient {
     }
     this.isClosed = true
     this.rejectPending()
+    this.commandClient.dispose()
     for (const listener of [...this.disposeListeners]) {
       try {
         listener(reason)

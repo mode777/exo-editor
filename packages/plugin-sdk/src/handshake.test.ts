@@ -57,6 +57,7 @@ function editorInit(overrides: Partial<EditorInit> = {}): EditorInit {
       openFile: true,
       openView: true,
       requestPanel: true,
+      commands: true,
     },
     limits: { maxFileSize: 10 * 1024 * 1024, maxRequestBytes: 16 * 1024 * 1024 },
     ...overrides,

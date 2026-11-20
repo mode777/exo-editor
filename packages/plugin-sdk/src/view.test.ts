@@ -18,6 +18,7 @@ function capabilities(overrides: Partial<EditorCapabilities> = {}): EditorCapabi
     openFile: true,
     openView: true,
     requestPanel: true,
+    commands: true,
     ...overrides,
   }
 }

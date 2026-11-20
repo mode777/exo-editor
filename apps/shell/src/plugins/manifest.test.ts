@@ -6,11 +6,14 @@ import {
   MANIFEST_HTTPS_URL_PATTERN,
   MANIFEST_ID_PATTERN,
   MANIFEST_CONTRIBUTION_ID_PATTERN,
+  MANIFEST_MAX_COMMANDS,
+  MANIFEST_MAX_COMMAND_TITLE,
   MANIFEST_MAX_CONTENT_VIEWS,
   MANIFEST_MAX_EDITORS,
   MANIFEST_MAX_PANELS,
   MANIFEST_MAX_VIEW_TITLE,
   MANIFEST_PANEL_LOCATIONS,
+  MANIFEST_COMMAND_MENUS,
   MANIFEST_MAX_ENUM_VALUES,
   MANIFEST_MAX_GLOB_LENGTH,
   MANIFEST_MAX_LABEL,
@@ -721,6 +724,173 @@ describe('manifest validation', () => {
       code: 'unsupported-origin',
     })
   })
+
+  it('accepts editor, panel and content-view commands with menu placement', () => {
+    const result = validate({
+      contributes: {
+        panels: [{ id: 'reports', title: 'Reports', location: 'primary', entry: 'reports.html' }],
+        contentViews: [{ id: 'report', title: 'Report', entry: 'report.html' }],
+        commands: [
+          {
+            id: 'format',
+            title: 'Format Document',
+            category: 'Editing',
+            target: 'activeEditor',
+            menus: ['commandPalette', 'editor/title'],
+          },
+          {
+            id: 'generate',
+            title: 'Generate Report',
+            target: { kind: 'panel', id: 'reports' },
+            menus: ['commandPalette', 'explorer/context'],
+          },
+          {
+            id: 'inspect',
+            title: 'Inspect Selection',
+            target: { kind: 'contentView', id: 'report' },
+          },
+        ],
+      },
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.manifest.commands).toEqual([
+      {
+        id: 'format',
+        title: 'Format Document',
+        category: 'Editing',
+        target: 'activeEditor',
+        menus: ['commandPalette', 'editor/title'],
+      },
+      {
+        id: 'generate',
+        title: 'Generate Report',
+        target: { kind: 'panel', id: 'reports' },
+        menus: ['commandPalette', 'explorer/context'],
+      },
+      {
+        id: 'inspect',
+        title: 'Inspect Selection',
+        target: { kind: 'contentView', id: 'report' },
+        menus: ['commandPalette'],
+      },
+    ])
+  })
+
+  it('accepts an empty command list', () => {
+    const result = validate({ contributes: { commands: [] } })
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.manifest.commands).toEqual([])
+  })
+
+  it('rejects invalid command ids, titles and categories', () => {
+    const valid = { id: 'format', title: 'Format', target: 'activeEditor' }
+    const cases: Array<[Record<string, unknown>, string]> = [
+      [{ ...valid, id: 'Format' }, '/contributes/commands/0/id'],
+      [{ ...valid, title: '' }, '/contributes/commands/0/title'],
+      [
+        { ...valid, title: 'x'.repeat(MANIFEST_MAX_COMMAND_TITLE + 1) },
+        '/contributes/commands/0/title',
+      ],
+      [{ ...valid, category: '' }, '/contributes/commands/0/category'],
+      [
+        { ...valid, category: 'x'.repeat(MANIFEST_MAX_COMMAND_TITLE + 1) },
+        '/contributes/commands/0/category',
+      ],
+      [{ ...valid, extra: true }, '/contributes/commands/0/extra'],
+    ]
+    for (const [command, field] of cases) {
+      expect(errorOf(validate({ contributes: { commands: [command] } })).field).toBe(field)
+    }
+  })
+
+  it('rejects duplicate command ids and the command limit', () => {
+    const command = { id: 'format', title: 'Format', target: 'activeEditor' }
+    expect(errorOf(validate({ contributes: { commands: [command, command] } })).field).toBe(
+      '/contributes/commands/1/id',
+    )
+    const commands = Array.from({ length: MANIFEST_MAX_COMMANDS + 1 }, (_, index) => ({
+      id: `command-${index}`,
+      title: `Command ${index}`,
+      target: 'activeEditor',
+    }))
+    expect(errorOf(validate({ contributes: { commands } })).field).toBe('/contributes/commands')
+  })
+
+  it('rejects unknown or undeclared command targets', () => {
+    const base = { id: 'generate', title: 'Generate' }
+    expect(
+      errorOf(validate({ contributes: { commands: [{ ...base, target: 'other' }] } })).field,
+    ).toBe('/contributes/commands/0/target')
+    expect(
+      errorOf(
+        validate({
+          contributes: { commands: [{ ...base, target: { kind: 'panel', id: 'missing' } }] },
+        }),
+      ).field,
+    ).toBe('/contributes/commands/0/target/id')
+    expect(
+      errorOf(
+        validate({
+          contributes: {
+            commands: [{ ...base, target: { kind: 'view', id: 'missing' } }],
+          },
+        }),
+      ).field,
+    ).toBe('/contributes/commands/0/target/kind')
+    expect(
+      errorOf(
+        validate({
+          contributes: {
+            panels: [{ id: 'reports', title: 'Reports', location: 'primary', entry: 'r.html' }],
+            commands: [{ ...base, target: { kind: 'panel', id: 'reports', extra: true } }],
+          },
+        }),
+      ).field,
+    ).toBe('/contributes/commands/0/target/extra')
+  })
+
+  it('rejects invalid menu placement and duplicate menu values', () => {
+    const panelCommand = {
+      id: 'generate',
+      title: 'Generate',
+      target: { kind: 'panel', id: 'reports' },
+    }
+    const contributes = (menus: unknown) => ({
+      contributes: {
+        panels: [{ id: 'reports', title: 'Reports', location: 'primary', entry: 'r.html' }],
+        commands: [{ ...panelCommand, menus }],
+      },
+    })
+    expect(errorOf(validate(contributes(['editor/title']))).field).toBe(
+      '/contributes/commands/0/menus',
+    )
+    expect(
+      errorOf(
+        validate({
+          contributes: {
+            commands: [
+              {
+                id: 'format',
+                title: 'Format',
+                target: 'activeEditor',
+                menus: ['explorer/context'],
+              },
+            ],
+          },
+        }),
+      ).field,
+    ).toBe('/contributes/commands/0/menus')
+    expect(errorOf(validate(contributes(['commandPalette', 'commandPalette']))).field).toBe(
+      '/contributes/commands/0/menus',
+    )
+    expect(errorOf(validate(contributes(['statusBar']))).field).toBe(
+      '/contributes/commands/0/menus',
+    )
+    expect(errorOf(validate(contributes('commandPalette'))).field).toBe(
+      '/contributes/commands/0/menus',
+    )
+  })
 })
 
 describe('entry resolution', () => {
@@ -929,9 +1099,22 @@ interface SchemaDefs {
       fileEditors: { maxItems: number; items: { $ref: string } }
       panels: { maxItems: number; items: { $ref: string } }
       contentViews: { maxItems: number; items: { $ref: string } }
+      commands: { maxItems: number; items: { $ref: string } }
       configuration: { $ref: string }
     }
   }
+  command: {
+    additionalProperties: boolean
+    required: string[]
+    properties: {
+      id: { $ref: string }
+      title: { minLength: number; maxLength: number }
+      category: { minLength: number; maxLength: number }
+      target: { $ref: string }
+      menus: { maxItems: number; uniqueItems: boolean; items: { enum: string[] } }
+    }
+  }
+  commandTarget: { oneOf: Array<Record<string, unknown>> }
   panel: {
     additionalProperties: boolean
     required: string[]
@@ -1022,6 +1205,18 @@ describe('manifest schema parity', () => {
     expect(defs.contributes.properties.fileEditors.maxItems).toBe(MANIFEST_MAX_EDITORS)
     expect(defs.contributes.properties.panels.maxItems).toBe(MANIFEST_MAX_PANELS)
     expect(defs.contributes.properties.contentViews.maxItems).toBe(MANIFEST_MAX_CONTENT_VIEWS)
+    expect(defs.contributes.properties.commands.maxItems).toBe(MANIFEST_MAX_COMMANDS)
+    expect(defs.contributes.properties.commands.items.$ref).toBe('#/$defs/command')
+    expect(defs.command.required).toEqual(['id', 'title', 'target'])
+    expect(defs.command.additionalProperties).toBe(false)
+    expect(defs.command.properties.id.$ref).toBe('#/$defs/contributionId')
+    expect(defs.command.properties.title.maxLength).toBe(MANIFEST_MAX_COMMAND_TITLE)
+    expect(defs.command.properties.category.maxLength).toBe(MANIFEST_MAX_COMMAND_TITLE)
+    expect(defs.command.properties.target.$ref).toBe('#/$defs/commandTarget')
+    expect(defs.command.properties.menus.maxItems).toBe(MANIFEST_COMMAND_MENUS.length)
+    expect(defs.command.properties.menus.uniqueItems).toBe(true)
+    expect(defs.command.properties.menus.items.enum).toEqual([...MANIFEST_COMMAND_MENUS])
+    expect(defs.commandTarget.oneOf).toHaveLength(3)
     expect(defs.panel.required).toEqual(['id', 'title', 'location', 'entry'])
     expect(defs.panel.properties.id.$ref).toBe('#/$defs/contributionId')
     expect(defs.panel.properties.title.maxLength).toBe(MANIFEST_MAX_VIEW_TITLE)

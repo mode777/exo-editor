@@ -1,7 +1,12 @@
 import { useCallback, useEffect } from 'react'
 import type { WorkbenchTab } from 'vscode-workbench'
 import { workspaceErrorMessage, type WorkspacePath } from '../workspace/contract'
-import { useDocument, useWorkspaceRuntime, useWorkspaceSnapshot } from '../workspace/context'
+import {
+  useDocument,
+  usePluginHost,
+  useWorkspaceRuntime,
+  useWorkspaceSnapshot,
+} from '../workspace/context'
 import { contentViewOf } from '../workbench/tabs'
 import { ContentViewSurface } from './ContentViewSurface'
 
@@ -17,6 +22,7 @@ export function DocumentArea({ tab }: { tab: WorkbenchTab }) {
 function DocumentSurface({ path }: { path: WorkspacePath }) {
   const runtime = useWorkspaceRuntime()
   const snapshot = useWorkspaceSnapshot()
+  const host = usePluginHost()
   const document = useDocument(path)
 
   const bindSurface = useCallback(
@@ -40,6 +46,18 @@ function DocumentSurface({ path }: { path: WorkspacePath }) {
 
   const plugin = document.surface === 'plugin'
   const pluginFailed = plugin && document.pluginPhase === 'failed'
+  const identity = document.editor?.identity
+  const activePlugin = identity
+    ? host.records.find(
+        (record) => record.identity === identity && record.phase === 'active' && record.manifest,
+      )
+    : undefined
+  const editorActions =
+    plugin && document.pluginPhase === 'active' && identity && activePlugin
+      ? activePlugin.commands.filter(
+          (command) => command.target === 'activeEditor' && command.menus.includes('editor/title'),
+        )
+      : []
   const readOnly =
     snapshot.writable === false ||
     document.readOnly ||
@@ -48,6 +66,28 @@ function DocumentSurface({ path }: { path: WorkspacePath }) {
 
   return (
     <div className="exo-document">
+      {editorActions.length > 0 && identity && activePlugin?.manifest && (
+        <div
+          className="exo-document-actions-bar"
+          role="toolbar"
+          aria-label={`Actions from ${activePlugin.manifest.name}`}
+        >
+          {editorActions.map((command) => (
+            <button
+              type="button"
+              key={command.id}
+              className="exo-document-action"
+              aria-label={`${command.title} (${activePlugin.manifest?.name})`}
+              onClick={() => {
+                void runtime.commands.invoke(identity, command.id, 'editorTitle')
+              }}
+            >
+              {command.title}
+            </button>
+          ))}
+        </div>
+      )}
+
       {plugin &&
         snapshot.writable !== false &&
         document.editor?.canWrite === false &&

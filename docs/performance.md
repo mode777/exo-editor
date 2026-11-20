@@ -99,6 +99,15 @@ covered by the no-lazy-frame check. The content-view measurement starts at the
 palette command and stops when the new content iframe is visible. Both are below
 the 2,000 ms ceiling with no accepted miss.
 
+### Plugin commands (local build, 2026-11-20)
+
+The production build adds 4,329 gzip bytes over the view-surfaces measurement:
+169,686 js against a 171,000 limit and 13,531 css against 14,000. The increase is
+the command registry, invocation controller, palette/menu/toolbar surfaces and
+notice region. The deployed first-command panel-mount measurement is recorded
+with the deployed verification before archiving; the budget is the 2,000 ms
+plugin frame startup ceiling.
+
 ## Bundle budget
 
 The committed budget lives in `apps/shell/budget.json` and is measured before the

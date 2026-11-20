@@ -232,3 +232,33 @@ The other fixture manifest declares `other-tutorial` and uses
 `other-plugin.html` as its controller, so the cross-plugin open has a real target
 identity. A same-origin copy runs with `allow-scripts` only; `storage` in the
 view observation is therefore `unavailable`.
+
+## Commands
+
+The manifest declares four commands and the controller registers all four ids:
+
+| Command            | Target                          | Surfaces                       | Behaviour                                                  |
+| ------------------ | ------------------------------- | ------------------------------ | ---------------------------------------------------------- |
+| `fixture.format`   | active editor                   | palette, editor action row     | Records the invocation and answers `{ ok: true }`          |
+| `fixture.generate` | panel `fixture-panel`           | palette, explorer context menu | Reveals the panel and records `{ path, kind }`             |
+| `fixture.inspect`  | content view `fixture-tutorial` | palette                        | Opens or focuses one `command/fixture.inspect` tab         |
+| `fixture.fail`     | active editor                   | palette                        | Answers `{ ok: false, message: "Fixture command failed" }` |
+
+The editor and view pages push each invocation into `observation.commands` and
+include the count in the document title. Manual checks:
+
+1. Open a `*.txt` file. The document action row shows **Format Fixture** with an
+   accessible name that includes the plugin. Run it: the editor observation
+   records `fixture.format` with no `args`, and no notice appears.
+2. Open the explorer context menu on a file and on a folder. Both list
+   **Generate Fixture Report (Exo Host Fixture)**. Run each: the primary panel is
+   revealed (lazily on the first run) and its observation records `{ path, kind }`
+   with `kind: "file"` or `kind: "directory"`.
+3. Run **Inspect Fixture View** twice. One content-view tab opens and the second
+   run focuses it; the content observation records two invocations for
+   `command/fixture.inspect`.
+4. Run **Fail Fixture Command** from the palette. A plain-text status notice
+   names the plugin, can be dismissed, and disappears after eight seconds.
+5. Disable the fixture in Settings. Every palette, explorer and action-row entry
+   disappears; a stale palette entry performs no delivery and appears in the
+   plugin log as `stale`.

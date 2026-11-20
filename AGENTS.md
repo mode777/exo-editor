@@ -33,7 +33,10 @@ in the archived change design. The post-layer-10 change `plugin-view-surfaces`
 `contributes.contentViews`, the `view` frame mode,
 `plugin/open-file`, `plugin/open-view`, `plugin/request-panel` and SDK `1.5.0`;
 its deployed verification is recorded in the change design and `ROADMAP.md`. The
-parallel Stratofold provider track
+post-layer-10 change `plugin-commands` adds `contributes.commands`, the
+`shell/command` and `plugin/command-result` messages, shell-owned command
+surfaces and SDK `1.6.0`; its deployed verification is recorded in `ROADMAP.md`.
+The parallel Stratofold provider track
 (P1-P3) is archived and verified; it does not gate the numbered layers. The
 contracts are ratified, and the shell app (`apps/shell`) builds, tests and
 deploys to GitHub Pages through CI. Do not scaffold code ahead of the [roadmap](./ROADMAP.md) layer

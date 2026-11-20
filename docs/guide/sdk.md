@@ -149,6 +149,30 @@ helpers, and no save or dirty methods. `view.kind` is `panel` or `content`;
 `/`-rooted path for `openFile`. Panels mount on first reveal; content views open a
 tab per instance key.
 
+## Commands
+
+Register the command ids you want active, then attach one handler in the frame
+that will receive them:
+
+```ts
+// controller
+registration.registerCommand('format')
+registration.registerCommand('generate')
+
+// editor or view page
+connection.editor.onCommand(async ({ command, args }) => {
+  if (command === 'format') return { ok: true }
+  if (!args) return { ok: false, message: 'This command needs an explorer selection.' }
+  await runReport(args.path, args.kind)
+})
+```
+
+The SDK answers every invocation automatically: a resolved handler is success, a
+thrown error or `{ ok: false, message }` is a bounded failure, and the shell
+shows the failure as a non-blocking notice. Up to ten commands that arrive before
+you attach a handler are queued. Check `supportsCommands` when you also support
+older shells; it is false when `capabilities.commands` is absent.
+
 ## Events
 
 ```ts

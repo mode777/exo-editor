@@ -96,6 +96,7 @@ function manifest(): PluginManifest {
     ],
     panels: [],
     contentViews: [],
+    commands: [],
   }
 }
 

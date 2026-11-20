@@ -158,8 +158,9 @@ interface ShellInit {
   /**
    * Registration init carries `{ localEvents }`. Editor and view init carry the
    * permission bits plus the shell support bits: `filePicker`,
-   * `directoryListing`, `localEvents`, `openFile`, `openView` and `requestPanel`
-   * are absent on older shells and a plugin must treat absence as false.
+   * `directoryListing`, `localEvents`, `openFile`, `openView`, `requestPanel` and
+   * `commands` are absent on older shells and a plugin must treat absence as
+   * false.
    */
   capabilities?: {
     read?: boolean
@@ -171,6 +172,7 @@ interface ShellInit {
     openFile?: boolean
     openView?: boolean
     requestPanel?: boolean
+    commands?: boolean
   }
   /** Present only when mode is 'editor' or 'view'. */
   limits?: { maxFileSize: number; maxRequestBytes: number }
@@ -201,8 +203,8 @@ reinterpret a frame that starts in one mode as the other.
 | Phase | Allowed plugin messages |
 | --- | --- |
 | `register` | `plugin/ready`, `plugin/register`, `plugin/register-complete` |
-| `editor` | `plugin/ready`, `plugin/request-file`, `plugin/request-files`, `plugin/request-list`, `plugin/dirty`, `plugin/request-save`, `plugin/save-content`, `plugin/subscribe`, `plugin/unsubscribe`, `plugin/publish`, `plugin/open-file`, `plugin/open-view`, `plugin/request-panel`, `plugin/dispose-ack` |
-| `view` | `plugin/ready`, `plugin/request-file`, `plugin/request-files`, `plugin/request-list`, `plugin/subscribe`, `plugin/unsubscribe`, `plugin/publish`, `plugin/open-file`, `plugin/open-view`, `plugin/request-panel`, `plugin/dispose-ack` |
+| `editor` | `plugin/ready`, `plugin/request-file`, `plugin/request-files`, `plugin/request-list`, `plugin/dirty`, `plugin/request-save`, `plugin/save-content`, `plugin/subscribe`, `plugin/unsubscribe`, `plugin/publish`, `plugin/open-file`, `plugin/open-view`, `plugin/request-panel`, `plugin/command-result`, `plugin/dispose-ack` |
+| `view` | `plugin/ready`, `plugin/request-file`, `plugin/request-files`, `plugin/request-list`, `plugin/subscribe`, `plugin/unsubscribe`, `plugin/publish`, `plugin/open-file`, `plugin/open-view`, `plugin/request-panel`, `plugin/command-result`, `plugin/dispose-ack` |
 
 - `plugin/ready` is accepted once per frame. A second `ready`, a
   `plugin/register-complete` before `ready`, or a registration message after
@@ -240,19 +242,22 @@ frame with `protocol-violation`.
 
 ```text
 plugin/register          { fileEditors?: FileEditorContribution[],
-                           panels?: string[], contentViews?: string[] }
+                           panels?: string[], contentViews?: string[],
+                           commands?: string[] }
 plugin/register-complete {}
 shell/register-ack      { accepted: string[],
                           acceptedPanels: string[],
                           acceptedContentViews: string[],
+                          acceptedCommands: string[],
                           rejected: RejectedContribution[] }
 
 FileEditorContribution = { glob: string; entry: string; label?: string }
 RejectedContribution   = { index: number,
                            reason: RegistrationRejection,
-                           kind?: 'fileEditor' | 'panel' | 'contentView',
+                           kind?: 'fileEditor' | 'panel' | 'contentView' | 'command',
                            message?: string }
-RegistrationRejection  = 'not-declared' | 'permission-denied' | 'invalid-glob' | 'invalid-contribution'
+RegistrationRejection  = 'not-declared' | 'permission-denied' | 'invalid-glob'
+                       | 'invalid-contribution' | 'target-not-registered'
 ```
 
 - `plugin/register` may be sent 0..n times before `plugin/register-complete`.
@@ -286,9 +291,16 @@ RegistrationRejection  = 'not-declared' | 'permission-denied' | 'invalid-glob' |
   `contributes.panels`, and likewise for content views. Only registered ids
   appear in the host snapshot, the activity bar, the picker or the palette.
 - `shell/register-ack` is additive: `accepted` keeps its glob meaning,
-  `acceptedPanels` and `acceptedContentViews` carry the view ids, and a
-  `rejected` entry names its `kind` when it is not an editor. An older SDK ignores
-  the extra fields; a newer SDK defaults their absence to empty arrays.
+  `acceptedPanels`, `acceptedContentViews` and `acceptedCommands` carry the view
+  and command ids, and a `rejected` entry names its `kind` when it is not an
+  editor. An older SDK ignores the extra fields; a newer SDK defaults their
+  absence to empty arrays.
+- `commands` is an array of declared command ids. The shell preserves arrival
+  order and deduplicates repeated ids. An undeclared id is rejected with
+  `not-declared`. At `plugin/register-complete` a command whose panel or
+  content-view target was not registered in the same session is rejected with
+  `target-not-registered`; the order of the panel and command registrations does
+  not matter. A rejected command appears in no surface.
 - Registration order is the order in which the shell accepted the contributions,
   and the plugin's declaration position in `exo.json` is the outer selection
   order. Equal-priority selection therefore never depends on network or handshake
@@ -572,6 +584,34 @@ shell/panel-result    { panel, open: boolean }
 - Each frame is limited to ten intents in a rolling second. Excess requests are
   `rate-limited`, not a teardown. A malformed intent is a protocol violation.
 
+### 5.6.1 Commands
+
+```text
+shell/command          { command: string, args?: { path: string, kind: 'file' | 'directory' } }
+                       // carries an id; the plugin answers with replyTo = that id
+plugin/command-result  { ok: true } | { ok: false, message?: string }
+```
+
+- The shell sends `shell/command` only to a live, active frame of the same plugin
+  identity that owns the command's target: the active document handler, a
+  revealed panel or an opened content-view tab. The registration frame never
+  receives one.
+- `args` is present only for an explorer context invocation and carries the
+  selected entry's normalized path and `file`/`directory` kind. Palette and
+  editor-title invocations carry no arguments. No file content, handle, `File` or
+  `Blob` is ever attached.
+- The plugin answers with exactly one `plugin/command-result` whose `replyTo` is
+  the invocation id. `ok: false` may carry a plain-text message of at most 200
+  characters; the shell truncates longer text for display and logging. A second
+  result, a result after the ten-second timeout and a result after disposal are
+  ignored and logged.
+- A `plugin/command-result` in the registration phase, or without a matching live
+  invocation in the editor or view phase, is a protocol violation or an ignored
+  late result respectively.
+- The shell allows one in-flight invocation per command, five concurrent
+  invocations per plugin and a five-second cooldown per command. An invocation
+  over a limit is `rate-limited` in the plugin log and delivers nothing.
+
 ### 5.7 Disposal
 
 ```text
@@ -625,6 +665,11 @@ are cleared on workspace switch.
 | Registration timeout | 10 s |
 | Save response timeout | 5 s |
 | Dispose acknowledgement | 1 s |
+| Command result timeout | 10 s |
+| Concurrent command invocations per plugin | 5 |
+| Command cooldown | 5 s |
+| Commands per manifest | 32 |
+| Command result message | 200 characters |
 | Protocol violations before teardown | 3 |
 | Frames per plugin per workspace | 1 registration + 1 per open document (max 20) + 1 per mounted panel (max 8) + 1 per open content-view tab (max 10) |
 | Content-view payload | 64 KiB |
@@ -664,11 +709,12 @@ for repeated violations, tears down the frame.
   Removed or reinterpreted fields require a new major and a new OpenSpec change.
   A shell that predates an additive notification ignores it; the plugin must keep
   a working fallback (for `plugin/request-save`, the shell Save action).
-- The `view` mode, the `view` init block, the navigation/panel intents and the
-  extra registration fields are additive within protocol major `1`. An older
-  shell rejects a manifest that declares `contributes.panels` or
-  `contributes.contentViews` unless `engines.exo` excludes that shell, so the
-  plugin fails closed with `incompatible-engine` rather than a partial surface.
+- The `view` mode, the `view` init block, the navigation/panel intents, the
+  command messages and the extra registration fields are additive within protocol
+  major `1`. An older shell rejects a manifest that declares
+  `contributes.panels`, `contributes.contentViews` or `contributes.commands`
+  unless `engines.exo` excludes that shell, so the plugin fails closed with
+  `incompatible-engine` rather than a partial surface.
 - The SDK exposes the protocol version as a constant so plugins do not hard-code
   it. The SDK major tracks the protocol major; its compatibility and deprecation
   policy is in [`plugin-sdk.md`](./plugin-sdk.md#9-compatibility-and-deprecation-policy).

@@ -31,6 +31,7 @@ reverting. Findings are recorded in [Findings](#findings).
 | 11 | User-mediated file picker | `plugin-protocol` - File picker request; `plugin-file-editors` - User-mediated file selection | `plugins/file-picker.ts`, `plugins/handler.ts` (active/visible/focused gate, reserved-path re-check), `document/FilePickerDialog.tsx` | `handler.test.ts`, `handlers.test.ts`, `file-picker.test.ts`, `FilePickerDialog.test.tsx`, `sdk-conformance.test.ts` |
 | 12 | Plugin-local event isolation | `plugin-events` - Plugin-local topic namespace; Delivery semantics; Limits and failure isolation | `plugins/events.ts` (identity filter, per-identity sequences, per-frame rate), `plugins/handler.ts` (`plugin/publish` validation) | `events.test.ts`, `handler.test.ts`, `registration.test.ts`, `sdk-conformance.test.ts` |
 | 13 | View surfaces and navigation intents | `plugin-views` - Panel contributions; Content-view contributions; Navigation and panel intents; Cross-plugin content views; View lifecycle | `plugins/frame-session.ts` (shared gate, path and intent checks), `plugins/view-session.ts`, `plugins/view-pool.ts` (lazy mount, caps, surfaces), `workspace/runtime.ts` (open-file/view/panel resolution) | `view-session.test.ts`, `view-pool.test.ts`, `runtime.views.test.ts`, `plugin-views.test.tsx`, `ContentViewSurface.test.tsx`, `SecondaryViewPicker.test.tsx` |
+| 14 | Plugin command surface | `plugin-commands` - Command contribution semantics; Command registration activation; Command invocation; Command results and failures; Command runtime limits; Command attribution and isolation; Command teardown | `plugins/commands.ts` (registry, single controller, target resolution, timers, limits, notices), `plugins/frame-session.ts` (`shell/command` delivery, active-phase result routing, init support bit), `plugins/registration.ts` (subset, dedupe, `target-not-registered`), `workbench/commands.ts` (synthetic palette ids), `explorer/ExplorerView.tsx`, `document/DocumentArea.tsx` | `commands.test.ts`, `registration.test.ts`, `host.test.ts`, `commands.test.ts` (palette), `ExplorerView.commands.test.tsx`, `DocumentArea.commands.test.tsx`, `CommandNotices.test.tsx` |
 
 ## Control details
 
@@ -292,6 +293,47 @@ reverting. Findings are recorded in [Findings](#findings).
   fails. Remove the `isReservedPath` check: the reserved `/exo.json` intent case
   opens a tab and fails.
 
+### 14. Plugin command surface
+
+- Requirements: `plugin-commands` all requirements; `plugin-manifest` section
+  3.3; `plugin-protocol` section 5.6.1; `plugin-host` "Command registry and
+  teardown"; `editor-shell` "Plugin commands in shell surfaces".
+- Enforcement: `CommandRegistry` accepts commands only after
+  `plugin/register-complete` and re-keys them by plugin identity and registration
+  order. Registration accepts only manifest-declared command ids, deduplicates
+  repeats and rejects a view-target command whose target was not registered in
+  the same session. `PluginCommandController` is the only path from a surface to
+  a frame: it re-resolves the live command, enforces one in-flight invocation per
+  command, five per plugin, the five-second cooldown and the ten-second timeout,
+  and resolves the active editor by identity or reveals/opens the view target.
+  `FrameSession.sendCommand` refuses a non-active frame; result routing accepts
+  only the active phase and the controller matches `replyTo` against the live
+  invocation. Arguments are shell-derived: `{ path, kind }` for explorer
+  invocations, absent otherwise; no content, handle, `File` or `Blob` is
+  attached. Palette ids are shell-owned and synthesized, so a plugin command
+  cannot shadow a shell id. Every surface names the plugin. Workspace teardown
+  clears the registry, controller timers, cooldowns, pending invocations and
+  notices; a late result from a released frame finds no pending record.
+- Tests: `commands.test.ts` covers registry ordering/removal, active-editor and
+  lazy panel/content-view delivery, explorer arguments, single-flight, cooldown,
+  concurrency, timeout, failure text, invalid and duplicate results, frame
+  disposal, reset and the result parser; `registration.test.ts` covers subset,
+  dedupe, undeclared ids, panel-first/command-first order and
+  `target-not-registered`; `host.test.ts` covers completion gating and teardown;
+  `workbench/commands.test.ts` covers synthetic ids and non-shadowing;
+  `ExplorerView.commands.test.tsx` and `DocumentArea.commands.test.tsx` cover
+  attribution, args, cap, keyboard Escape and axe; `CommandNotices.test.tsx`
+  covers plain text, dismissal and auto-dismiss.
+- Mutation: remove the `pending.has(key)` single-flight check: the
+  "single-flight" expectation in `commands.test.ts` fails. Remove the
+  `frameSession.phase !== 'active'` guard in `sendCommand`: the inactive-frame
+  case delivers a message and fails. Remove the `target-not-registered` loop in
+  `RegistrationSession.handleComplete`: the missing-target test accepts the
+  command. Remove the identity comparison in `Runtime.activeEditorTarget`: the
+  editor-action test for another plugin renders and fails. Remove
+  `commands.reset()` from `WorkspaceRuntime.deactivate`: the workspace-reset test
+  observes stale notices and fails.
+
 ## Findings
 
 | ID | Severity | Finding | Disposition |
@@ -302,6 +344,7 @@ reverting. Findings are recorded in [Findings](#findings).
 | F4 | critical (dependency) | `monaco-editor@0.57.0` pins `dompurify@3.4.15` (bundled in `apps/code-plugin`), which is affected by DOMPurify advisories including IN_PLACE node removal and `application/xhtml+xml` parsing. | Accepted with rationale and follow-up owner: Monaco uses the string/`RETURN_TRUSTED_TYPE` path, does not set `IN_PLACE` or `SAFE_FOR_TEMPLATES`, parses as `text/html`, and the editor renders workspace content as text, not as HTML. The code plugin runs in a sandboxed frame with no storage. Upgrade when `monaco-editor` bumps its pinned DOMPurify; re-check this row on every dependency update. |
 | F5 | moderate (dev) | `npm audit` reports a `minimatch` ReDoS in the TypeScript ESLint dependency tree. | Accepted: development-only tooling, no runtime or deployed artifact, inputs are repository files rather than untrusted plugin data. Update with the next tooling bump. |
 | F6 | low | Panels and content views are excluded from the consent fingerprint, so an already-approved plugin can add an activity-bar item, a side panel or a content-view tab without a new prompt. | Accepted by design: the surfaces are user-invoked, grant no autonomous data or file access, and every shell chrome surface names the plugin so a new surface cannot impersonate the shell. The first-grant prompt lists them and the security review tracks the mitigation; adding them to the fingerprint is a one-change follow-up with a single re-prompt if required later. |
+| F7 | low | Commands are excluded from the consent fingerprint and a misleading title could imitate shell chrome or describe an action broadly. | Accepted by design: commands are user-invoked, run only in frames the user already approved with their existing permissions, grant no autonomous access and cannot use a shell command id. Every palette entry, explorer entry and editor action names the contributing plugin, the first-grant prompt lists each command with its target and placements, and the plugin log attributes every invocation. A future fingerprint inclusion is a one-change follow-up with a single re-prompt. |
 
 No open finding above accepted severity. There is no server, secret, account or
 first-party API in the deployed artifact. The dependency audit result is part of

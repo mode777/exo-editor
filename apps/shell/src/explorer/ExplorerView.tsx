@@ -15,9 +15,10 @@ import {
   pathIsUnder,
   validateEntryName,
 } from '../workspace/paths'
-import { useWorkspaceRuntime, useWorkspaceSnapshot } from '../workspace/context'
+import { usePluginHost, useWorkspaceRuntime, useWorkspaceSnapshot } from '../workspace/context'
 import { requestRemoteConnect } from '../workspace/connect-bus'
 import { onExplorerCommand } from './bus'
+import type { PluginHostRecord } from '../plugins/host'
 
 interface Row {
   entry: FileStat
@@ -58,6 +59,31 @@ function sortEntries(entries: FileStat[], caseSensitive: boolean): FileStat[] {
   })
 }
 
+interface ExplorerPluginCommand {
+  identity: string
+  commandId: string
+  title: string
+  pluginName: string
+}
+
+/** Active explorer/context commands in declaration and registration order. */
+function runnerCommands(records: PluginHostRecord[]): ExplorerPluginCommand[] {
+  const commands: ExplorerPluginCommand[] = []
+  for (const record of records) {
+    if (record.phase !== 'active' || !record.identity || !record.manifest) continue
+    for (const command of record.commands) {
+      if (!command.menus.includes('explorer/context')) continue
+      commands.push({
+        identity: record.identity,
+        commandId: command.id,
+        title: command.title,
+        pluginName: record.manifest.name,
+      })
+    }
+  }
+  return commands
+}
+
 export function ExplorerView() {
   const snapshot = useWorkspaceSnapshot()
   return <Explorer key={snapshot.generation} />
@@ -66,6 +92,7 @@ export function ExplorerView() {
 function Explorer() {
   const runtime = useWorkspaceRuntime()
   const snapshot = useWorkspaceSnapshot()
+  const host = usePluginHost()
   const session = runtime.getSession()
   const caseSensitive = snapshot.capabilities?.caseSensitive ?? true
   const writable = snapshot.writable
@@ -213,6 +240,38 @@ function Explorer() {
     if (!row) return ROOT
     return row.entry.kind === 'directory' ? row.entry.path : dirname(row.entry.path)
   }, [selected, visible])
+
+  const explorerCommands = useMemo(() => runnerCommands(host.records).slice(0, 10), [host])
+
+  const runExplorerCommand = (identity: string, commandId: string) => {
+    if (!context) return
+    const entry = visible.find((row) => row.entry.path === context.path)?.entry
+    setContext(null)
+    if (!entry) return
+    void runtime.commands.invoke(identity, commandId, 'explorer', {
+      path: entry.path,
+      kind: entry.kind,
+    })
+  }
+
+  const handleMenuKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    const items = Array.from(
+      event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'),
+    )
+    const index = items.indexOf(document.activeElement as HTMLButtonElement)
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      setContext(null)
+      return
+    }
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault()
+      if (items.length === 0) return
+      const delta = event.key === 'ArrowDown' ? 1 : -1
+      const next = index < 0 ? 0 : (index + delta + items.length) % items.length
+      items[next]?.focus()
+    }
+  }
 
   const beginCreate = (kind: NameDialog['kind'], directory = targetDirectory) => {
     if (!writable) return
@@ -601,7 +660,12 @@ function Explorer() {
       )}
 
       {context && (
-        <div className="exo-context-menu" role="menu" style={{ left: context.x, top: context.y }}>
+        <div
+          className="exo-context-menu"
+          role="menu"
+          style={{ left: context.x, top: context.y }}
+          onKeyDown={handleMenuKeyDown}
+        >
           <button type="button" role="menuitem" onClick={() => runContext('file')}>
             New File…
           </button>
@@ -614,6 +678,18 @@ function Explorer() {
           <button type="button" role="menuitem" onClick={() => runContext('delete')}>
             Delete
           </button>
+          {explorerCommands.length > 0 && <div role="separator" className="exo-menu-separator" />}
+          {explorerCommands.map((command) => (
+            <button
+              key={`${command.identity}:${command.commandId}`}
+              type="button"
+              role="menuitem"
+              title={`${command.title} — ${command.pluginName}`}
+              onClick={() => runExplorerCommand(command.identity, command.commandId)}
+            >
+              {command.title} <span className="exo-menu-attribution">({command.pluginName})</span>
+            </button>
+          ))}
         </div>
       )}
 

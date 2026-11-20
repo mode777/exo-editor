@@ -61,6 +61,17 @@ the deployed URL below, not a local dev server or local build.
     Save or dirty state, a bounded payload, and a frame that is disposed when the
     tab closes. A second plugin opens the same content view and receives
     `openedBy`; it cannot read the target's state or events.
+14. **Run plugin commands.** With the fixture active, open a text file matched by
+    `**/*.txt`. The document action row above the editor offers Format Fixture and
+    names the plugin. Use it: the fixture records the invocation and the status
+    notice stays silent on success. Run Generate Fixture Report from the explorer
+    context menu on a file and on a folder: the panel is revealed (lazily on the
+    first run), the fixture records `{ path, kind }`, and the menu shows at most
+    ten plugin entries. Run Inspect Fixture View: one content-view tab opens and
+    focuses rather than a second tab. Run Fail Fixture Command: a plain-text
+    notice names the plugin and can be dismissed. Disable the fixture: every
+    palette, menu and action entry disappears and no new invocation reaches its
+    frames.
 
 ## Screenshots
 

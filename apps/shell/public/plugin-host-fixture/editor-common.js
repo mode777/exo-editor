@@ -31,6 +31,7 @@
     external: null,
     saveCount: 0,
     saveResult: null,
+    commands: [],
     errors: [],
   }
 
@@ -316,6 +317,19 @@
     render()
   }
 
+  function onCommand(id, payload) {
+    const command = payload && payload.command
+    const args = payload && payload.args ? payload.args : null
+    state.commands.push({ id, command, args })
+    console.log('EXO_EDITOR command', id, command, args)
+    if (command === 'fixture.fail') {
+      post('plugin/command-result', { ok: false, message: 'Fixture command failed' }, id)
+    } else {
+      post('plugin/command-result', { ok: true }, id)
+    }
+    render()
+  }
+
   function onSaveResult(payload) {
     state.saveResult = payload
     if (payload && payload.ok) {
@@ -390,6 +404,9 @@
         break
       case 'shell/event':
         onEvent(data.payload || {})
+        break
+      case 'shell/command':
+        onCommand(data.id, data.payload || {})
         break
       case 'shell/dispose':
         onDispose(data.payload)

@@ -18,6 +18,7 @@ function record(overrides: Partial<PluginHostRecord> = {}): PluginHostRecord {
     registrations: [],
     panels: [],
     contentViews: [],
+    commands: [],
     ...overrides,
   }
 }
@@ -95,6 +96,7 @@ describe('plugin runtime status row', () => {
             fileEditors: [],
             panels: [],
             contentViews: [],
+            commands: [],
           },
         })}
         onReview={onReview}
@@ -148,6 +150,39 @@ describe('plugin runtime status row', () => {
     expect(onRevoke).not.toHaveBeenCalled()
     await act(async () => click(button(rendered, 'Confirm revoke')))
     expect(onRevoke).toHaveBeenCalledWith('https://plugins.example.com::com.example.test')
+  })
+
+  it('shows registered command titles and targets', async () => {
+    const rendered = await render(
+      <RuntimeRow
+        record={record({
+          phase: 'active',
+          consent: 'granted',
+          commands: [
+            {
+              id: 'format',
+              title: 'Format Document',
+              target: 'activeEditor',
+              menus: ['commandPalette'],
+              registrationOrder: 0,
+            },
+            {
+              id: 'generate',
+              title: 'Generate Report',
+              target: { kind: 'panel', id: 'reports' },
+              menus: ['commandPalette', 'explorer/context'],
+              registrationOrder: 1,
+            },
+          ],
+        })}
+        onReview={vi.fn()}
+        onRevoke={vi.fn()}
+      />,
+    )
+    const text = rendered.textContent ?? ''
+    expect(text).toContain('Active — Format Document, Generate Report')
+    expect(text).toContain('Format Document (active editor)')
+    expect(text).toContain('Generate Report (panel reports)')
   })
 
   it('shows a failure code and phase', async () => {

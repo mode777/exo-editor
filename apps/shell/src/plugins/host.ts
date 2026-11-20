@@ -6,11 +6,13 @@ import {
   RegistrationSession,
   type RegistrationErrorCode,
   type RegistrationOutcome,
+  type RegisteredCommand,
   type RegisteredContentView,
   type RegisteredEditor,
   type RegisteredPanel,
 } from './registration'
 import { EditorRegistry, type EditorCandidate } from './registry'
+import { CommandRegistry, type CommandEntry, type PluginCommandSource } from './commands'
 import type { PluginConfigStore } from './store'
 import type { PluginSettingsStore } from './settings'
 import { SHELL_VERSION } from '../version'
@@ -35,6 +37,7 @@ export interface PluginHostRecord {
   registrations: RegisteredEditor[]
   panels: RegisteredPanel[]
   contentViews: RegisteredContentView[]
+  commands: RegisteredCommand[]
   error?: {
     code: PluginHostErrorCode
     phase: PluginHostFailurePhase
@@ -145,6 +148,13 @@ function cloneManifest(manifest: PluginManifest): PluginManifest {
   return {
     ...manifest,
     fileEditors: manifest.fileEditors.map((editor) => ({ ...editor })),
+    panels: manifest.panels.map((panel) => ({ ...panel })),
+    contentViews: manifest.contentViews.map((view) => ({ ...view })),
+    commands: manifest.commands.map((command) => ({
+      ...command,
+      ...(command.target === 'activeEditor' ? {} : { target: { ...command.target } }),
+      menus: [...command.menus],
+    })),
     configuration: manifest.configuration
       ? {
           properties: Object.fromEntries(
@@ -168,6 +178,11 @@ function cloneRecord(record: PluginHostRecord): PluginHostRecord {
     registrations: [...record.registrations],
     panels: record.panels.map((panel) => ({ ...panel })),
     contentViews: record.contentViews.map((view) => ({ ...view })),
+    commands: record.commands.map((command) => ({
+      ...command,
+      ...(command.target === 'activeEditor' ? {} : { target: { ...command.target } }),
+      menus: [...command.menus],
+    })),
     error: record.error ? { ...record.error } : undefined,
   }
 }
@@ -199,6 +214,7 @@ export class PluginHost {
   private readonly listeners = new Set<() => void>()
   private readonly records = new Map<string, PluginHostRecord>()
   private readonly registry = new EditorRegistry()
+  private readonly commands = new CommandRegistry()
   private readonly denied = new Set<string>()
   private readonly sessions = new Map<string, RegistrationSession>()
   private readonly mounted = new Set<string>()
@@ -289,6 +305,15 @@ export class PluginHost {
     return this.registry.match(path)
   }
 
+  /** Every active plugin command, ordered by declaration and registration order. */
+  listCommands(): CommandEntry[] {
+    return this.commands.list()
+  }
+
+  findCommand(identity: string, commandId: string): CommandEntry | undefined {
+    return this.commands.find(identity, commandId)
+  }
+
   requestConsent(identity: string): void {
     const record = this.findByIdentity(identity)
     if (!record?.manifest || !record.fingerprint) return
@@ -341,6 +366,7 @@ export class PluginHost {
     record.registrations = []
     record.panels = []
     record.contentViews = []
+    record.commands = []
     record.error = undefined
     this.consentRequest = null
     this.log('consent', record, 'denied')
@@ -359,6 +385,7 @@ export class PluginHost {
     record.registrations = []
     record.panels = []
     record.contentViews = []
+    record.commands = []
     record.error = undefined
     this.denied.delete(identity)
     if (this.consentRequest?.identity === identity) this.consentRequest = null
@@ -389,6 +416,20 @@ export class PluginHost {
     return undefined
   }
 
+  private commandSource(
+    record: PluginHostRecord,
+    identity = record.identity ?? '',
+  ): PluginCommandSource {
+    return {
+      identity,
+      pluginId: record.manifest?.id ?? identity,
+      pluginName: record.manifest?.name ?? record.manifestUrl,
+      pluginVersion: record.manifest?.version ?? '0.0.0',
+      origin: record.manifest?.manifestOrigin ?? '',
+      pluginOrder: record.entryIndex,
+    }
+  }
+
   private reconcile(): void {
     if (!this.session || !this.config) return
     const config = this.config.getSnapshot()
@@ -396,6 +437,7 @@ export class PluginHost {
       this.stopAll()
       this.records.clear()
       this.registry.clear()
+      this.commands.clear()
       this.consentRequest = null
       this.publish()
       return
@@ -422,6 +464,7 @@ export class PluginHost {
             registrations: [],
             panels: [],
             contentViews: [],
+            commands: [],
           })
           continue
         }
@@ -436,6 +479,7 @@ export class PluginHost {
         record.registrations = []
         record.panels = []
         record.contentViews = []
+        record.commands = []
         record.error = undefined
         continue
       }
@@ -450,6 +494,7 @@ export class PluginHost {
           registrations: [],
           panels: [],
           contentViews: [],
+          commands: [],
         }
         this.records.set(entry.manifest, record)
         this.enqueueManifest(record)
@@ -467,6 +512,7 @@ export class PluginHost {
         record.registrations = []
         record.panels = []
         record.contentViews = []
+        record.commands = []
         record.error = undefined
         this.enqueueManifest(record)
       } else if (record.identity && record.phase === 'active') {
@@ -482,6 +528,7 @@ export class PluginHost {
           },
           record.registrations,
         )
+        this.commands.add(this.commandSource(record), record.commands)
       }
     }
 
@@ -735,6 +782,7 @@ export class PluginHost {
       record.registrations = outcome.editors
       record.panels = outcome.panels
       record.contentViews = outcome.contentViews
+      record.commands = outcome.commands
       record.error = undefined
       record.consent = 'granted'
       this.registry.add(
@@ -749,23 +797,26 @@ export class PluginHost {
         },
         outcome.editors,
       )
+      this.commands.add(this.commandSource(record, identity), outcome.commands)
       this.log(
         'register',
         record,
         'active',
-        `${outcome.editors.length} editor(s), ${outcome.panels.length} panel(s), ${outcome.contentViews.length} content view(s)`,
+        `${outcome.editors.length} editor(s), ${outcome.panels.length} panel(s), ${outcome.contentViews.length} content view(s), ${outcome.commands.length} command(s)`,
       )
     } else {
       record.phase = 'failed'
       record.registrations = []
       record.panels = []
       record.contentViews = []
+      record.commands = []
       record.error = {
         code: outcome.code,
         phase: outcome.phase,
         message: outcome.message,
       }
       this.registry.remove(identity)
+      this.commands.remove(identity)
       this.sessions.delete(identity)
       this.log('register', record, outcome.code, outcome.message)
     }
@@ -809,6 +860,7 @@ export class PluginHost {
     this.handlerLifecycleValue?.closeFor(identity, 'plugin-removed')
     this.viewLifecycleValue?.closeFor(identity, 'plugin-removed')
     this.registry.remove(identity)
+    this.commands.remove(identity)
     this.registrationQueue = this.registrationQueue.filter((entry) => entry !== record)
   }
 
@@ -837,6 +889,7 @@ export class PluginHost {
     this.mounted.clear()
     this.records.clear()
     this.registry.clear()
+    this.commands.clear()
     this.fetchQueue = []
     this.registrationQueue = []
     this.manifestLoading.clear()
@@ -854,6 +907,10 @@ export class PluginHost {
   }
 
   logView(identity: string, phase: string, code?: string, message?: string): void {
+    this.logHandler(identity, phase, code, message)
+  }
+
+  logCommand(identity: string, phase: string, code?: string, message?: string): void {
     this.logHandler(identity, phase, code, message)
   }
 

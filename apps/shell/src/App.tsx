@@ -20,10 +20,12 @@ import {
   createExoCommandRegistry,
   type CommandContext,
   type ExoCommandHandlers,
+  type PluginPaletteProvider,
 } from './workbench/commands'
 import { workbenchMenus } from './workbench/menus'
 import { createQuickOpenProvider } from './workbench/quick-open'
 import { ExoStatusBar } from './workbench/status-bar'
+import { CommandNotices } from './workbench/CommandNotices'
 import { activeDocumentPath, configurePresetStore, installCloseGuard } from './workbench/tabs'
 import type { EditorCandidate } from './plugins/registry'
 import { derivePluginWorkbench, pluginViewId } from './workbench/plugin-views'
@@ -301,9 +303,28 @@ function Shell({ runtime }: { runtime: WorkspaceRuntime }) {
     return commands
   }, [runtime])
 
+  const pluginPalette = useMemo<PluginPaletteProvider>(
+    () => ({
+      list: () =>
+        runtime.pluginHost.listCommands().map((entry) => ({
+          identity: entry.identity,
+          commandId: entry.command.id,
+          title: entry.command.title,
+          category: entry.command.category
+            ? `${entry.pluginName} · ${entry.command.category}`
+            : entry.pluginName,
+          inPalette: entry.command.menus.includes('commandPalette'),
+        })),
+      invoke: (identity, commandId) => {
+        void runtime.commands.invoke(identity, commandId, 'palette')
+      },
+    }),
+    [runtime],
+  )
+
   const commands = useMemo(
-    () => createExoCommandRegistry(getContext, handlers, getDynamicCommands),
-    [getContext, getDynamicCommands, handlers],
+    () => createExoCommandRegistry(getContext, handlers, getDynamicCommands, pluginPalette),
+    [getContext, getDynamicCommands, handlers, pluginPalette],
   )
   const quickOpen = useMemo(createQuickOpenProvider, [])
   const renderDocument = useCallback((tab: WorkbenchTab) => <DocumentArea tab={tab} />, [])
@@ -353,6 +374,7 @@ function Shell({ runtime }: { runtime: WorkspaceRuntime }) {
         statusBar={<ExoStatusBar />}
         initialSession={EMPTY_SESSION}
       />
+      <CommandNotices />
       <SettingsDialog
         open={settingsOpen}
         section={settingsSection}

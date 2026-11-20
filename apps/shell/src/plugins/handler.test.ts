@@ -1384,6 +1384,56 @@ describe('handler navigation intents', () => {
   })
 })
 
+describe('command delivery', () => {
+  it('advertises command support and sends only from an active frame', async () => {
+    const context = await start()
+    expect(context.handler.sendCommand('cmd-1', 'format')).toBe(false)
+    ready(context)
+    const init = postedType(context.frame, 'shell/init')
+    expect(init?.payload).toMatchObject({ capabilities: { commands: true } })
+    expect(
+      context.handler.sendCommand('cmd-2', 'format', { path: '/notes.txt', kind: 'file' }),
+    ).toBe(true)
+    const message = postedType(context.frame, 'shell/command')
+    expect(message).toMatchObject({
+      id: 'cmd-2',
+      payload: { command: 'format', args: { path: '/notes.txt', kind: 'file' } },
+    })
+  })
+
+  it('routes active results and drops foreign origins, frames and post-dispose messages', async () => {
+    const context = await start()
+    ready(context)
+    const received: unknown[] = []
+    const off = context.handler.onCommandResult((envelope) => received.push(envelope.payload))
+    context.frame.emit(
+      { exo: 1, type: 'plugin/command-result', replyTo: 'cmd-1', payload: { ok: true } },
+      PLUGIN_ORIGIN,
+    )
+    expect(received).toEqual([{ ok: true }])
+
+    context.frame.emit(
+      { exo: 1, type: 'plugin/command-result', replyTo: 'cmd-2', payload: { ok: true } },
+      'https://other.example.com',
+    )
+    expect(received).toHaveLength(1)
+    context.frame.emit(
+      { exo: 1, type: 'plugin/command-result', replyTo: 'cmd-3', payload: { ok: true } },
+      PLUGIN_ORIGIN,
+      {} as never,
+    )
+    expect(received).toHaveLength(1)
+
+    off()
+    context.handler.close()
+    context.frame.emit(
+      { exo: 1, type: 'plugin/command-result', replyTo: 'cmd-4', payload: { ok: true } },
+      PLUGIN_ORIGIN,
+    )
+    expect(received).toHaveLength(1)
+  })
+})
+
 describe('resolveHandlerReadPath', () => {
   it('resolves siblings, parents inside the root and absolute paths', () => {
     expect(resolveHandlerReadPath('/src/editor.ts', './types.ts')).toBe('/src/types.ts')

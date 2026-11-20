@@ -31,6 +31,7 @@ import {
   parseEnvelope,
   payloadTooLarge,
   postEnvelope,
+  postRequest,
   sendShellError,
   type Envelope,
   type FrameMode,
@@ -225,6 +226,8 @@ export abstract class FrameSession {
   private pickerId: string | null = null
   private pickerAbort: AbortController | null = null
   private intentWindow: { start: number; count: number } | null = null
+  private readonly commandResultListeners = new Set<(envelope: Envelope) => void>()
+  private readonly closeListeners = new Set<(reason: 'closed' | 'error') => void>()
 
   constructor(options: FrameSessionOptions) {
     this.options = options
@@ -280,6 +283,44 @@ export abstract class FrameSession {
     return this.frame?.hasFocus?.() ?? false
   }
 
+  /** Send one `shell/command` to this active frame; false means nothing was sent. */
+  sendCommand(invocationId: string, commandId: string, args?: unknown): boolean {
+    if (this.phase !== 'active' || !this.frame) return false
+    postRequest(this.frame, this.boundary.targetOrigin, 'shell/command', invocationId, {
+      command: commandId,
+      ...(args === undefined ? {} : { args }),
+    })
+    return true
+  }
+
+  /** Observe `plugin/command-result` messages for this frame. */
+  onCommandResult(listener: (envelope: Envelope) => void): () => void {
+    this.commandResultListeners.add(listener)
+    return () => {
+      this.commandResultListeners.delete(listener)
+    }
+  }
+
+  /** Observe this frame's disposal or failure. */
+  onClosed(listener: (reason: 'closed' | 'error') => void): () => void {
+    this.closeListeners.add(listener)
+    return () => {
+      this.closeListeners.delete(listener)
+    }
+  }
+
+  private notifyClosed(reason: 'closed' | 'error'): void {
+    for (const listener of [...this.closeListeners]) {
+      try {
+        listener(reason)
+      } catch {
+        // A listener must not break teardown.
+      }
+    }
+    this.closeListeners.clear()
+    this.commandResultListeners.clear()
+  }
+
   cancelFilePicker(): void {
     const abort = this.pickerAbort
     this.pickerAbort = null
@@ -322,6 +363,7 @@ export abstract class FrameSession {
     this.cancelFilePicker()
     this.listing.reset()
     this.onClosing()
+    this.notifyClosed('closed')
     if (!this.frame) {
       this.phase = 'closed'
       return
@@ -351,6 +393,7 @@ export abstract class FrameSession {
     this.frame = null
     this.disposeResolve?.()
     this.disposeResolve = null
+    this.notifyClosed('closed')
   }
 
   protected abstract buildModeInit(): Record<string, unknown>
@@ -430,6 +473,7 @@ export abstract class FrameSession {
     this.frame?.close()
     this.frame = null
     this.options.onFailure({ code, phase, message })
+    this.notifyClosed('error')
   }
 
   private finishDispose(): void {
@@ -446,6 +490,7 @@ export abstract class FrameSession {
     this.frame = null
     this.disposeResolve?.()
     this.disposeResolve = null
+    this.notifyClosed('closed')
   }
 
   private handleMessage(message: PluginMessage): void {
@@ -522,6 +567,9 @@ export abstract class FrameSession {
         return
       case 'plugin/dispose-ack':
         return
+      case 'plugin/command-result':
+        this.handleCommandResult(envelope)
+        return
       case 'plugin/register':
       case 'plugin/register-complete':
         this.violation(envelope)
@@ -529,6 +577,17 @@ export abstract class FrameSession {
       default:
         if (envelope.id) this.sendError('unsupported-message', envelope.id)
         return
+    }
+  }
+
+  private handleCommandResult(envelope: Envelope): void {
+    if (this.phase !== 'active') return
+    for (const listener of [...this.commandResultListeners]) {
+      try {
+        listener(envelope)
+      } catch {
+        // A controller listener must not break protocol dispatch.
+      }
     }
   }
 
@@ -581,6 +640,7 @@ export abstract class FrameSession {
         openFile: true,
         openView: true,
         requestPanel: true,
+        commands: true,
       },
       limits: {
         maxFileSize: this.options.maxFileSize,

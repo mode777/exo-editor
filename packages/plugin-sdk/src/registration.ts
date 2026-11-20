@@ -35,7 +35,8 @@ function parseAck(payload: unknown): RegistrationAck | null {
   }
   const acceptedPanels = parseStringList(payload.acceptedPanels)
   const acceptedContentViews = parseStringList(payload.acceptedContentViews)
-  if (!acceptedPanels || !acceptedContentViews) return null
+  const acceptedCommands = parseStringList(payload.acceptedCommands)
+  if (!acceptedPanels || !acceptedContentViews || !acceptedCommands) return null
   if (!Array.isArray(payload.rejected)) return null
   const rejected: RejectedContribution[] = []
   for (const item of payload.rejected) {
@@ -54,7 +55,8 @@ function parseAck(payload: unknown): RegistrationAck | null {
       item.kind !== undefined &&
       item.kind !== 'fileEditor' &&
       item.kind !== 'panel' &&
-      item.kind !== 'contentView'
+      item.kind !== 'contentView' &&
+      item.kind !== 'command'
     ) {
       return null
     }
@@ -63,7 +65,7 @@ function parseAck(payload: unknown): RegistrationAck | null {
       reason: item.reason as RegistrationRejectionReason,
       ...(item.kind === undefined
         ? {}
-        : { kind: item.kind as 'fileEditor' | 'panel' | 'contentView' }),
+        : { kind: item.kind as 'fileEditor' | 'panel' | 'contentView' | 'command' }),
       ...(item.message === undefined ? {} : { message: item.message }),
     })
   }
@@ -71,6 +73,7 @@ function parseAck(payload: unknown): RegistrationAck | null {
     accepted: payload.accepted as string[],
     acceptedPanels,
     acceptedContentViews,
+    acceptedCommands,
     rejected,
   }
 }
@@ -149,7 +152,12 @@ export class RegistrationClient {
     this.sendViewRegistration('contentViews', id)
   }
 
-  private sendViewRegistration(kind: 'panels' | 'contentViews', id: string): void {
+  /** Register a declared command id; it activates after completion. */
+  registerCommand(id: string): void {
+    this.sendViewRegistration('commands', id)
+  }
+
+  private sendViewRegistration(kind: 'panels' | 'contentViews' | 'commands', id: string): void {
     if (this.completed || this.completing) {
       throw new ExoProtocolError(
         'protocol-violation',

@@ -34,6 +34,20 @@ export interface CommandContext {
   secondaryViewCount: number
 }
 
+/** One active plugin command as the palette lists it; ids stay shell-owned. */
+export interface PluginPaletteEntry {
+  identity: string
+  commandId: string
+  title: string
+  category: string
+  inPalette: boolean
+}
+
+export interface PluginPaletteProvider {
+  list(): PluginPaletteEntry[]
+  invoke(identity: string, commandId: string): void
+}
+
 export interface ExoCommandHandlers {
   openSettings: () => void
   openPluginSettings: () => void
@@ -180,6 +194,14 @@ const AVAILABILITY: Record<string, (context: CommandContext) => boolean> = {
 }
 
 /**
+ * A shell-owned, collision-free palette id. The plugin id is encoded, so even a
+ * plugin command named `exo.settings.open` cannot replace the shell entry.
+ */
+export function pluginCommandPaletteId(identity: string, commandId: string): string {
+  return `exo.plugin.${encodeURIComponent(identity)}.${encodeURIComponent(commandId)}`
+}
+
+/**
  * The palette renders every entry it is given as runnable, so applicability is
  * applied when listing rather than by disabling. `run` re-checks it so a stale
  * palette entry cannot start an invalid operation.
@@ -188,9 +210,27 @@ export function createExoCommandRegistry(
   getContext: () => CommandContext,
   handlers: ExoCommandHandlers,
   getDynamicCommands: () => WorkbenchCommand[] = () => [],
+  pluginCommands?: PluginPaletteProvider,
 ): CommandRegistry {
   const commands = createExoCommands(handlers)
-  const all = () => [...commands, ...getDynamicCommands()]
+  const knownPluginIds = new Map<string, { identity: string; commandId: string }>()
+  const pluginCommandList = (): WorkbenchCommand[] => {
+    if (!pluginCommands) return []
+    const entries: WorkbenchCommand[] = []
+    for (const entry of pluginCommands.list()) {
+      const id = pluginCommandPaletteId(entry.identity, entry.commandId)
+      knownPluginIds.set(id, { identity: entry.identity, commandId: entry.commandId })
+      if (!entry.inPalette) continue
+      entries.push({
+        id,
+        title: entry.title,
+        category: entry.category,
+        run: () => pluginCommands.invoke(entry.identity, entry.commandId),
+      })
+    }
+    return entries
+  }
+  const all = () => [...commands, ...getDynamicCommands(), ...pluginCommandList()]
   const isAvailable = (command: WorkbenchCommand, context: CommandContext) =>
     AVAILABILITY[command.id]?.(context) ?? true
 
@@ -201,10 +241,17 @@ export function createExoCommandRegistry(
     },
     run(id: string): boolean {
       const command = all().find((entry) => entry.id === id)
-      if (!command) return false
-      if (!isAvailable(command, getContext())) return false
-      command.run()
-      return true
+      if (command) {
+        if (!isAvailable(command, getContext())) return false
+        command.run()
+        return true
+      }
+      const known = knownPluginIds.get(id)
+      if (known && pluginCommands) {
+        pluginCommands.invoke(known.identity, known.commandId)
+        return true
+      }
+      return false
     },
   }
 }

@@ -29,6 +29,28 @@ function rootUrl(manifest: PluginManifest): string {
   return `${manifest.manifestOrigin}${manifest.pluginRoot}`
 }
 
+function commandTargetText(
+  command: PluginManifest['commands'][number],
+  manifest: PluginManifest,
+): string {
+  const target = command.target
+  if (target === 'activeEditor') return 'Acts on the active editor.'
+  const label =
+    target.kind === 'panel'
+      ? manifest.panels.find((panel) => panel.id === target.id)?.title
+      : manifest.contentViews.find((view) => view.id === target.id)?.title
+  return `Acts on ${target.kind === 'panel' ? 'the panel' : 'the content view'} “${label ?? target.id}”.`
+}
+
+function commandPlacementsText(command: PluginManifest['commands'][number]): string {
+  const placements = command.menus.map((menu) => {
+    if (menu === 'commandPalette') return 'the command palette'
+    if (menu === 'explorer/context') return 'the explorer context menu'
+    return 'the editor action row'
+  })
+  return `Offered in ${placements.join(', ')}.`
+}
+
 export function ConsentDialog({ request, shellOrigin, onApprove, onDeny }: ConsentDialogProps) {
   const denyButton = useRef<HTMLButtonElement>(null)
   const dialogRef = useModalDialog({
@@ -149,6 +171,23 @@ export function ConsentDialog({ request, shellOrigin, onApprove, onDeny }: Conse
                   <div className="exo-consent-page">
                     <code>{view.entryUrl}</code>
                   </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section className="exo-consent-section" aria-labelledby="exo-consent-commands">
+          <h3 id="exo-consent-commands">Commands it can add</h3>
+          {manifest.commands.length === 0 ? (
+            <p className="exo-settings-hint">This plugin adds no commands.</p>
+          ) : (
+            <ul className="exo-consent-list">
+              {manifest.commands.map((command) => (
+                <li key={command.id}>
+                  <strong>{command.title}</strong> — <code>{command.id}</code>
+                  <div className="exo-consent-page">{commandTargetText(command, manifest)}</div>
+                  <div className="exo-consent-page">{commandPlacementsText(command)}</div>
                 </li>
               ))}
             </ul>
