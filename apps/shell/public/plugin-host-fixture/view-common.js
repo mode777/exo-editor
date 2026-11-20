@@ -128,7 +128,10 @@
   wire('new-file-oversized', () =>
     post(
       'plugin/request-new-file',
-      { text: 'x'.repeat(8 * 1024 * 1024 + 1), suggestedName: 'too-large.txt' },
+      {
+        bytes: new Uint8Array(8 * 1024 * 1024 + 1).buffer,
+        suggestedName: 'too-large.bin',
+      },
       `new-large-${Date.now()}`,
     ),
   )
