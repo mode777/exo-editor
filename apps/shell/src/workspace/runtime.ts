@@ -21,7 +21,7 @@ import { PluginHost } from '../plugins/host'
 import { HandlerPool } from '../plugins/handlers'
 import { FilePickerController } from '../plugins/file-picker'
 import { PluginSettingsStore, type PluginSettingsStorage } from '../plugins/settings'
-import { FileChangeCoalescer, SelfWriteEcho, type ThemeName } from '../plugins/events'
+import { EventBus, FileChangeCoalescer, SelfWriteEcho, type ThemeName } from '../plugins/events'
 import { FolderWorkspaceProvider } from './providers/folder/provider'
 import { IndexedDbHandleStore, type HandleStore } from './providers/folder/handle-store'
 import { supportsFolderWorkspaces } from './providers/folder/fsa'
@@ -116,6 +116,8 @@ export class WorkspaceRuntime {
   readonly pluginConfig: PluginConfigStore
   readonly pluginHost: PluginHost
   readonly handlers: HandlerPool
+  /** The one event bus for the current workspace; shared by handler pools. */
+  readonly events: EventBus
   readonly filePicker: FilePickerController
   readonly pluginSettings: PluginSettingsStore
 
@@ -154,9 +156,16 @@ export class WorkspaceRuntime {
     })
     this.pluginHost = options.pluginHost ?? new PluginHost()
     this.filePicker = new FilePickerController()
+    this.events =
+      options.handlerPool?.events ??
+      new EventBus({
+        onSubscriberRemoved: (label, topic, code) =>
+          this.pluginHost.logHandler(label, 'handler-events', code, topic),
+      })
     this.handlers =
       options.handlerPool ??
       new HandlerPool({
+        events: this.events,
         onHandlerClosed: (path) => this.documents.handleHandlerClosed(path),
         onSaveRequested: (path) => this.documents.saveFromPlugin(path),
         onRequestFiles: (request) => this.filePicker.request(request),
@@ -549,6 +558,7 @@ export class WorkspaceRuntime {
 
     this.generationCount += 1
     const generation = this.generationCount
+    this.events.reset()
     const session = this.createSession(handle)
     this.session = session
     this.provider = provider
@@ -607,6 +617,7 @@ export class WorkspaceRuntime {
     this.filePicker.reset()
     this.handlers.publishWorkspaceClosed(reason)
     await this.handlers.detach()
+    this.events.reset()
     this.fileChanges.reset()
     this.echoes.reset()
     this.pluginHost.detach()

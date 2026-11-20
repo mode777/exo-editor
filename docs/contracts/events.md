@@ -7,8 +7,11 @@ requirements are mirrored in `openspec/specs/plugin-events/spec.md`.
 
 Shell-to-plugin notifications - theme changes, file changes, workspace closure,
 plugin configuration - travel over a topic subscription API carried by the same
-envelope as the plugin protocol. Workspace-wide notifications use topics only;
-the targeted `shell/file-changed` message for an open document (section 5.4 of
+envelope as the plugin protocol. The same bus also carries **plugin-local**
+events between the frames of one plugin: `local/<name>` topics are scoped to a
+single plugin identity, so two plugins may use the same name without observing
+each other. Workspace-wide notifications use topics only; the targeted
+`shell/file-changed` message for an open document (section 5.4 of
 [`plugin-protocol.md`](./plugin-protocol.md#54-external-changes)) stays a
 protocol message and is not a second subscription channel. Both forms derive
 from the same observation.
@@ -21,44 +24,75 @@ does not wait for a plugin to handle one, and a slow plugin cannot block another
 ```text
 plugin/subscribe    { topic: string }
 plugin/unsubscribe  { topic: string }
+plugin/publish      { topic: string, payload: unknown }
 shell/subscribed    { topic: string, seq: number } | { topic, code: 'unsupported-topic' }
-shell/event         { topic: string, seq: number, payload: unknown }
+shell/published     { topic: string, seq: number }
+shell/event         { topic: string, seq: number, from?: string, payload: unknown }
 ```
 
 - `plugin/subscribe` is idempotent. Re-subscribing returns the current `seq`.
-- `PluginPermission` `events:subscribe` is required; without it the shell replies
+- `PluginPermission` `events:subscribe` is required for shell subscriptions and
+  for local publication and subscription; without it the shell replies
   `permission-denied`.
+- `plugin/publish` is correlated: it carries a request id and the shell replies
+  `shell/published` with the accepted topic and sequence. The reply means the
+  shell accepted the event, not that a peer handled it.
 - `config/changed` is targeted: only the subscribed handler frames of the plugin
   named in the payload receive it. A frame of another plugin receives neither the
   event nor the values, even if it subscribes to the topic.
 - Unknown topics are rejected with `unsupported-topic`; the shell does not
-  wildcard-match topics.
+  wildcard-match topics. A shell topic sent through `plugin/publish` is rejected
+  with `permission-denied` and does not advance that topic's sequence.
 - Subscriptions belong to a frame. They are not persisted and do not survive
   `shell/dispose`.
-- Only handler frames may subscribe. Registration frames are too short-lived;
-  a plugin that needs events without an open document needs a background frame,
-  which is not part of v1. This is sufficient for the reference editor: theme and
-  file changes matter while a document is open, and a closed document has nothing
-  to render.
+- Only handler frames may subscribe or publish. Registration frames are too
+  short-lived; a plugin that needs events without an open document needs a
+  background frame, which is not part of v1. This is sufficient for the reference
+  editor: theme and file changes matter while a document is open, and a closed
+  document has nothing to render.
+
+### Local topic rules
+
+- `local/<name>` is reserved for plugin-authored topics. The name is 1-64
+  characters of lowercase letters, digits, dots, underscores or hyphens and
+  starts with a letter or digit. `local/`, `local/State`, `local/a/b` and a name
+  longer than 64 characters are rejected with `unsupported-topic`.
+- A local subscription and its sequence are keyed by `(plugin identity, topic)`.
+  The plugin identity includes the manifest origin and id, so two plugins with
+  the same id on different origins are separate. Delivery filters on that
+  identity and never routes to another plugin.
+- A local event carries `from`, the publishing frame's opaque `exo-session`.
+  The shell sets it; a plugin cannot forge another frame's id through the
+  payload.
+- A publisher that is also subscribed receives its own event. There is no
+  ordering guarantee between `shell/published` and delivery to the publisher.
+- The shell does not interpret, log or persist the payload. Plugins own their
+  payload shapes and should include a correlation id for request/reply patterns.
+- Local topics share the 32-topic per-frame budget with shell topics.
 
 ## 3. Event shape
 
 ```ts
 interface ShellEvent<T> {
   topic: string
-  /** Monotonic per workspace session, per topic. Resets on workspace switch. */
+  /** Monotonic per workspace session and topic; resets on workspace switch. */
   seq: number
+  /** Local events only: the publishing frame's opaque exo-session. */
+  from?: string
   payload: T
 }
 ```
 
+- Shell sequences are per topic per workspace session. Local sequences are per
+  plugin identity and topic, so two plugins using `local/state` each start at 1.
 - `seq` starts at 1 for the first event a frame receives after subscribing; the
   `shell/subscribed` reply carries the current value so a plugin can detect a
   gap. With one subscriber per topic this is enough; the shell makes no
   cross-topic ordering promise.
 - Delivery is at-most-once. A dropped event is not replayed.
-- The shell delivers to every live frame of every plugin subscribed to the topic,
-  independently. One plugin's failure to process does not affect another.
+- The shell delivers to every live frame of every plugin subscribed to a shell
+  topic, independently, and to every subscribed frame of the same identity for a
+  local topic. One plugin's failure to process does not affect another.
 - Event payloads must be structured-cloneable and contain no functions, handles
   or DOM nodes.
 
@@ -74,6 +108,13 @@ interface ShellEvent<T> {
 Topic names are `<namespace>/<event>`, lowercase, `[a-z0-9-]` segments, maximum
 64 characters. New topics are added by changing this contract and the OpenSpec
 spec; a plugin must ignore topics it does not know.
+
+### Plugin-local namespace
+
+`local/<name>` is not part of the shell catalog. It exists only for the frames
+of one plugin and is governed by the local rules in section 2. A plugin cannot
+add a shell topic, cannot publish a shell topic, and cannot observe another
+plugin's local topic. `config/changed` remains the only targeted shell topic.
 
 `config/changed` carries the full new value map for the named plugin, not a
 delta. It requires `events:subscribe`, and the shell delivers it only to that
@@ -124,10 +165,12 @@ without subscribing. `config/changed` is then incremental.
 
 | Limit | Value |
 | --- | --- |
-| Topics per frame | 32 |
+| Topics per frame | 32 across shell and local namespaces |
 | Queued events per topic per frame | 1000 |
-| Event payload | 1 MiB |
-| Publish rate per topic | 100 events/s (coalesced topics may burst) |
+| Event payload | 1 MiB (shell and local) |
+| Shell publish rate per topic | 100 events/s (coalesced topics may burst) |
+| Local publish rate per identity and topic | 100 events/s |
+| Local publish rate per frame | 200 events/s across all local topics |
 
 - On queue overflow the shell drops the oldest events and sends one
   `shell/error` with `rate-limited` and the topic name. It does not tear down the
@@ -136,8 +179,13 @@ without subscribing. `config/changed` is then incremental.
 - Non-coalesced topics publish at most 100 events per rolling second; events
   beyond that are dropped and not replayed. Coalesced file changes are exempt
   from that gate because they are already merged per path.
-- A frame that repeatedly sends invalid subscription messages is treated as a
-  protocol violation under
+- A local publication over the 100/s topic rate or the 200/s frame aggregate is
+  rejected with `rate-limited`; no event is delivered for it and the frame is not
+  torn down.
+- A local payload over 1 MiB is rejected with `too-large` and a message naming
+  the limit; the sequence does not advance.
+- A frame that repeatedly sends invalid subscription or publication messages is
+  treated as a protocol violation under
   [`plugin-protocol.md`](./plugin-protocol.md#6-errors).
 - Event publication must never throw into the shell's render path. A failing
   subscriber is logged and removed from the delivery set after three failures.
@@ -148,8 +196,10 @@ without subscribing. `config/changed` is then incremental.
   A breaking payload change ships under the same topic only with a protocol
   major bump, because plugins and shell are deployed independently.
 - Additive payload fields are allowed; consumers must tolerate unknown fields.
-- The catalog is closed for v1. A plugin cannot publish topics; plugin-to-shell
-  notifications use the protocol's request messages.
+- The shell catalog is closed for v1. A plugin cannot publish shell topics;
+  plugin-to-shell notifications use the protocol's request messages. The only
+  plugin-published topics are in the reserved `local/` namespace, whose payloads
+  the shell treats as opaque.
 
 ## 8. Resolved during ratification
 

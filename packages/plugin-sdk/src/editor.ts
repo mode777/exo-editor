@@ -3,7 +3,11 @@ import { parseShellError } from './init'
 import {
   ExoProtocolError,
   MAX_IN_FLIGHT_REQUESTS,
+  MAX_LOCAL_EVENT_BYTES,
+  isEventTopic,
+  isLocalEventTopic,
   isPlainObject,
+  payloadTooLarge,
   type BinaryFileContent,
   type DisposeReason,
   type EditorCapabilities,
@@ -17,6 +21,8 @@ import {
   type FilePickerOptions,
   type DirectoryPage,
   type ListDirectoryOptions,
+  type LocalEvent,
+  type LocalEventTopic,
   type SaveContent,
   type SaveResult,
   type SettingValues,
@@ -145,7 +151,20 @@ function parseFileChanged(payload: unknown): FileChangedPayload | null {
 function parseEvent(payload: unknown): ShellEvent | null {
   if (!isPlainObject(payload)) return null
   if (typeof payload.topic !== 'string' || typeof payload.seq !== 'number') return null
-  return { topic: payload.topic as EventTopic, seq: payload.seq, payload: payload.payload }
+  if (payload.from !== undefined && typeof payload.from !== 'string') return null
+  if (!isEventTopic(payload.topic) && !isLocalEventTopic(payload.topic)) return null
+  return {
+    topic: payload.topic,
+    seq: payload.seq,
+    payload: payload.payload,
+    ...(payload.from === undefined ? {} : { from: payload.from }),
+  }
+}
+
+function parsePublished(payload: unknown): { topic: LocalEventTopic; seq: number } | null {
+  if (!isPlainObject(payload)) return null
+  if (!isLocalEventTopic(payload.topic) || typeof payload.seq !== 'number') return null
+  return { topic: payload.topic, seq: payload.seq }
 }
 
 /** One editor frame's protocol client. It never parses file content. */
@@ -197,6 +216,9 @@ export class EditorClient {
     gate.on('shell/file-changed', (envelope) => this.handleFileChanged(envelope.payload))
     gate.on('shell/subscribed', (envelope) =>
       this.handleSubscribed(envelope.replyTo, envelope.payload),
+    )
+    gate.on('shell/published', (envelope) =>
+      this.handlePublished(envelope.replyTo, envelope.payload),
     )
     gate.on('shell/event', (envelope) => this.handleEvent(envelope.payload))
     gate.on('shell/dispose', (envelope) => this.handleDispose(envelope.payload))
@@ -360,11 +382,97 @@ export class EditorClient {
     )
   }
 
-  unsubscribe(topic: EventTopic): void {
+  unsubscribe(topic: EventTopic | LocalEventTopic): void {
     if (this.isClosed) return
     this.subscriptions.delete(topic)
     this.eventListeners.delete(topic)
     this.gate.send('plugin/unsubscribe', { topic })
+  }
+
+  /**
+   * Publish a plugin-local event to the other frames of this plugin. The call
+   * resolves when the shell has accepted the event (not when a peer handled it).
+   */
+  publishLocal(
+    topic: LocalEventTopic | EventTopic,
+    payload: unknown,
+  ): Promise<{ topic: LocalEventTopic; seq: number }> {
+    const preflight = this.localPreflight(topic)
+    if (preflight) return Promise.reject(preflight)
+    if (payloadTooLarge(payload, MAX_LOCAL_EVENT_BYTES)) {
+      return Promise.reject(
+        new ExoProtocolError(
+          'too-large',
+          `Local event payloads are limited to ${MAX_LOCAL_EVENT_BYTES} bytes.`,
+        ),
+      )
+    }
+    const id = this.nextId()
+    return this.request<{ topic: LocalEventTopic; seq: number }>(id, 'plugin/publish', {
+      topic,
+      payload,
+    })
+  }
+
+  /** Subscribe to a plugin-local topic; no history is replayed. */
+  subscribeLocal(
+    topic: LocalEventTopic | EventTopic,
+  ): Promise<{ topic: LocalEventTopic; seq: number }> {
+    const preflight = this.localPreflight(topic)
+    if (preflight) return Promise.reject(preflight)
+    const id = this.nextId()
+    return this.request<{ topic: string; seq: number }>(id, 'plugin/subscribe', { topic }).then(
+      (result) => {
+        this.subscriptions.add(topic)
+        return { topic: topic as LocalEventTopic, seq: result.seq }
+      },
+    )
+  }
+
+  /** Receive local events after `subscribeLocal`; the payload is not interpreted. */
+  onLocalEvent<T = unknown>(
+    topic: LocalEventTopic,
+    listener: (event: LocalEvent<T>) => void,
+  ): () => void {
+    let set = this.eventListeners.get(topic)
+    if (!set) {
+      set = new Set()
+      this.eventListeners.set(topic, set)
+    }
+    const wrapped = listener as unknown as (event: ShellEvent) => void
+    set.add(wrapped)
+    return () => {
+      const current = this.eventListeners.get(topic)
+      current?.delete(wrapped)
+    }
+  }
+
+  private localPreflight(topic: string): ExoProtocolError | null {
+    if (!this.init.capabilities.localEvents) {
+      return new ExoProtocolError(
+        'unsupported-message',
+        'This shell does not support plugin-local events.',
+      )
+    }
+    if (!this.init.permissions.includes('events:subscribe')) {
+      return new ExoProtocolError(
+        'permission-denied',
+        'The plugin does not have events:subscribe permission for local topics.',
+      )
+    }
+    if (isEventTopic(topic)) {
+      return new ExoProtocolError(
+        'permission-denied',
+        'Plugins cannot publish or subscribe to shell topics through the local API.',
+      )
+    }
+    if (!isLocalEventTopic(topic)) {
+      return new ExoProtocolError(
+        'unsupported-topic',
+        'A local topic must be local/<name> with a lowercase 1-64 character name.',
+      )
+    }
+    return null
   }
 
   onEvent<T extends EventTopic>(topic: T, listener: EventListener<T>): () => void {
@@ -565,6 +673,18 @@ export class EditorClient {
       return
     }
     this.settle(replyTo, undefined, { topic: payload.topic as EventTopic, seq: payload.seq })
+  }
+
+  private handlePublished(replyTo: string | undefined, payload: unknown): void {
+    const published = parsePublished(payload)
+    if (!published) {
+      this.settle(
+        replyTo,
+        new ExoProtocolError('protocol-violation', 'The shell sent an invalid publish reply.'),
+      )
+      return
+    }
+    this.settle(replyTo, undefined, published)
   }
 
   private handleEvent(payload: unknown): void {

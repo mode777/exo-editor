@@ -135,16 +135,18 @@ interface ShellInit {
   /** Present only when mode is 'editor'. Never contains file content. */
   file?: FileMetadata
   /**
-   * Present only when mode is 'editor'. `requestFiles` is the permission bit;
-   * `filePicker` and `directoryListing` are shell support bits and are absent
-   * on older shells.
+   * Registration init carries `{ localEvents }`. Editor init carries the
+   * permission bits plus the shell support bits: `filePicker`,
+   * `directoryListing` and `localEvents` are absent on older shells and a plugin
+   * must treat absence as false.
    */
   capabilities?: {
-    read: boolean
-    write: boolean
-    requestFiles: boolean
+    read?: boolean
+    write?: boolean
+    requestFiles?: boolean
     filePicker?: boolean
     directoryListing?: boolean
+    localEvents?: boolean
   }
   /** Present only when mode is 'editor'. */
   limits?: { maxFileSize: number; maxRequestBytes: number }
@@ -175,7 +177,7 @@ reinterpret a frame that starts in one mode as the other.
 | Phase | Allowed plugin messages |
 | --- | --- |
 | `register` | `plugin/ready`, `plugin/register`, `plugin/register-complete` |
-| `editor` | `plugin/ready`, `plugin/request-file`, `plugin/request-files`, `plugin/request-list`, `plugin/dirty`, `plugin/request-save`, `plugin/save-content`, `plugin/subscribe`, `plugin/unsubscribe`, `plugin/dispose-ack` |
+| `editor` | `plugin/ready`, `plugin/request-file`, `plugin/request-files`, `plugin/request-list`, `plugin/dirty`, `plugin/request-save`, `plugin/save-content`, `plugin/subscribe`, `plugin/unsubscribe`, `plugin/publish`, `plugin/dispose-ack` |
 
 - `plugin/ready` is accepted once per frame. A second `ready`, a
   `plugin/register-complete` before `ready`, or a registration message after
@@ -188,6 +190,9 @@ reinterpret a frame that starts in one mode as the other.
   single live `shell/request-save`. Content with no live request, or for a
   request that already timed out, is ignored, never written, and counted as a
   protocol violation.
+- `plugin/publish` is accepted only in the editor phase. A registration frame
+  that sends it receives `protocol-violation`, publishes nothing and counts the
+  message toward its budget.
 - `plugin/request-save` is an id-less intent notification. It asks the shell to
   run the normal Save action for the handler's document; it carries no content
   and must not have an `id` or a non-empty payload. The shell may coalesce it
@@ -435,6 +440,30 @@ reload, keep its buffer, or ask the user. The shell does not auto-reload a dirty
 tab. A save after deletion fails with `not-found` and does not recreate the
 file.
 
+### 5.4.1 Plugin-local events
+
+```text
+plugin/publish       { topic: 'local/<name>', payload: unknown }   // correlated
+shell/published      { topic: 'local/<name>', seq: number }        // replyTo = request id
+```
+
+- `plugin/publish` is an editor-phase, correlated request. It requires
+  `events:subscribe`. The topic must be a well-formed `local/<name>`; a shell
+  catalog topic is rejected with `permission-denied`, another malformed name with
+  `unsupported-topic`, a payload over 1 MiB with `too-large`, and an excess rate
+  with `rate-limited`. The shell does not interpret, log or persist the payload.
+- The shell sets `from` on the resulting `shell/event` to the publishing frame's
+  opaque `exo-session`. Delivery is limited to subscribed handler frames of the
+  same plugin identity and is at-most-once with no replay. A publisher that also
+  subscribed receives its own event.
+- `shell/published` means the shell accepted the event, not that a peer handled
+  it. A publish from a disposed frame is dropped with no reply.
+- The shell reserves `local/` for this purpose. The shell topic catalog stays
+  closed; a plugin cannot publish `theme/changed` or any other shell topic.
+- A frame may publish at most 200 local events per rolling second across all
+  local topics and 100 per second on one topic. The limits are in
+  [`events.md`](./events.md#6-limits-and-failure).
+
 ### 5.5 Disposal
 
 ```text
@@ -466,6 +495,7 @@ interface ShellError {
     | 'too-large'
     | 'conflict'
     | 'rate-limited'
+    | 'unsupported-topic'
     | 'internal'
   message?: string // user-safe, no paths outside the requested scope
 }
@@ -497,6 +527,10 @@ are cleared on workspace switch.
 | Listing requests per rolling second per frame | 20 |
 | Listing page timeout | 5 s |
 | Listing snapshots per handler | bounded with LRU eviction; the newest snapshot is always admitted |
+| Local event payload | 1 MiB |
+| Local publish rate per identity and topic | 100 events per rolling second |
+| Local publish rate per frame | 200 events per rolling second across all local topics |
+| Local topics per frame | included in the 32-topic subscription budget |
 
 When a plugin already has 20 handler frames open, the shell refrains from mounting
 another one: the new document opens in the shell's fallback renderer with a
@@ -546,5 +580,6 @@ for repeated violations, tears down the frame.
 - Normalize every path before the reserved-path and containment checks; check
   after resolution, not before.
 - Drop messages after `shell/dispose` even if the frame is still alive.
-- Do not log file contents. Log ids, paths and error codes.
+- Do not log file contents. Log ids, paths, topics and error codes; a local
+  event payload is opaque and is never logged.
 - A same-origin plugin entry must never receive `allow-same-origin` (D3, D9).

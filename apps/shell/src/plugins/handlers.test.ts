@@ -4,6 +4,7 @@ import { Session } from '../workspace/session'
 import type { WorkspacePath, WorkspaceSession } from '../workspace/contract'
 import { FakeFrameTransport } from './frame-test-support'
 import { HandlerPool, type HandlerPoolHost } from './handlers'
+import { EventBus } from './events'
 import {
   FilePickerController,
   type FilePickerOpenRequest,
@@ -540,5 +541,30 @@ describe('handler pool', () => {
     await detached
     expect(context.transport.frames[0].closed).toBe(true)
     vi.useRealTimers()
+  })
+
+  it('does not reset a shared bus on attach or detach', async () => {
+    const context = await harness({ '/src/a.ts': 'a' })
+    const events = new EventBus()
+    const subscriber = events.createSubscriber({
+      identity: 'other::com.example',
+      deliver: () => {},
+    })
+    subscriber.subscribe('theme/changed')
+    events.publish('theme/changed', { theme: 'dark' })
+    const pool = new HandlerPool({
+      transport: new FakeFrameTransport(),
+      events,
+      shellOrigin: SHELL_ORIGIN,
+      shellVersion: '0.1.0',
+    })
+
+    pool.attach({ session: context.session, host: context.host, workspaceName: 'demo' })
+    expect(subscriber.active).toBe(true)
+    expect(events.sequence('theme/changed')).toBe(1)
+    await pool.detach()
+    expect(subscriber.active).toBe(true)
+    expect(subscriber.topics.has('theme/changed')).toBe(true)
+    expect(events.sequence('theme/changed')).toBe(1)
   })
 })

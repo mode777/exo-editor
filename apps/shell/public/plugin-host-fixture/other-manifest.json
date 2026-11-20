@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "id": "com.example.exo.fixture.other",
+  "name": "Exo Host Fixture Other",
+  "version": "1.2.0",
+  "description": "A second identity for cross-plugin local-event isolation checks.",
+  "publisher": {
+    "name": "Exo"
+  },
+  "engines": {
+    "exo": ">=0.2.0"
+  },
+  "runtime": {
+    "entry": "plugin.html"
+  },
+  "permissions": ["workspace:read", "events:subscribe"],
+  "contributes": {
+    "fileEditors": [
+      {
+        "glob": "**/*.local-other.txt",
+        "entry": "editor-local-events.html",
+        "label": "Fixture Other Local Events",
+        "priority": 60,
+        "rendering": "frame"
+      }
+    ]
+  }
+}

@@ -37,6 +37,13 @@
     },
     "fileEditors": [
       {
+        "glob": "**/*.local.txt",
+        "entry": "editor-local-events.html",
+        "label": "Fixture Local Events",
+        "priority": 60,
+        "rendering": "frame"
+      },
+      {
         "glob": "**/*.list.txt",
         "entry": "editor-list.html",
         "label": "Fixture Listing",

@@ -264,6 +264,7 @@ export class RegistrationSession {
       case 'plugin/save-content':
       case 'plugin/subscribe':
       case 'plugin/unsubscribe':
+      case 'plugin/publish':
       case 'plugin/dispose-ack':
         this.violation(envelope)
         return
@@ -319,6 +320,7 @@ export class RegistrationSession {
       permissions: this.options.manifest.permissions,
       locale: this.options.locale,
       settings: this.options.settings ?? {},
+      capabilities: { localEvents: true },
     })
     this.registrationTimer = this.setTimeoutImpl(() => {
       this.fail('timeout', 'register')

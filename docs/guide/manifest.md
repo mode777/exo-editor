@@ -97,7 +97,7 @@ A file editor contribution requires `workspace:read` or `workspace:write`.
 | `workspace:read` | Read known paths it opens or requests, and paths the user selects in its picker. |
 | `workspace:write` | Save changes to workspace files through the normal save flow. Requires `workspace:read`. |
 | `workspace:list` | Enumerate one directory level at a time through `plugin/request-list`. Requires `workspace:read`. |
-| `events:subscribe` | Subscribe to the v1 shell event topics. |
+| `events:subscribe` | Subscribe to the v1 shell event topics and exchange `local/` messages with this plugin's own frames. |
 
 Listing is separate from reading so the consent text can name discovery
 explicitly. Adding `workspace:list` to an already-approved reader changes the
@@ -112,7 +112,8 @@ kinds and file sizes only; bytes still come from `plugin/request-file`.
   renders the controls and delivers values in `shell/init` and
   `config/changed`; values are stored by the shell, not written into `exo.json`.
 - `contributes.fileEditors[].rendering` opts into the visible handler surface.
-- `events:subscribe` lets the handler subscribe to the v1 event topics.
+- `events:subscribe` lets the handler subscribe to the v1 event topics and
+  publish or subscribe to `local/<name>` topics for its own frames.
 
 Do not add fields that the contract does not define. Validation is
 all-or-nothing: one unknown field or invalid page means the whole manifest is

@@ -32,6 +32,7 @@ function init(overrides: Partial<EditorInit> = {}): EditorInit {
       requestFiles: true,
       filePicker: true,
       directoryListing: true,
+      localEvents: true,
     },
     limits: { maxFileSize: 10 * 1024 * 1024, maxRequestBytes: 16 * 1024 * 1024 },
     ...overrides,
@@ -67,6 +68,7 @@ describe('editor client', () => {
       requestFiles: true,
       filePicker: true,
       directoryListing: true,
+      localEvents: true,
     })
     expect(editor.settings).toEqual({ 'template.greeting': 'hello' })
     expect(transport.posted.filter((item) => item.type === 'plugin/request-file')).toHaveLength(0)
@@ -331,6 +333,121 @@ describe('editor client', () => {
     expect(seen).toEqual([])
   })
 
+  it('publishes a local event and resolves from the acknowledgement', async () => {
+    const { transport, editor } = await connect()
+    const published = editor.publishLocal('local/state', { ready: true })
+    const id = postedId(transport, 'plugin/publish')
+    expect(transport.last('plugin/publish')?.payload).toEqual({
+      topic: 'local/state',
+      payload: { ready: true },
+    })
+    transport.emit({
+      exo: 1,
+      type: 'shell/published',
+      replyTo: id,
+      payload: { topic: 'local/state', seq: 7 },
+    })
+    await expect(published).resolves.toEqual({ topic: 'local/state', seq: 7 })
+  })
+
+  it('subscribes to a local topic and delivers from and payload unchanged', async () => {
+    const { transport, editor } = await connect()
+    const subscription = editor.subscribeLocal('local/state')
+    const subscribeId = postedId(transport, 'plugin/subscribe')
+    expect(transport.last('plugin/subscribe')?.payload).toEqual({ topic: 'local/state' })
+    transport.emit({
+      exo: 1,
+      type: 'shell/subscribed',
+      replyTo: subscribeId,
+      payload: { topic: 'local/state', seq: 2 },
+    })
+    await expect(subscription).resolves.toEqual({ topic: 'local/state', seq: 2 })
+
+    const seen: unknown[] = []
+    editor.onLocalEvent('local/state', (event) => seen.push(event))
+    editor.onLocalEvent('local/state', () => {
+      throw new Error('local listener')
+    })
+    transport.emit({
+      exo: 1,
+      type: 'shell/event',
+      payload: { topic: 'local/state', seq: 3, from: 'frame-a', payload: { n: 1 } },
+    })
+    expect(seen).toEqual([{ topic: 'local/state', seq: 3, from: 'frame-a', payload: { n: 1 } }])
+
+    editor.unsubscribe('local/state')
+    expect(transport.last('plugin/unsubscribe')?.payload).toEqual({ topic: 'local/state' })
+    transport.emit({
+      exo: 1,
+      type: 'shell/event',
+      payload: { topic: 'local/state', seq: 4, from: 'frame-b', payload: { n: 2 } },
+    })
+    expect(seen).toHaveLength(1)
+  })
+
+  it('preflights local support, permission, topic form and size without sending', async () => {
+    const old = await connect({
+      capabilities: {
+        read: true,
+        write: true,
+        requestFiles: true,
+        filePicker: true,
+        directoryListing: true,
+        localEvents: false,
+      },
+    })
+    await expect(old.editor.publishLocal('local/state', {})).rejects.toMatchObject({
+      code: 'unsupported-message',
+    })
+    expect(old.transport.posted.filter((item) => item.type === 'plugin/publish')).toHaveLength(0)
+    expect(old.editor.capabilities.localEvents).toBe(false)
+
+    const denied = await connect({ permissions: ['workspace:read'] })
+    await expect(denied.editor.publishLocal('local/state', {})).rejects.toMatchObject({
+      code: 'permission-denied',
+    })
+    await expect(denied.editor.subscribeLocal('local/state')).rejects.toMatchObject({
+      code: 'permission-denied',
+    })
+
+    const { transport, editor } = await connect()
+    await expect(editor.publishLocal('theme/changed', {})).rejects.toMatchObject({
+      code: 'permission-denied',
+    })
+    for (const topic of ['local/', 'local/State', 'local/a/b']) {
+      await expect(editor.subscribeLocal(topic as 'local/state')).rejects.toMatchObject({
+        code: 'unsupported-topic',
+      })
+    }
+    await expect(editor.publishLocal('local/state', 'x'.repeat(1024 * 1024))).rejects.toMatchObject(
+      { code: 'too-large' },
+    )
+    expect(transport.posted.filter((item) => item.type === 'plugin/publish')).toHaveLength(0)
+    expect(transport.posted.filter((item) => item.type === 'plugin/subscribe')).toHaveLength(0)
+  })
+
+  it('rejects pending local calls on disposal', async () => {
+    const { transport, editor } = await connect()
+    const publish = editor.publishLocal('local/state', {})
+    const subscribe = editor.subscribeLocal('local/state')
+    transport.emit({ exo: 1, type: 'shell/dispose', payload: { reason: 'closed' } })
+    await expect(publish).rejects.toMatchObject({ code: 'closed' })
+    await expect(subscribe).rejects.toMatchObject({ code: 'closed' })
+  })
+
+  it('rejects a malformed publish acknowledgement', async () => {
+    const { transport, editor } = await connect()
+    const pending = editor.publishLocal('local/state', {})
+    const id = postedId(transport, 'plugin/publish')
+    transport.emit({
+      exo: 1,
+      type: 'shell/published',
+      replyTo: id,
+      payload: { topic: 'theme/changed', seq: 1 },
+    })
+    await expect(pending).rejects.toMatchObject({ code: 'protocol-violation' })
+  })
+
   it('surfaces unsolicited errors without closing', async () => {
     const { transport, editor } = await connect()
     const errors: unknown[] = []
@@ -424,6 +541,7 @@ describe('editor client', () => {
         requestFiles: false,
         filePicker: true,
         directoryListing: true,
+        localEvents: true,
       },
     })
     await expect(denied.editor.requestFiles()).rejects.toMatchObject({ code: 'permission-denied' })
@@ -513,6 +631,7 @@ describe('editor client', () => {
         requestFiles: true,
         filePicker: true,
         directoryListing: false,
+        localEvents: true,
       },
     })
     await expect(old.editor.listDirectory('/')).rejects.toMatchObject({

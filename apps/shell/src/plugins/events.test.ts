@@ -5,11 +5,14 @@ import {
   EventBus,
   FileChangeCoalescer,
   MAX_EVENTS_PER_SECOND,
+  MAX_EVENT_BYTES,
+  MAX_LOCAL_EVENTS_PER_SECOND,
   MAX_QUEUED_EVENTS,
   MAX_TOPICS_PER_FRAME,
   SelfWriteEcho,
   fileChangedPayload,
   isEventTopic,
+  isLocalEventTopic,
   mergeFileChange,
   validTopicSyntax,
   type EventSink,
@@ -57,6 +60,170 @@ function change(
     stat: { path, kind: 'file', size: 1, mtime: 1, version },
   }
 }
+
+describe('local topics', () => {
+  it('accepts and rejects the local name syntax', () => {
+    for (const topic of [
+      'local/state',
+      'local/state.v1',
+      'local/my_state',
+      'local/a-b',
+      'local/0',
+    ]) {
+      expect(isLocalEventTopic(topic)).toBe(true)
+    }
+    for (const topic of [
+      'local/',
+      'local/State',
+      'local/a/b',
+      'local/state/',
+      `local/${'a'.repeat(65)}`,
+      'theme/changed',
+      'local/.hidden',
+    ]) {
+      expect(isLocalEventTopic(topic)).toBe(false)
+    }
+  })
+
+  it('delivers only to the publishing plugin and carries the frame session', () => {
+    const { bus, flush } = harness()
+    const first = collector('first', 'a::com.example.a')
+    const second = collector('second', 'b::com.example.b')
+    const publisher = collector('publisher', 'a::com.example.a')
+    const firstSubscriber = bus.createSubscriber(first.sink)
+    const secondSubscriber = bus.createSubscriber(second.sink)
+    const publisherSubscriber = bus.createSubscriber(publisher.sink)
+    firstSubscriber.subscribe('local/state')
+    secondSubscriber.subscribe('local/state')
+    publisherSubscriber.subscribe('local/state')
+
+    expect(
+      bus.publishLocal(publisherSubscriber, 'local/state', { ready: true }, { from: 'frame-a' }),
+    ).toEqual({ ok: true, seq: 1 })
+    flush()
+
+    expect(first.events).toEqual([
+      { topic: 'local/state', seq: 1, payload: { ready: true }, from: 'frame-a' },
+    ])
+    expect(second.events).toHaveLength(0)
+    expect(publisher.events).toHaveLength(1)
+    expect(bus.localSequence('a::com.example.a', 'local/state')).toBe(1)
+    expect(bus.localSequence('b::com.example.b', 'local/state')).toBe(0)
+  })
+
+  it('sequences per plugin identity and does not replay', () => {
+    const { bus, flush } = harness()
+    const first = collector('first', 'a::com.example.a')
+    const second = collector('second', 'b::com.example.b')
+    const firstPublisher = bus.createSubscriber(collector('pa', 'a::com.example.a').sink)
+    const secondPublisher = bus.createSubscriber(collector('pb', 'b::com.example.b').sink)
+    bus.publishLocal(firstPublisher, 'local/state', { n: 1 }, { from: 'a1' })
+    bus.publishLocal(firstPublisher, 'local/state', { n: 2 }, { from: 'a1' })
+    bus.publishLocal(secondPublisher, 'local/state', { n: 3 }, { from: 'b1' })
+    flush()
+
+    const firstSubscriber = bus.createSubscriber(first.sink)
+    const secondSubscriber = bus.createSubscriber(second.sink)
+    expect(firstSubscriber.subscribe('local/state')).toEqual({ ok: true, seq: 2 })
+    expect(secondSubscriber.subscribe('local/state')).toEqual({ ok: true, seq: 1 })
+    flush()
+    expect(first.events).toHaveLength(0)
+    expect(second.events).toHaveLength(0)
+  })
+
+  it('acknowledges with no subscribers and shares the topic budget', () => {
+    const { bus } = harness()
+    const publisher = bus.createSubscriber(collector('publisher', 'a::com.example.a').sink)
+    expect(bus.publishLocal(publisher, 'local/state', {}, { from: 'a1' })).toEqual({
+      ok: true,
+      seq: 1,
+    })
+
+    const subscriber = bus.createSubscriber(collector('subscriber', 'a::com.example.a').sink)
+    for (let index = 0; index < MAX_TOPICS_PER_FRAME; index += 1) {
+      subscriber.topics.add(`fake/topic-${index}` as EventTopic)
+    }
+    expect(subscriber.subscribe('local/state')).toEqual({ ok: false, code: 'rate-limited' })
+  })
+
+  it('drops an oversized local payload without advancing the sequence', () => {
+    const { bus, dropped } = harness()
+    const publisher = bus.createSubscriber(collector('publisher', 'a::com.example.a').sink)
+    expect(
+      bus.publishLocal(
+        publisher,
+        'local/state',
+        { padding: 'x'.repeat(MAX_EVENT_BYTES) },
+        { from: 'a1' },
+      ),
+    ).toEqual({ ok: false, code: 'too-large' })
+    expect(bus.localSequence('a::com.example.a', 'local/state')).toBe(0)
+    expect(dropped).toEqual([{ topic: 'local/state', code: 'too-large' }])
+  })
+
+  it('limits one topic to 100 local events per second per identity', () => {
+    let now = 0
+    const { bus } = harness(() => now)
+    const publisher = bus.createSubscriber(collector('publisher', 'a::com.example.a').sink)
+    for (let index = 0; index < MAX_EVENTS_PER_SECOND; index += 1) {
+      expect(bus.publishLocal(publisher, 'local/state', { index }, { from: 'a1' }).ok).toBe(true)
+    }
+    expect(bus.publishLocal(publisher, 'local/state', {}, { from: 'a1' })).toEqual({
+      ok: false,
+      code: 'rate-limited',
+    })
+    now = 1001
+    expect(bus.publishLocal(publisher, 'local/state', {}, { from: 'a1' }).ok).toBe(true)
+  })
+
+  it('limits one frame to 200 local events per second across topics', () => {
+    const { bus } = harness()
+    const publisher = bus.createSubscriber(collector('publisher', 'a::com.example.a').sink)
+    for (let index = 0; index < MAX_LOCAL_EVENTS_PER_SECOND; index += 1) {
+      expect(bus.publishLocal(publisher, `local/topic-${index}`, {}, { from: 'a1' }).ok).toBe(true)
+    }
+    expect(bus.publishLocal(publisher, 'local/other', {}, { from: 'a1' })).toEqual({
+      ok: false,
+      code: 'rate-limited',
+    })
+  })
+
+  it('caps the local queue per subscriber and reports overflow once', () => {
+    let now = 0
+    const { bus, flush } = harness(() => now)
+    const { sink, events, errors } = collector('subscriber', 'a::com.example.a')
+    const subscriber = bus.createSubscriber(sink)
+    subscriber.subscribe('local/state')
+    const publisher = bus.createSubscriber(collector('publisher', 'a::com.example.a').sink)
+
+    let seq = 0
+    for (let window = 0; window < 11; window += 1) {
+      for (let index = 0; index < 100; index += 1) {
+        const result = bus.publishLocal(publisher, 'local/state', { index }, { from: 'a1' })
+        expect(result.ok).toBe(true)
+        if (result.ok) seq = result.seq
+      }
+      now += 1001
+    }
+    flush()
+
+    expect(seq).toBe(1100)
+    expect(events).toHaveLength(MAX_QUEUED_EVENTS)
+    expect(events[0]?.seq).toBe(101)
+    expect(events.at(-1)?.seq).toBe(1100)
+    expect(errors).toEqual([{ topic: 'local/state', code: 'rate-limited' }])
+  })
+
+  it('resets local sequences and subscriptions with the workspace', () => {
+    const { bus } = harness()
+    const publisher = bus.createSubscriber(collector('publisher', 'a::com.example.a').sink)
+    bus.publishLocal(publisher, 'local/state', {}, { from: 'a1' })
+    expect(bus.localSequence('a::com.example.a', 'local/state')).toBe(1)
+    bus.reset()
+    expect(bus.localSequence('a::com.example.a', 'local/state')).toBe(0)
+    expect(publisher.active).toBe(false)
+  })
+})
 
 describe('topic names', () => {
   it('accepts the v1 catalog and well-formed names', () => {

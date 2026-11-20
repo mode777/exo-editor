@@ -138,6 +138,32 @@ Subscriptions are per handler frame and require the manifest's
 `events:subscribe` permission. Initial state is in `shell/init`; events are
 changes, not a replay. See [`docs/contracts/events.md`](../contracts/events.md).
 
+### Messaging between your own frames
+
+Each open document has its own handler frame. To share state between them, use a
+local topic; the shell scopes it to your plugin identity, so another plugin using
+the same name never sees it.
+
+```ts
+// Every editor frame subscribes once after connecting.
+const sessionId = editor.initialization.sessionId
+await editor.subscribeLocal('local/selection')
+editor.onLocalEvent('local/selection', (event) => {
+  if (event.from === sessionId) return // ignore your own event
+  renderSelection(event.payload)
+})
+
+// When the user changes the selection, tell the sibling frames.
+await editor.publishLocal('local/selection', { path: editor.file.path, start, end })
+```
+
+`publishLocal()` resolves when the shell accepted the event; it does not mean a
+peer handled it. Keep your own request/reply correlation id in the payload if you
+need replies. A late-joining frame receives the current sequence and only later
+events, so ask a peer for current state or carry it in `shell/init`/the workspace.
+`localEvents` is a support bit: on a shell that omits it, the SDK rejects local
+calls with `unsupported-message` before sending anything.
+
 ## Errors
 
 `ExoProtocolError` carries a stable code. A protocol major mismatch includes

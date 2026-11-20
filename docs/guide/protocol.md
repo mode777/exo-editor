@@ -72,6 +72,14 @@ topics. The catalog, payloads, sequence numbers, coalescing and queue limits are
 in [`docs/contracts/events.md`](../contracts/events.md). Initial theme and
 workspace state are already in `shell/init`; events carry changes, not replay.
 
+The same permission also carries plugin-local messages. A handler sends a
+correlated `plugin/publish` on a `local/<name>` topic and the shell delivers a
+`shell/event` with `from` set to the publishing frame's session id to every
+subscribed frame of the same plugin. Two plugins may use `local/state`
+independently. The shell does not interpret the payload, keeps no history and
+does not route it to another plugin. The payload limit is 1 MiB, with 100
+events/s per topic and 200/s per frame.
+
 ## Errors
 
 The shell answers a correlated request with `shell/error` and a stable code. A

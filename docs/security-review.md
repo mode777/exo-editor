@@ -28,6 +28,8 @@ reverting. Findings are recorded in [Findings](#findings).
 | 8 | Consent fingerprint | `plugin-manifest` - Consent fingerprint | `plugins/consent.ts` (`fingerprintInput`, `computeFingerprint`), `plugins/host.ts` (compare before activation) | `consent.test.ts`, `host.test.ts` |
 | 9 | Shell-owned credentials | `remote-workspace` - Shell-owned credential; No remote URL capabilities | `workspace/providers/stratofold/connection-store.ts`, `workspace/runtime.ts` (`summaryOf` and the `ConnectionStore` boundary) | `runtime.remote.test.ts`, `App.remote.test.tsx`, `connection-store.test.ts` |
 | 10 | Secret-free delivery | `editor-shell` - Static, backend-free delivery | `scripts/check-dist-secrets.mjs` (new), CI after the child-path copies | `scripts/check-dist-secrets.test.mjs` (new), `check:dist-secrets` |
+| 11 | User-mediated file picker | `plugin-protocol` - File picker request; `plugin-file-editors` - User-mediated file selection | `plugins/file-picker.ts`, `plugins/handler.ts` (active/visible/focused gate, reserved-path re-check), `document/FilePickerDialog.tsx` | `handler.test.ts`, `handlers.test.ts`, `file-picker.test.ts`, `FilePickerDialog.test.tsx`, `sdk-conformance.test.ts` |
+| 12 | Plugin-local event isolation | `plugin-events` - Plugin-local topic namespace; Delivery semantics; Limits and failure isolation | `plugins/events.ts` (identity filter, per-identity sequences, per-frame rate), `plugins/handler.ts` (`plugin/publish` validation) | `events.test.ts`, `handler.test.ts`, `registration.test.ts`, `sdk-conformance.test.ts` |
 
 ## Control details
 
@@ -224,6 +226,35 @@ reverting. Findings are recorded in [Findings](#findings).
   Remove the `surfaces`/`hasFocus` gate in `HandlerPool`. Result:
   `handlers.test.ts` "opens a picker only for an active visible focused handler"
   and "denies a picker from a hidden handler" fail.
+
+### 12. Plugin-local event isolation
+
+- Requirements: `plugin-events` "Plugin-local topic namespace", "Delivery
+  semantics", "Limits and failure isolation"; `plugin-protocol` "Plugin-local
+  publication message".
+- Enforcement: `EventBus.publishLocal` rejects a non-`local/` topic, scopes
+  sequences by `(identity, topic)` and filters delivery on
+  `subscriber.sink.identity === identity`. The shell sets `from` from the handler
+  session id, never from the payload. `HandlerSession.handlePublish` requires
+  `events:subscribe`, a live id and a well-formed topic, enforces the 1 MiB
+  payload and 200/s frame rate, and logs the topic but not the payload.
+  Registration frames reject `plugin/publish` as a protocol violation.
+- Tests: `events.test.ts` "delivers only to the publishing plugin and carries the
+  frame session", "sequences per plugin identity and does not replay", "limits
+  one frame to 200 local events per second across topics" and "caps the local
+  queue per subscriber and reports overflow once"; `handler.test.ts` "publishes
+  a local event, acknowledges it and delivers it to the publisher", "rejects a
+  shell topic publication without changing its sequence", "explains an oversized
+  local payload", "treats a publish without an id as a protocol violation" and
+  "drops a publish after disposal without acknowledging it";
+  `registration.test.ts` "rejects a local publish from the registration frame as
+  a violation"; `sdk-conformance.test.ts` "exchanges local events between two
+  real handler frames and isolates another plugin".
+- Mutation: remove the `subscriber.sink.identity !== identity` filter in
+  `EventBus.publishLocal`. Result: `events.test.ts` "delivers only to the
+  publishing plugin and carries the frame session" fails because the second
+  plugin's subscriber receives the event. Removing the shell-topic guard makes
+  "rejects a shell topic publication without changing its sequence" fail.
 
 ## Findings
 

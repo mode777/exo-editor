@@ -10,7 +10,9 @@ export const EVENT_TOPICS = [
   'config/changed',
 ] as const
 
-export type EventTopic = (typeof EVENT_TOPICS)[number]
+export type ShellEventTopic = (typeof EVENT_TOPICS)[number]
+export type LocalEventTopic = `local/${string}`
+export type EventTopic = ShellEventTopic | LocalEventTopic
 
 export interface ThemeChangedPayload {
   theme: ThemeName
@@ -42,27 +44,53 @@ export interface ShellEvent<T = unknown> {
   topic: EventTopic
   seq: number
   payload: T
+  /** Opaque `exo-session` of the publishing frame; present on local events. */
+  from?: string
 }
 
 export const MAX_TOPICS_PER_FRAME = 32
 export const MAX_QUEUED_EVENTS = 1000
 export const MAX_EVENT_BYTES = 1024 * 1024
 export const MAX_EVENTS_PER_SECOND = 100
+export const MAX_LOCAL_EVENTS_PER_SECOND = 200
 export const EVENT_RATE_WINDOW_MS = 1000
+export const LOCAL_TOPIC_PREFIX = 'local/'
 
 const TOPIC_PATTERN = /^[a-z0-9-]+\/[a-z0-9-]+$/
+const LOCAL_TOPIC_PATTERN = /^local\/[a-z0-9][a-z0-9._-]{0,63}$/
 
-/** Topic names are lowercase `<namespace>/<event>` segments, at most 64 chars. */
+/** Shell topic names are lowercase `<namespace>/<event>` segments, at most 64 chars. */
 export function validTopicSyntax(topic: string): boolean {
   return topic.length > 0 && topic.length <= 64 && TOPIC_PATTERN.test(topic)
 }
 
-export function isEventTopic(value: unknown): value is EventTopic {
+export function isEventTopic(value: unknown): value is ShellEventTopic {
   return typeof value === 'string' && (EVENT_TOPICS as readonly string[]).includes(value)
+}
+
+/**
+ * Plugin-local topics reserve `local/<name>`: the name is 1-64 characters of
+ * lowercase letters, digits, dots, underscores or hyphens and starts with a
+ * letter or digit.
+ */
+export function isLocalEventTopic(value: unknown): value is LocalEventTopic {
+  return typeof value === 'string' && LOCAL_TOPIC_PATTERN.test(value)
+}
+
+export function isLocalTopicSyntax(topic: string): boolean {
+  return isLocalEventTopic(topic)
+}
+
+function localSequenceKey(identity: string, topic: LocalEventTopic): string {
+  return `${identity}\u0000${topic}`
 }
 
 export type SubscribeResult =
   { ok: true; seq: number } | { ok: false; code: 'unsupported-topic' | 'rate-limited' | 'internal' }
+
+export type PublishLocalResult =
+  | { ok: true; seq: number }
+  | { ok: false; code: 'unsupported-topic' | 'too-large' | 'rate-limited' | 'internal' }
 
 export interface EventSink {
   /** Post one `shell/event` to the frame. May throw; the bus contains it. */
@@ -121,8 +149,11 @@ interface RateWindow {
  */
 export class EventBus {
   private readonly subscribers = new Set<EventSubscriber>()
-  private readonly sequences = new Map<EventTopic, number>()
-  private readonly rates = new Map<EventTopic, RateWindow>()
+  private readonly sequences = new Map<ShellEventTopic, number>()
+  private readonly localSequences = new Map<string, number>()
+  private readonly rates = new Map<ShellEventTopic, RateWindow>()
+  private readonly localRates = new Map<string, RateWindow>()
+  private readonly localFrameRates = new Map<string, RateWindow>()
   private readonly now: () => number
   private readonly scheduleFlush: (flush: () => void) => void
   private readonly onSubscriberRemoved:
@@ -147,20 +178,22 @@ export class EventBus {
 
   subscribe(subscriber: EventSubscriber, topic: string): SubscribeResult {
     if (!subscriber.active) return { ok: false, code: 'internal' }
-    if (!isEventTopic(topic)) return { ok: false, code: 'unsupported-topic' }
+    const local = isLocalEventTopic(topic)
+    if (!local && !isEventTopic(topic)) return { ok: false, code: 'unsupported-topic' }
+    if (local && !subscriber.sink.identity) return { ok: false, code: 'unsupported-topic' }
     if (subscriber.topics.has(topic)) {
-      return { ok: true, seq: this.sequences.get(topic) ?? 0 }
+      return { ok: true, seq: this.sequenceFor(subscriber, topic) }
     }
     if (subscriber.topics.size >= MAX_TOPICS_PER_FRAME) {
       return { ok: false, code: 'rate-limited' }
     }
     subscriber.topics.add(topic)
     subscriber.queues.set(topic, [])
-    return { ok: true, seq: this.sequences.get(topic) ?? 0 }
+    return { ok: true, seq: this.sequenceFor(subscriber, topic) }
   }
 
   unsubscribe(subscriber: EventSubscriber, topic: string): void {
-    if (!isEventTopic(topic)) return
+    if (!isEventTopic(topic) && !isLocalEventTopic(topic)) return
     subscriber.topics.delete(topic)
     subscriber.queues.delete(topic)
     subscriber.rateLimited.delete(topic)
@@ -172,15 +205,29 @@ export class EventBus {
     subscriber.topics.clear()
     subscriber.queues.clear()
     subscriber.rateLimited.clear()
+    this.localFrameRates.delete(subscriber.id)
     this.subscribers.delete(subscriber)
   }
 
-  sequence(topic: EventTopic): number {
+  sequence(topic: ShellEventTopic): number {
     return this.sequences.get(topic) ?? 0
   }
 
+  /** Current local sequence for one plugin identity and topic. */
+  localSequence(identity: string, topic: LocalEventTopic): number {
+    return this.localSequences.get(localSequenceKey(identity, topic)) ?? 0
+  }
+
+  private sequenceFor(subscriber: EventSubscriber, topic: EventTopic): number {
+    if (isLocalEventTopic(topic)) {
+      const identity = subscriber.sink.identity
+      return identity ? this.localSequence(identity, topic) : 0
+    }
+    return this.sequence(topic)
+  }
+
   publish(
-    topic: EventTopic,
+    topic: ShellEventTopic,
     payload: unknown,
     options: { burst?: boolean; target?: string } = {},
   ): boolean {
@@ -189,7 +236,7 @@ export class EventBus {
       this.onDropped?.(topic, 'too-large')
       return false
     }
-    if (!options.burst && !this.allowRate(topic)) {
+    if (!options.burst && !this.allowRate(this.rates, topic, MAX_EVENTS_PER_SECOND)) {
       this.onDropped?.(topic, 'rate-limited')
       return false
     }
@@ -202,26 +249,54 @@ export class EventBus {
     for (const subscriber of [...this.subscribers]) {
       if (!subscriber.active || !subscriber.topics.has(topic)) continue
       if (options.target !== undefined && subscriber.sink.identity !== options.target) continue
-      let queue = subscriber.queues.get(topic)
-      if (!queue) {
-        queue = []
-        subscriber.queues.set(topic, queue)
-      }
-      queue.push(event)
-      if (queue.length > MAX_QUEUED_EVENTS) {
-        queue.shift()
-        if (!subscriber.rateLimited.has(topic)) {
-          subscriber.rateLimited.add(topic)
-          this.report(subscriber, topic)
-        }
-      }
-      this.schedule(subscriber)
+      this.enqueue(subscriber, event)
     }
     return true
   }
 
+  /**
+   * Publish one plugin-local event. Delivery is limited to subscribers of the
+   * publisher's identity; `from` is the shell-known frame session id. The
+   * payload is opaque to the shell and only size and rate are enforced.
+   */
+  publishLocal(
+    publisher: EventSubscriber,
+    topic: string,
+    payload: unknown,
+    options: { from: string },
+  ): PublishLocalResult {
+    if (!publisher.active) return { ok: false, code: 'internal' }
+    if (!isLocalEventTopic(topic)) return { ok: false, code: 'unsupported-topic' }
+    const identity = publisher.sink.identity
+    if (!identity) return { ok: false, code: 'internal' }
+    if (payloadTooLarge(payload, MAX_EVENT_BYTES)) {
+      this.onDropped?.(topic, 'too-large')
+      return { ok: false, code: 'too-large' }
+    }
+    if (!this.allowRate(this.localFrameRates, publisher.id, MAX_LOCAL_EVENTS_PER_SECOND)) {
+      this.onDropped?.(topic, 'rate-limited')
+      return { ok: false, code: 'rate-limited' }
+    }
+    const key = localSequenceKey(identity, topic)
+    if (!this.allowRate(this.localRates, key, MAX_EVENTS_PER_SECOND)) {
+      this.onDropped?.(topic, 'rate-limited')
+      return { ok: false, code: 'rate-limited' }
+    }
+
+    const seq = (this.localSequences.get(key) ?? 0) + 1
+    this.localSequences.set(key, seq)
+    const event: ShellEvent = { topic, seq, payload, from: options.from }
+    for (const subscriber of [...this.subscribers]) {
+      if (!subscriber.active) continue
+      if (subscriber.sink.identity !== identity) continue
+      if (!subscriber.topics.has(topic)) continue
+      this.enqueue(subscriber, event)
+    }
+    return { ok: true, seq }
+  }
+
   /** Deliver synchronously, bypassing the queue; used for `workspace/closed`. */
-  publishImmediate(topic: EventTopic, payload: unknown): boolean {
+  publishImmediate(topic: ShellEventTopic, payload: unknown): boolean {
     if (!isEventTopic(topic)) return false
     if (payloadTooLarge(payload, MAX_EVENT_BYTES)) {
       this.onDropped?.(topic, 'too-large')
@@ -256,17 +331,37 @@ export class EventBus {
     }
     this.subscribers.clear()
     this.sequences.clear()
+    this.localSequences.clear()
     this.rates.clear()
+    this.localRates.clear()
+    this.localFrameRates.clear()
   }
 
-  private allowRate(topic: EventTopic): boolean {
+  private enqueue(subscriber: EventSubscriber, event: ShellEvent): void {
+    let queue = subscriber.queues.get(event.topic)
+    if (!queue) {
+      queue = []
+      subscriber.queues.set(event.topic, queue)
+    }
+    queue.push(event)
+    if (queue.length > MAX_QUEUED_EVENTS) {
+      queue.shift()
+      if (!subscriber.rateLimited.has(event.topic)) {
+        subscriber.rateLimited.add(event.topic)
+        this.report(subscriber, event.topic)
+      }
+    }
+    this.schedule(subscriber)
+  }
+
+  private allowRate<K>(rates: Map<K, RateWindow>, key: K, limit: number): boolean {
     const now = this.now()
-    let window = this.rates.get(topic)
+    let window = rates.get(key)
     if (!window || now - window.start >= EVENT_RATE_WINDOW_MS) {
       window = { start: now, count: 0 }
-      this.rates.set(topic, window)
+      rates.set(key, window)
     }
-    if (window.count >= MAX_EVENTS_PER_SECOND) return false
+    if (window.count >= limit) return false
     window.count += 1
     return true
   }

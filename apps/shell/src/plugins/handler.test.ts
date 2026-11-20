@@ -1105,6 +1105,144 @@ describe('handler subscriptions', () => {
       replyTo: 's1',
     })
   })
+
+  it('advertises local events in the editor init', async () => {
+    const context = await start({ candidate: subscribed() })
+    ready(context)
+    expect(postedType(context.frame, 'shell/init')?.payload).toMatchObject({
+      capabilities: { localEvents: true },
+    })
+  })
+
+  it('publishes a local event, acknowledges it and delivers it to the publisher', async () => {
+    const context = await start({ candidate: subscribed() })
+    ready(context)
+    context.frame.emit(
+      { exo: 1, type: 'plugin/subscribe', id: 's1', payload: { topic: 'local/state' } },
+      PLUGIN_ORIGIN,
+    )
+    expect(messages(context.frame, 'shell/subscribed').at(-1)).toMatchObject({
+      payload: { topic: 'local/state', seq: 0 },
+      replyTo: 's1',
+    })
+
+    context.frame.emit(
+      {
+        exo: 1,
+        type: 'plugin/publish',
+        id: 'p1',
+        payload: { topic: 'local/state', payload: { ready: true } },
+      },
+      PLUGIN_ORIGIN,
+    )
+    expect(messages(context.frame, 'shell/published').at(-1)).toMatchObject({
+      payload: { topic: 'local/state', seq: 1 },
+      replyTo: 'p1',
+    })
+
+    context.events.flush()
+    expect(messages(context.frame, 'shell/event').at(-1)).toMatchObject({
+      payload: {
+        topic: 'local/state',
+        seq: 1,
+        from: 'session-1',
+        payload: { ready: true },
+      },
+    })
+    expect(context.logs.at(-1)).toEqual({
+      phase: 'handler-events',
+      code: 'published',
+      message: 'local/state',
+    })
+    expect(JSON.stringify(context.logs)).not.toContain('ready')
+  })
+
+  it('accepts a local subscription and rejects a malformed local name', async () => {
+    const context = await start({ candidate: subscribed() })
+    ready(context)
+    context.frame.emit(
+      { exo: 1, type: 'plugin/subscribe', id: 's1', payload: { topic: 'local/a/b' } },
+      PLUGIN_ORIGIN,
+    )
+    expect(messages(context.frame, 'shell/subscribed').at(-1)).toMatchObject({
+      payload: { topic: 'local/a/b', code: 'unsupported-topic' },
+    })
+  })
+
+  it('rejects a shell topic publication without changing its sequence', async () => {
+    const context = await start({ candidate: subscribed() })
+    ready(context)
+    context.frame.emit(
+      {
+        exo: 1,
+        type: 'plugin/publish',
+        id: 'p1',
+        payload: { topic: 'theme/changed', payload: { theme: 'light' } },
+      },
+      PLUGIN_ORIGIN,
+    )
+    expect(messages(context.frame, 'shell/error').at(-1)).toMatchObject({
+      payload: { code: 'permission-denied' },
+      replyTo: 'p1',
+    })
+    expect(context.events.sequence('theme/changed')).toBe(0)
+    expect(messages(context.frame, 'shell/event')).toHaveLength(0)
+  })
+
+  it('explains an oversized local payload', async () => {
+    const context = await start({ candidate: subscribed() })
+    ready(context)
+    context.frame.emit(
+      {
+        exo: 1,
+        type: 'plugin/publish',
+        id: 'p1',
+        payload: { topic: 'local/state', payload: 'x'.repeat(1024 * 1024) },
+      },
+      PLUGIN_ORIGIN,
+    )
+    expect(messages(context.frame, 'shell/error').at(-1)).toMatchObject({
+      payload: {
+        code: 'too-large',
+        message: expect.stringContaining('1048576'),
+      },
+      replyTo: 'p1',
+    })
+    expect(messages(context.frame, 'shell/published')).toHaveLength(0)
+  })
+
+  it('treats a publish without an id as a protocol violation', async () => {
+    const context = await start({ candidate: subscribed() })
+    ready(context)
+    context.frame.emit(
+      {
+        exo: 1,
+        type: 'plugin/publish',
+        payload: { topic: 'local/state', payload: {} },
+      },
+      PLUGIN_ORIGIN,
+    )
+    expect(postedType(context.frame, 'shell/error')).toMatchObject({
+      payload: { code: 'protocol-violation' },
+    })
+    expect(messages(context.frame, 'shell/published')).toHaveLength(0)
+  })
+
+  it('drops a publish after disposal without acknowledging it', async () => {
+    const context = await start({ candidate: subscribed() })
+    ready(context)
+    await context.handler.dispose('closed')
+    context.frame.emit(
+      {
+        exo: 1,
+        type: 'plugin/publish',
+        id: 'p1',
+        payload: { topic: 'local/state', payload: {} },
+      },
+      PLUGIN_ORIGIN,
+    )
+    expect(messages(context.frame, 'shell/published')).toHaveLength(0)
+  })
 })
 
 describe('resolveHandlerReadPath', () => {

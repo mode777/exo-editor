@@ -20,6 +20,7 @@ function init(): RegistrationInit {
     permissions: ['workspace:read', 'workspace:write'],
     locale: 'en',
     settings: {},
+    capabilities: { localEvents: true },
   }
 }
 
@@ -104,6 +105,7 @@ describe('registration client', () => {
         requestFiles: true,
         filePicker: true,
         directoryListing: true,
+        localEvents: true,
       },
       limits: { maxFileSize: 1, maxRequestBytes: 1 },
     } as unknown as RegistrationInit

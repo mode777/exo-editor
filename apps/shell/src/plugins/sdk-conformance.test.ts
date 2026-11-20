@@ -50,13 +50,13 @@ function manifest(): PluginManifest {
   return result.manifest
 }
 
-function bridge(frame: FakeFrame, mode: 'register' | 'editor') {
+function bridge(frame: FakeFrame, mode: 'register' | 'editor', sessionId = SESSION_ID) {
   const shellWindow = { name: 'shell' }
   const pluginWindow = frame.window
   const transport = new FakePluginTransport({
     hostOrigin: SHELL_ORIGIN,
     mode,
-    sessionId: SESSION_ID,
+    sessionId,
     parent: shellWindow,
     onPost: (message) => {
       frame.emit(message, PLUGIN_ORIGIN, pluginWindow)
@@ -243,6 +243,99 @@ describe('SDK conformance against the shell', () => {
     await workspace.session.dispose()
   })
 
+  it('exchanges local events between two real handler frames and isolates another plugin', async () => {
+    const provider = new MemoryWorkspaceProvider({
+      now: () => 1000,
+      initialFiles: {
+        '/exo.json': '{}',
+        '/one.template.txt': 'one',
+        '/two.template.txt': 'two',
+        '/three.template.txt': 'three',
+      },
+    })
+    const handle = await provider.open()
+    const session = new Session(handle)
+    const transport = new FakeFrameTransport()
+    const events = new EventBus()
+
+    async function startHandler(path: string, sessionId: string, pluginId: string) {
+      const stat = await session.stat(path)
+      const handler = new HandlerSession({
+        candidate: {
+          ...candidate(),
+          pluginId,
+          identity: `${PLUGIN_ORIGIN}::${pluginId}`,
+        },
+        file: {
+          path,
+          name: path.slice(1),
+          dir: '/',
+          size: stat.size,
+          mtime: stat.mtime,
+          version: stat.version,
+        },
+        session,
+        transport,
+        shellVersion: '0.2.0',
+        shellOrigin: SHELL_ORIGIN,
+        workspaceName: 'demo',
+        theme: 'dark',
+        locale: 'en',
+        events,
+        canWrite: true,
+        maxFileSize: 10 * 1024 * 1024,
+        maxRequestBytes: 16 * 1024 * 1024,
+        createSessionId: () => sessionId,
+        onDirty: () => {},
+        onFailure: () => {},
+      })
+      handler.start()
+      const frame = transport.frames.at(-1) as FakeFrame
+      const sdk = bridge(frame, 'editor', sessionId)
+      const connection = await connectPlugin({ transport: sdk, timeoutMs: 1000 })
+      if (connection.mode !== 'editor') throw new Error('expected editor mode')
+      return { handler, editor: connection.editor }
+    }
+
+    const first = await startHandler('/one.template.txt', 'frame-a', 'com.example.template')
+    const second = await startHandler('/two.template.txt', 'frame-b', 'com.example.template')
+    const other = await startHandler('/three.template.txt', 'frame-c', 'com.example.other')
+
+    await expect(first.editor.subscribeLocal('local/state')).resolves.toMatchObject({ seq: 0 })
+    await expect(second.editor.subscribeLocal('local/state')).resolves.toMatchObject({ seq: 0 })
+    await expect(other.editor.subscribeLocal('local/state')).resolves.toMatchObject({ seq: 0 })
+
+    const firstEvents: unknown[] = []
+    const secondEvents: unknown[] = []
+    const otherEvents: unknown[] = []
+    first.editor.onLocalEvent('local/state', (event) => firstEvents.push(event))
+    second.editor.onLocalEvent('local/state', (event) => secondEvents.push(event))
+    other.editor.onLocalEvent('local/state', (event) => otherEvents.push(event))
+
+    await expect(first.editor.publishLocal('local/state', { ready: true })).resolves.toEqual({
+      topic: 'local/state',
+      seq: 1,
+    })
+
+    await vi.waitFor(() => expect(secondEvents).toHaveLength(1))
+    expect(secondEvents[0]).toEqual({
+      topic: 'local/state',
+      seq: 1,
+      from: 'frame-a',
+      payload: { ready: true },
+    })
+    expect(firstEvents).toEqual(secondEvents)
+    expect(otherEvents).toHaveLength(0)
+
+    first.editor.unsubscribe('local/state')
+    second.editor.unsubscribe('local/state')
+    other.editor.unsubscribe('local/state')
+    await first.handler.dispose('closed')
+    await second.handler.dispose('closed')
+    await other.handler.dispose('closed')
+    await session.dispose()
+  })
+
   it('ignores a spoofed init and accepts the real one', async () => {
     const fake = new FakePluginTransport({
       hostOrigin: SHELL_ORIGIN,
@@ -327,6 +420,7 @@ function registerInit(overrides: Partial<RegistrationInit> = {}): RegistrationIn
     permissions: ['workspace:read', 'workspace:write'],
     locale: 'en',
     settings: {},
+    capabilities: { localEvents: true },
     ...overrides,
   }
 }

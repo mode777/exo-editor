@@ -16,6 +16,7 @@ import {
   hasWorkspaceWrite,
 } from './manifest'
 import type { EventBus, EventSubscriber } from './events'
+import { MAX_EVENT_BYTES, isEventTopic, isLocalEventTopic } from './events'
 import type { EditorCandidate } from './registry'
 import type { SettingValues } from './settings'
 import {
@@ -514,8 +515,8 @@ export class HandlerSession {
     this.disposeResolve = null
   }
 
-  private sendError(code: ShellErrorCode, replyTo?: string): void {
-    sendShellError(this.frame, this.boundary.targetOrigin, code, replyTo)
+  private sendError(code: ShellErrorCode, replyTo?: string, message?: string): void {
+    sendShellError(this.frame, this.boundary.targetOrigin, code, replyTo, message)
   }
 
   private log(phase: string, code?: string, message?: string): void {
@@ -596,6 +597,9 @@ export class HandlerSession {
       case 'plugin/unsubscribe':
         this.handleUnsubscribe(envelope)
         return
+      case 'plugin/publish':
+        this.handlePublish(envelope)
+        return
       case 'plugin/register':
       case 'plugin/register-complete':
         this.violation(envelope)
@@ -653,6 +657,7 @@ export class HandlerSession {
         requestFiles: hasWorkspaceRead(candidate.permissions),
         filePicker: this.options.onRequestFiles !== undefined,
         directoryListing: true,
+        localEvents: true,
       },
       limits: {
         maxFileSize: this.options.maxFileSize,
@@ -715,6 +720,66 @@ export class HandlerSession {
       return
     }
     this.subscription.unsubscribe(payload.topic)
+  }
+
+  private handlePublish(envelope: Envelope): void {
+    const id = envelope.id
+    const payload = envelope.payload
+    if (
+      !id ||
+      !isPlainObject(payload) ||
+      typeof payload.topic !== 'string' ||
+      Object.keys(payload).some((key) => key !== 'topic' && key !== 'payload')
+    ) {
+      this.violation(envelope)
+      return
+    }
+    if (!hasEventsSubscribe(this.options.candidate.permissions)) {
+      this.sendError('permission-denied', id)
+      this.log('handler-events', 'permission-denied', payload.topic)
+      return
+    }
+    if (isEventTopic(payload.topic)) {
+      this.sendError('permission-denied', id)
+      this.log('handler-events', 'permission-denied', payload.topic)
+      return
+    }
+    if (!isLocalEventTopic(payload.topic)) {
+      this.sendError(
+        'unsupported-topic',
+        id,
+        'Local event topics use local/<name> with a lowercase 1-64 character name.',
+      )
+      this.log('handler-events', 'unsupported-topic', payload.topic)
+      return
+    }
+    const result = this.options.events.publishLocal(
+      this.subscription,
+      payload.topic,
+      payload.payload,
+      { from: this.sessionId },
+    )
+    if (result.ok) {
+      postEnvelope(
+        this.frame,
+        this.boundary.targetOrigin,
+        'shell/published',
+        { topic: payload.topic, seq: result.seq },
+        id,
+      )
+      this.log('handler-events', 'published', payload.topic)
+      return
+    }
+    if (result.code === 'too-large') {
+      this.sendError(
+        'too-large',
+        id,
+        `Local event payloads are limited to ${MAX_EVENT_BYTES} bytes.`,
+      )
+    } else {
+      this.sendError(result.code, id)
+    }
+    this.log('handler-events', result.code, payload.topic)
   }
 
   private handleDirty(envelope: Envelope): void {

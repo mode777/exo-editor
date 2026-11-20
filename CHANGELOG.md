@@ -3,6 +3,40 @@
 All notable changes to Exo Editor are recorded here. The version axes and the
 release process are in [`docs/releases.md`](./docs/releases.md).
 
+## [0.2.0] - 2026-11-20
+
+Additive post-release update: plugin-local events between the frames of one
+plugin.
+
+### Added
+
+- `plugin/publish` / `shell/published` and the reserved `local/<name>` topic
+  namespace. Local events are scoped to one plugin identity, carry the
+  publishing frame's opaque `from` session id, and never route to another
+  plugin.
+- `capabilities.localEvents` in editor and registration `shell/init`; `1.4.0`
+  of `@exo/plugin-sdk` adds `publishLocal()`, `subscribeLocal()`,
+  `onLocalEvent()` and the absent-as-false support bit.
+- Limits: 1 MiB per local payload, 100 events/s per identity and topic, 200
+  events/s per frame across local topics, and the existing 32-topic and
+  1,000-event queue budgets shared with shell topics.
+- The event bus is owned by the workspace runtime and shared with the handler
+  pool, so a pool attach or detach no longer resets another pool's
+  subscriptions.
+
+### Compatibility
+
+- Shell: `0.2.0`
+- Protocol: `1`
+- Manifest schema: `1`
+- SDK: `1.4.0`
+
+### Breaking
+
+- None. The messages, capability and SDK helpers are additive within protocol
+  major `1`; `events:subscribe` keeps its existing permission string and stored
+  consent.
+
 ## [0.1.0] - 2026-11-18
 
 Additive post-release updates: the plugin file picker and directory listing.

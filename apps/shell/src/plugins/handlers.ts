@@ -17,7 +17,7 @@ import {
   type HandlerSaveRequest,
 } from './handler'
 import { hasWorkspaceRead } from './manifest'
-import { EventBus, type EventTopic, type ThemeName } from './events'
+import { EventBus, type ShellEventTopic, type ThemeName } from './events'
 import type { PluginSettingsStore, SettingValues } from './settings'
 import { MAX_HANDLER_FRAMES } from './protocol'
 import type { EditorCandidate } from './registry'
@@ -162,7 +162,6 @@ export class HandlerPool {
   }
 
   attach(options: HandlerPoolAttachOptions): void {
-    this.events.reset()
     this.attachOptions = options
   }
 
@@ -172,7 +171,6 @@ export class HandlerPool {
     this.records.clear()
     this.attachOptions = null
     await Promise.all(sessions.map((record) => record.session.dispose('workspace-switch')))
-    this.events.reset()
   }
 
   candidates(path: WorkspacePath): EditorCandidate[] {
@@ -357,7 +355,7 @@ export class HandlerPool {
     record?.session.notifyChange(change)
   }
 
-  publish(topic: EventTopic, payload: unknown, options: { burst?: boolean } = {}): boolean {
+  publish(topic: ShellEventTopic, payload: unknown, options: { burst?: boolean } = {}): boolean {
     return this.events.publish(topic, payload, options)
   }
 

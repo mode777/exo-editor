@@ -25,6 +25,7 @@
     listReads: [],
     pendingListRead: null,
     listStarted: false,
+    local: { subscription: null, published: [], events: [] },
     dirty: false,
     disposed: 'pending',
     external: null,
@@ -36,7 +37,7 @@
   function render() {
     state.origin = location.origin
     observation.textContent = JSON.stringify(state)
-    document.title = `Exo fixture ${fixtureMode} ${state.phase} events:${state.events.length} picks:${state.picks.length} lists:${state.lists.length}`
+    document.title = `Exo fixture ${fixtureMode} ${state.phase} events:${state.events.length} picks:${state.picks.length} lists:${state.lists.length} local:${state.local.events.length}`
   }
 
   function post(type, payload, replyTo, id) {
@@ -168,6 +169,7 @@
       settings: payload.settings,
     }
     if (fixtureMode === 'events') subscribeAll()
+    if (fixtureMode === 'local-events') subscribeLocal()
     if (fixtureMode === 'list') setTimeout(startListing, 300)
     render()
     // Delay the first read so a verifier can observe init without content.
@@ -185,14 +187,44 @@
     }
   }
 
+  function subscribeLocal() {
+    post('plugin/subscribe', { topic: 'local/fixture' }, undefined, 'sub-local')
+  }
+
+  function publishLocal() {
+    const n = state.local.published.length + 1
+    post(
+      'plugin/publish',
+      {
+        topic: 'local/fixture',
+        payload: { path: state.file && state.file.path, n },
+      },
+      undefined,
+      `pub-${n}`,
+    )
+  }
+
   function onSubscribed(payload) {
     state.subscriptions.push(payload)
+    if (payload && payload.topic === 'local/fixture') state.local.subscription = payload
     console.log('EXO_EDITOR subscribed', payload && payload.topic, payload && payload.seq)
+    render()
+  }
+
+  function onPublished(payload) {
+    state.local.published.push({
+      topic: payload && payload.topic,
+      seq: payload && payload.seq,
+    })
+    console.log('EXO_EDITOR published', payload && payload.topic, payload && payload.seq)
     render()
   }
 
   function onEvent(payload) {
     state.events.push(payload)
+    if (payload && typeof payload.topic === 'string' && payload.topic.startsWith('local/')) {
+      state.local.events.push(payload)
+    }
     if (
       payload &&
       payload.topic === 'config/changed' &&
@@ -243,6 +275,10 @@
       state.buffer = payload.text
     }
     render()
+    if (fixtureMode === 'local-events') {
+      // Stay clean on open so the local-event check does not prompt a save.
+      return
+    }
     if (fixtureMode === 'repeat' && state.reads.length === 1) {
       requestFile('read-2')
       return
@@ -349,6 +385,9 @@
       case 'shell/subscribed':
         onSubscribed(data.payload || {})
         break
+      case 'shell/published':
+        onPublished(data.payload || {})
+        break
       case 'shell/event':
         onEvent(data.payload || {})
         break
@@ -366,6 +405,11 @@
   if (fixtureMode === 'picker') {
     const pick = document.getElementById('pick')
     if (pick) pick.addEventListener('click', pickFiles)
+  }
+
+  if (fixtureMode === 'local-events') {
+    const publish = document.getElementById('publish')
+    if (publish) publish.addEventListener('click', publishLocal)
   }
 
   render()

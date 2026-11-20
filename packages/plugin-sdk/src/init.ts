@@ -7,6 +7,7 @@ import {
   type FileMetadata,
   type PluginMode,
   type PluginPermission,
+  type RegistrationCapabilities,
   type RegistrationInit,
   type ShellErrorCode,
   type ShellErrorPayload,
@@ -30,6 +31,7 @@ const SHELL_ERROR_CODES: ShellErrorCode[] = [
   'too-large',
   'conflict',
   'rate-limited',
+  'unsupported-topic',
   'internal',
 ]
 
@@ -112,6 +114,24 @@ function capabilitiesAt(value: Record<string, unknown>, path: string): EditorCap
       capabilities.directoryListing === undefined
         ? false
         : booleanAt(capabilities, 'directoryListing', `${path}.capabilities`),
+    localEvents:
+      capabilities.localEvents === undefined
+        ? false
+        : booleanAt(capabilities, 'localEvents', `${path}.capabilities`),
+  }
+}
+
+function registrationCapabilitiesAt(
+  value: Record<string, unknown>,
+  path: string,
+): RegistrationCapabilities {
+  if (value.capabilities === undefined) return { localEvents: false }
+  const capabilities = objectAt(value, 'capabilities', path)
+  return {
+    localEvents:
+      capabilities.localEvents === undefined
+        ? false
+        : booleanAt(capabilities, 'localEvents', `${path}.capabilities`),
   }
 }
 
@@ -180,7 +200,11 @@ export function parseShellInit(
   }
 
   if (mode === 'register') {
-    return { ...base, mode } satisfies RegistrationInit
+    return {
+      ...base,
+      mode,
+      capabilities: registrationCapabilitiesAt(init, '/'),
+    } satisfies RegistrationInit
   }
   if (mode !== 'editor') invalid('/mode', 'expected register or editor')
   return {

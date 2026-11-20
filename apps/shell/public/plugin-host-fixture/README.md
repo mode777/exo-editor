@@ -14,13 +14,14 @@ npm run dev:plugin
 This serves `http://localhost:5174/` with `Access-Control-Allow-Origin: *` and
 `application/json` for manifests. Use these manifest URLs in `exo.json`:
 
-| Purpose              | URL                                               |
-| -------------------- | ------------------------------------------------- |
-| Normal registration  | `http://localhost:5174/exo-manifest.json`         |
-| Missing CORS         | `http://localhost:5174/no-cors/exo-manifest.json` |
-| Never sends `ready`  | `http://localhost:5174/never-ready-manifest.json` |
-| Widened capabilities | `http://localhost:5174/widened-manifest.json`     |
-| Duplicate identity   | `http://localhost:5174/duplicate-manifest.json`   |
+| Purpose                      | URL                                               |
+| ---------------------------- | ------------------------------------------------- |
+| Normal registration          | `http://localhost:5174/exo-manifest.json`         |
+| Missing CORS                 | `http://localhost:5174/no-cors/exo-manifest.json` |
+| Never sends `ready`          | `http://localhost:5174/never-ready-manifest.json` |
+| Widened capabilities         | `http://localhost:5174/widened-manifest.json`     |
+| Duplicate identity           | `http://localhost:5174/duplicate-manifest.json`   |
+| Second local-events identity | `http://localhost:5174/other-manifest.json`       |
 
 The deployed same-origin copy lives at
 `https://mode777.github.io/exo-editor/plugin-host-fixture/exo-manifest.json`.
@@ -50,15 +51,16 @@ without breaking the other variants.
 and acknowledges `shell/dispose`. State is mirrored into `#observation` and the
 document title so a hidden frame remains inspectable in devtools.
 
-| File glob           | Page                    | Behaviour                                                                       |
-| ------------------- | ----------------------- | ------------------------------------------------------------------------------- |
-| `**/*.list.txt`     | `editor-list.html`      | Probes `plugin/request-list`: root, relative, large, file, missing and reserved |
-| `**/*.picker.txt`   | `editor-picker.html`    | Visible frame with a Pick button; exercises `plugin/request-files`              |
-| `**/*.events.txt`   | `editor-events.html`    | Subscribes to the four v1 topics and records sequences and events               |
-| `**/*.txt`          | `editor.html`           | Read, report dirty, save with a `[fixture save N]` marker, acknowledge dispose  |
-| `**/*.append.txt`   | `editor-append.html`    | Same, with an `[fixture append N]` marker and a second visible edit signal      |
-| `**/*.repeat.txt`   | `editor-repeat.html`    | Requests the same file twice and records both versions in `#observation`        |
-| `**/*.neverack.txt` | `editor-never-ack.html` | Ignores `shell/dispose` so the 1 s teardown timeout is observable               |
+| File glob           | Page                       | Behaviour                                                                                                           |
+| ------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `**/*.local.txt`    | `editor-local-events.html` | Visible frame with a Publish button; subscribes to `local/fixture` and records acknowledgements and received events |
+| `**/*.list.txt`     | `editor-list.html`         | Probes `plugin/request-list`: root, relative, large, file, missing and reserved                                     |
+| `**/*.picker.txt`   | `editor-picker.html`       | Visible frame with a Pick button; exercises `plugin/request-files`                                                  |
+| `**/*.events.txt`   | `editor-events.html`       | Subscribes to the four v1 topics and records sequences and events                                                   |
+| `**/*.txt`          | `editor.html`              | Read, report dirty, save with a `[fixture save N]` marker, acknowledge dispose                                      |
+| `**/*.append.txt`   | `editor-append.html`       | Same, with an `[fixture append N]` marker and a second visible edit signal                                          |
+| `**/*.repeat.txt`   | `editor-repeat.html`       | Requests the same file twice and records both versions in `#observation`                                            |
+| `**/*.neverack.txt` | `editor-never-ack.html`    | Ignores `shell/dispose` so the 1 s teardown timeout is observable                                                   |
 
 The `events` mode subscribes to `theme/changed`, `workspace/file-changed`,
 `workspace/closed` and `config/changed` after `shell/init`. `#observation`
@@ -69,6 +71,23 @@ recorded `settings` with the event's full value map. It stays clean on open; an
 external change re-reads the file, applies a local edit and reports dirty so a
 following save is observable. The other modes do not subscribe, so they receive
 no topic events.
+
+## Local events
+
+`editor-local-events.html` is a visible handler for `**/*.local.txt`. It
+subscribes to `local/fixture` after `shell/init`, stores the
+`shell/subscribed` sequence in `observation.local.subscription`, and renders a
+**Publish local event** button. A click sends one correlated `plugin/publish`
+with `{ path, n }`; the acknowledgement is appended to
+`observation.local.published` and each delivered event, including `from` and
+the payload, is appended to `observation.local.events`. The page stays clean on
+open so the check does not prompt a save.
+
+Open two `.local.txt` files with the same manifest to see each frame receive the
+other frame's event and its own event with its own `exo-session` in `from`.
+`other-manifest.json` declares a second plugin id with `**/*.local-other.txt`;
+open one of each to confirm the same topic name does not cross the identity
+boundary.
 
 ## Contributed settings
 
@@ -169,6 +188,24 @@ carries the full new map to subscribed frames of this plugin only.
     frame is disposed, no late `list-result` is recorded, and the new workspace
     starts with no listing state. Disabling the plugin or closing the tab has the
     same effect.
+25. Open `one.local.txt` with the deployed manifest. `observation.local`
+    records `subscription: { topic: 'local/fixture', seq: 0 }`. Press **Publish
+    local event**: `published` records `{ topic: 'local/fixture', seq: 1 }` and
+    `events` records one event with `from` equal to the frame's
+    `exo-session`.
+26. Keep it open and open `two.local.txt`. Press Publish in the second frame:
+    switch back to the first and confirm it recorded the second frame's event
+    with the second `from`; the second frame also records its own event. The
+    sequences increase per identity and topic.
+27. Add `other-manifest.json` to `exo.json`, approve its consent and open
+    `three.local-other.txt`. Press Publish in both plugins: neither plugin's
+    `local.events` contains the other plugin's event or `from`, while each
+    receives its own.
+28. Send an oversized local publish or a shell topic through DevTools and
+    confirm `errors` records `too-large` with the 1 MiB limit or
+    `permission-denied` for `theme/changed`; no `published` entry is added. A
+    publish from the registration frame is a protocol violation and produces no
+    event.
 
 Changes are only observed for open documents plus the shell's own writes; both
 providers are non-watchable, so an unopened file is not reported.

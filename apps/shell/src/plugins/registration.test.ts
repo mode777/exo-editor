@@ -138,7 +138,7 @@ describe('registration session', () => {
       settings: { 'editor.greeting': 'hi' },
     })
     expect(init?.payload).not.toHaveProperty('file')
-    expect(init?.payload).not.toHaveProperty('capabilities')
+    expect(init?.payload).toMatchObject({ capabilities: { localEvents: true } })
     expect(init?.payload).not.toHaveProperty('limits')
     expect(context.frame.posted[0].targetOrigin).toBe('https://plugins.example.com')
   })
@@ -453,6 +453,7 @@ describe('registration session', () => {
       'plugin/save-content',
       'plugin/subscribe',
       'plugin/unsubscribe',
+      'plugin/publish',
     ]) {
       context.frame.emit(
         { exo: 1, type, payload: { path: '/secret.txt' } },
@@ -465,5 +466,28 @@ describe('registration session', () => {
       phase: 'register',
     })
     expect(postedType(context.frame, 'shell/init')?.payload).not.toHaveProperty('file')
+  })
+
+  it('rejects a local publish from the registration frame as a violation', () => {
+    const context = start()
+    ready(context)
+    context.frame.emit(
+      {
+        exo: 1,
+        type: 'plugin/publish',
+        id: 'p1',
+        payload: { topic: 'local/state', payload: {} },
+      },
+      context.manifest.manifestOrigin,
+    )
+    expect(postedType(context.frame, 'shell/error')).toMatchObject({
+      payload: { code: 'protocol-violation' },
+      replyTo: 'p1',
+    })
+    expect(
+      context.frame.posted.filter(
+        (entry) => (entry.message as { type?: string }).type === 'shell/published',
+      ),
+    ).toHaveLength(0)
   })
 })

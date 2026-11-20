@@ -18,14 +18,15 @@ enough to ship a plugin.
 
 | Artifact                                            | Version | Packaging                                        |
 | --------------------------------------------------- | ------- | ------------------------------------------------ |
-| `packages/plugin-sdk` (`@exo/plugin-sdk`)           | `1.3.0` | Private workspace package; no runtime dependency |
+| `packages/plugin-sdk` (`@exo/plugin-sdk`)           | `1.4.0` | Private workspace package; no runtime dependency |
 | `packages/plugin-template` (`@exo/plugin-template`) | `0.1.0` | Private workspace package; built static assets   |
 
 - The SDK MAJOR equals the protocol major it speaks. `PROTOCOL_VERSION` and
   `SDK_VERSION` are exported constants; a plugin must not hard-code the protocol
   number. `1.1.0` adds the additive `requestSave()` helper, `1.2.0` adds the
-  additive `requestFiles()` helper and `1.3.0` adds the additive
-  `listDirectory()` helper, all without changing the protocol major.
+  additive `requestFiles()` helper, `1.3.0` adds the additive
+  `listDirectory()` helper and `1.4.0` adds the additive local-event helpers,
+  all without changing the protocol major.
 - The packages are not published in v1 (D12). Consumers in this repository use
   the workspace copy. A future publication adds a built `dist` and does not
   change the message protocol.
@@ -119,7 +120,7 @@ complete()                          -> one plugin/register-complete, then shell/
 
 ```ts
 editor.file // FileMetadata from shell/init, no content
-editor.capabilities // read, write, requestFiles, filePicker, directoryListing
+editor.capabilities // read, write, requestFiles, filePicker, directoryListing, localEvents
 editor.limits // maxFileSize, maxRequestBytes
 editor.settings // resolved shell settings
 editor.readFile(path, 'utf8' | 'binary')
@@ -135,6 +136,9 @@ editor.onError(listener)
 editor.subscribe(topic)
 editor.unsubscribe(topic)
 editor.onEvent(topic, listener)
+editor.publishLocal(topic, payload)
+editor.subscribeLocal(topic)
+editor.onLocalEvent(topic, listener)
 ```
 
 - Reads send `plugin/request-file` with a per-frame monotonic id and resolve from
@@ -186,10 +190,27 @@ editor.onEvent(topic, listener)
   `shell/subscribed`. `unsupported-topic` and `permission-denied` reject the
   promise with that code.
 - `unsubscribe(topic)` sends `plugin/unsubscribe`, removes the local listener and
-  returns immediately; the protocol defines no acknowledgement.
+  returns immediately; the protocol defines no acknowledgement. It accepts both
+  shell and local topics.
 - `onEvent(topic, listener)` receives `{ topic, seq, payload }` for that topic.
   A throwing listener is contained and later events still arrive.
 - Topic names and payloads are the v1 catalog in [`events.md`](./events.md).
+- `publishLocal(topic, payload)` sends one correlated `plugin/publish` and
+  resolves `{ topic, seq }` from `shell/published`. It rejects locally with
+  `unsupported-message` when `capabilities.localEvents` is absent or false, with
+  `permission-denied` when the manifest lacks `events:subscribe` or the caller
+  names a shell topic, with `unsupported-topic` for a malformed `local/<name>`,
+  and with `too-large` for a payload over 1 MiB. A failed preflight sends no
+  message. The shell acknowledgement means the event was accepted, not handled.
+- `subscribeLocal(topic)` sends one `plugin/subscribe` and resolves with the
+  current local sequence; no history is replayed. It applies the same support,
+  permission and topic preflights.
+- `onLocalEvent(topic, listener)` receives `{ topic, seq, from, payload }` for a
+  subscribed local topic. `from` is the publishing frame's opaque session id;
+  the SDK does not interpret the payload. `shell/dispose` rejects pending local
+  calls with `closed`.
+- A local publisher that also subscribes receives its own event and can ignore
+  it by comparing `from` with its own session id.
 
 ## 9. Compatibility and deprecation policy
 
@@ -203,6 +224,10 @@ editor.onEvent(topic, listener)
 - The SDK MAJOR and protocol MAJOR advance together. The shell accepts exactly
   one protocol major per release, as defined in
   [`plugin-protocol.md`](./plugin-protocol.md#8-versioning).
+- Plugin-local event helpers are an additive minor (`1.4.0`): they do not change
+  an existing method or the meaning of a shell topic. A shell that predates them
+  omits `capabilities.localEvents`; the SDK treats absence as false and rejects
+  local calls locally.
 - A deprecated SDK export remains functional for the rest of the current major,
   carries an `@deprecated` note with its replacement and is removed only at the
   next major.

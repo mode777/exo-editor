@@ -21,7 +21,8 @@ const PERMISSION_TEXT: Record<PluginPermission, string> = {
   'workspace:write': 'Write changes to workspace files when you save.',
   'workspace:list':
     'List folder contents and file names in the workspace, including files it has not opened.',
-  'events:subscribe': 'Receive shell notifications such as theme and file changes.',
+  'events:subscribe':
+    'Receive shell notifications such as theme and file changes, and exchange local messages with this plugin\u2019s own frames.',
 }
 
 function rootUrl(manifest: PluginManifest): string {

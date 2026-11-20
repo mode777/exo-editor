@@ -19,7 +19,7 @@ describe('deployed plugin fixture', () => {
     )
     expect(result.ok).toBe(true)
     if (!result.ok) return
-    expect(result.manifest.fileEditors).toHaveLength(8)
+    expect(result.manifest.fileEditors).toHaveLength(9)
     expect(result.manifest.configuration?.properties).toMatchObject({
       'fixture.greeting': { type: 'string', default: 'hello from fixture' },
       'fixture.repeat': { type: 'boolean', default: false },
@@ -38,6 +38,8 @@ describe('deployed plugin fixture', () => {
       contributes: { fileEditors: Array<{ glob: string; entry: string; priority: number }> }
     }
     const byGlob = new Map(manifest.contributes.fileEditors.map((entry) => [entry.glob, entry]))
+    expect(byGlob.get('**/*.local.txt')?.entry).toBe('editor-local-events.html')
+    expect(byGlob.get('**/*.local.txt')?.priority).toBeGreaterThan(0)
     expect(byGlob.get('**/*.list.txt')?.entry).toBe('editor-list.html')
     expect(byGlob.get('**/*.list.txt')?.priority).toBeGreaterThan(0)
     expect(byGlob.get('**/*.picker.txt')?.entry).toBe('editor-picker.html')
@@ -60,5 +62,21 @@ describe('deployed plugin fixture', () => {
       expect(controller).toContain(`glob: '${editor.glob}'`)
       expect(controller).toContain(`entry: '${editor.entry}'`)
     }
+  })
+
+  it('declares a second identity for cross-plugin local-event isolation', () => {
+    const raw = readFileSync(resolve(fixtureDir, 'other-manifest.json'), 'utf8')
+    const result = validateManifest(
+      JSON.parse(raw) as unknown,
+      'https://mode777.github.io/exo-editor/plugin-host-fixture/other-manifest.json',
+      '0.2.0',
+    )
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.manifest.id).toBe('com.example.exo.fixture.other')
+    expect(result.manifest.fileEditors).toEqual([
+      expect.objectContaining({ glob: '**/*.local-other.txt', entry: 'editor-local-events.html' }),
+    ])
+    expect(existsSync(resolve(fixtureDir, 'editor-local-events.html'))).toBe(true)
   })
 })

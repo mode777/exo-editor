@@ -5,12 +5,15 @@
  */
 
 export const PROTOCOL_VERSION = '1'
-export const SDK_VERSION = '1.3.0'
+export const SDK_VERSION = '1.4.0'
 
 export const READY_TIMEOUT_MS = 10_000
 export const REGISTRATION_TIMEOUT_MS = 10_000
 export const MAX_IN_FLIGHT_REQUESTS = 64
 export const MAX_ID_LENGTH = 64
+export const MAX_LOCAL_EVENT_BYTES = 1024 * 1024
+
+const LOCAL_TOPIC_PATTERN = /^local\/[a-z0-9][a-z0-9._-]{0,63}$/
 
 export type PluginMode = 'register' | 'editor'
 export type ThemeName = 'dark' | 'light' | 'high-contrast'
@@ -38,10 +41,10 @@ export type ShellErrorCode =
   | 'too-large'
   | 'conflict'
   | 'rate-limited'
+  | 'unsupported-topic'
   | 'internal'
 
-export type SdkErrorCode =
-  ShellErrorCode | 'bootstrap' | 'identity' | 'unsupported-topic' | 'closed'
+export type SdkErrorCode = ShellErrorCode | 'bootstrap' | 'identity' | 'closed'
 
 export interface ExoProtocolErrorDetails {
   expected?: string
@@ -92,6 +95,13 @@ export interface EditorCapabilities {
   filePicker: boolean
   /** Shell support bit for `plugin/request-list`; false on older shells. */
   directoryListing: boolean
+  /** Shell support bit for plugin-local publication and subscription. */
+  localEvents: boolean
+}
+
+export interface RegistrationCapabilities {
+  /** Shell support bit for plugin-local publication and subscription. */
+  localEvents: boolean
 }
 
 export interface FilePickerOptions {
@@ -140,6 +150,7 @@ interface ShellInitBase {
 
 export interface RegistrationInit extends ShellInitBase {
   mode: 'register'
+  capabilities: RegistrationCapabilities
 }
 
 export interface EditorInit extends ShellInitBase {
@@ -203,6 +214,17 @@ export const EVENT_TOPICS = [
 ] as const
 
 export type EventTopic = (typeof EVENT_TOPICS)[number]
+export type LocalEventTopic = `local/${string}`
+export type AnyEventTopic = EventTopic | LocalEventTopic
+
+/** True for a well-formed `local/<name>` topic; the shell reserves the namespace. */
+export function isLocalEventTopic(value: unknown): value is LocalEventTopic {
+  return typeof value === 'string' && LOCAL_TOPIC_PATTERN.test(value)
+}
+
+export function isEventTopic(value: unknown): value is EventTopic {
+  return typeof value === 'string' && (EVENT_TOPICS as readonly string[]).includes(value)
+}
 
 export interface ThemeChangedPayload {
   theme: ThemeName
@@ -225,9 +247,16 @@ export interface EventPayloads {
 }
 
 export interface ShellEvent<T = unknown> {
-  topic: EventTopic
+  topic: AnyEventTopic
   seq: number
   payload: T
+  /** Present on local events: the publishing frame's opaque session id. */
+  from?: string
+}
+
+export type LocalEvent<T = unknown> = ShellEvent<T> & {
+  topic: LocalEventTopic
+  from: string
 }
 
 export function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -252,6 +281,38 @@ export function isEnvelope(value: unknown): value is Envelope {
     return false
   }
   return true
+}
+
+function sizeOf(value: unknown, limit: number, seen: Set<object>): number {
+  if (typeof value === 'string') return value.length * 2
+  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') return 8
+  if (value === null || value === undefined) return 0
+  if (value instanceof ArrayBuffer) return value.byteLength
+  if (ArrayBuffer.isView(value)) return value.byteLength
+  if (Array.isArray(value)) {
+    let total = 0
+    for (const item of value) {
+      total += sizeOf(item, limit - total, seen)
+      if (total > limit) return total
+    }
+    return total
+  }
+  if (typeof value === 'object') {
+    if (seen.has(value)) return 0
+    seen.add(value)
+    let total = 0
+    for (const [key, item] of Object.entries(value)) {
+      total += key.length * 2 + sizeOf(item, limit - total, seen)
+      if (total > limit) return total
+    }
+    return total
+  }
+  return 0
+}
+
+/** The same conservative envelope size rule the shell applies to payloads. */
+export function payloadTooLarge(payload: unknown, limit = MAX_LOCAL_EVENT_BYTES): boolean {
+  return sizeOf(payload, limit, new Set()) > limit
 }
 
 export interface EnvelopeOptions {

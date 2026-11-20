@@ -13,7 +13,7 @@ checklist item performed manually against the deployed site.
 | 10k-entry directory listing | 3,000 ms total, 1,000 ms longest task | Expand a directory with 10,000 entries and measure until every row is painted |
 | 1 MiB file open | 1,000 ms | Shell text surface and reference code plugin, from activating the file to the editable surface |
 | 1 MiB file save | 1,000 ms | Shell text surface and reference code plugin, from Save to the shell's success state |
-| Shell bundle (JS) | 157,000 gzip bytes | `npm run budget` / CI `Bundle budget` |
+| Shell bundle (JS) | 159,000 gzip bytes | `npm run budget` / CI `Bundle budget` |
 | Shell bundle (CSS) | 14,000 gzip bytes | `npm run budget` / CI `Bundle budget` |
 
 These are release ceilings, not product SLOs. They are intentionally generous
@@ -101,3 +101,11 @@ support bit add 2,175 gzip bytes over the previous ceiling (measured build:
 headroom; no dependency, font or vendored asset is added. Listing is one
 directory level with a 1,000-entry page cap and does not change a runtime
 budget.
+
+The `plugin-local-events` change raises the JS ceiling from 157,000 to 159,000
+gzip bytes. Local topic validation, per-identity sequences, the publish/ack
+path and the SDK support bit add 1,340 gzip bytes over the previous build
+(measured build: 157,056 JS, 13,242 CSS). The 2,000-byte allowance keeps roughly
+1,944 bytes of headroom; no dependency, font or vendored asset is added. Local
+delivery reuses the existing queue, schedule and rate machinery and does not
+change a runtime budget.

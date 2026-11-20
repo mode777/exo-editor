@@ -33,6 +33,7 @@ export type ShellErrorCode =
   | 'too-large'
   | 'conflict'
   | 'rate-limited'
+  | 'unsupported-topic'
   | 'internal'
 
 export interface Envelope {
