@@ -788,7 +788,8 @@ the handler. The local gate passed with 715 shell tests and a 155,716/157,000 js
 gzip budget; the 3,000-byte increase is recorded in
 [`docs/performance.md`](./docs/performance.md).
 
-**Follow-up (2026-11-20):** the post-layer-10 change `plugin-local-events` adds
+**Follow-up (2026-11-20):** the post-layer-10 change `plugin-local-events`
+(archived as `2026-11-20-plugin-local-events`) adds
 `plugin/publish` / `shell/published`, the identity-scoped `local/<name>` topic
 namespace, `capabilities.localEvents` and SDK `1.4.0`. It also moves the single
 `EventBus` to the workspace runtime so handler pools share it without resetting
