@@ -259,3 +259,44 @@ describe('explorer new-file templates', () => {
     runtime.newFiles.cancel()
   })
 })
+
+describe('explorer refresh after creation', () => {
+  it('shows a file created outside a React event handler', async () => {
+    const template: RegisteredNewFile = {
+      id: 'component',
+      label: 'Component',
+      fileName: 'Component.tsx',
+      encoding: 'utf8',
+      bytes: new TextEncoder().encode('export {}'),
+      text: 'export {}',
+      registrationOrder: 0,
+    }
+    const { runtime, container } = await render([], [template])
+    const session = runtime.getSession()
+    if (!session) throw new Error('No session')
+    const before = runtime.getSnapshot().explorerRevision
+    runtime.newFiles.beginTemplate({
+      kind: 'template',
+      templateId: template.id,
+      fileName: template.fileName,
+      identity: IDENTITY,
+      pluginId: 'com.example.test',
+      pluginName: 'Example Plugin',
+      content: { bytes: template.bytes, text: template.text },
+      fallbackDirectory: '/',
+      directory: '/',
+      session,
+    })
+    await runtime.newFiles.submit('/', 'Component.tsx')
+    expect(runtime.getSnapshot().explorerRevision).toBeGreaterThan(before)
+    await vi.waitFor(
+      () =>
+        expect(
+          Array.from(container.querySelectorAll('.exo-tree-row')).some((row) =>
+            row.textContent?.includes('Component.tsx'),
+          ),
+        ).toBe(true),
+      { timeout: 5000 },
+    )
+  })
+})

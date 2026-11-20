@@ -542,7 +542,12 @@ function Explorer() {
   const workspaceName = snapshot.descriptor?.name || 'Workspace'
 
   return (
-    <div className="exo-explorer" role="region" aria-label="Explorer">
+    <div
+      className="exo-explorer"
+      role="region"
+      aria-label="Explorer"
+      data-explorer-revision={snapshot.explorerRevision}
+    >
       <div className="exo-explorer-header">
         <button
           type="button"
