@@ -9,7 +9,7 @@ keep one slow subscriber from affecting the shell or another plugin.
 
 ### Requirement: Subscription API
 
-The shell SHALL deliver shell-catalog events only to handler frames whose plugin holds the `events:subscribe` permission, SHALL treat subscription as idempotent, SHALL stop delivery to a frame after `plugin/unsubscribe`, SHALL reject unknown shell topics without wildcard matching, SHALL accept only valid `local/<name>` plugin-local topics, and SHALL cap a frame at 32 topics across both namespaces.
+The shell SHALL deliver shell-catalog and local events to handler and view frames whose plugin holds the `events:subscribe` permission, SHALL treat subscription as idempotent, SHALL stop delivery to a frame after `plugin/unsubscribe`, SHALL reject unknown shell topics without wildcard matching, SHALL accept only valid `local/<name>` plugin-local topics, and SHALL cap a frame at 32 topics across both namespaces.
 
 #### Scenario: Permission required
 
@@ -35,6 +35,11 @@ The shell SHALL deliver shell-catalog events only to handler frames whose plugin
 
 - **WHEN** a registration frame attempts to subscribe
 - **THEN** the shell rejects the request and the frame is unloaded as usual
+
+#### Scenario: View frames may subscribe
+
+- **WHEN** a panel or content-view frame sends `plugin/subscribe`
+- **THEN** the shell accepts it under the same identity, permission and topic rules as an editor frame
 
 #### Scenario: Subscriptions are ephemeral
 
@@ -92,7 +97,7 @@ The shell SHALL expose exactly `theme/changed` with `{ theme }`, `workspace/file
 
 ### Requirement: Delivery semantics
 
-The shell SHALL sequence shell-catalog events per topic per workspace session and local events per plugin identity and topic, SHALL deliver at most once, SHALL deliver independently to each subscribed frame, and SHALL NOT replay history. `config/changed` SHALL be delivered only to the subscribed handler frames of the plugin named in the payload. A local event SHALL carry the publisher frame's opaque `exo-session` in `from` and SHALL be delivered only to subscribed handler frames of the publishing plugin.
+The shell SHALL sequence shell-catalog events per topic per workspace session and local events per plugin identity and topic, SHALL deliver at most once, SHALL deliver independently to each subscribed handler or view frame, and SHALL NOT replay history. `config/changed` SHALL be delivered only to the subscribed handler and view frames of the plugin named in the payload. A local event SHALL carry the publisher frame's opaque `exo-session` in `from` and SHALL be delivered only to subscribed frames of the publishing plugin.
 
 #### Scenario: Monotonic sequence
 
@@ -121,7 +126,7 @@ The shell SHALL sequence shell-catalog events per topic per workspace session an
 
 #### Scenario: Initial state
 
-- **WHEN** a handler frame is initialized
+- **WHEN** a handler or view frame is initialized
 - **THEN** the init message already carries the current theme, workspace name and the plugin's settings values
 
 #### Scenario: Unrelated subscriber is skipped
@@ -133,6 +138,11 @@ The shell SHALL sequence shell-catalog events per topic per workspace session an
 
 - **WHEN** a frame subscribed to `local/state` publishes on `local/state`
 - **THEN** it receives its own event with `from` equal to its frame session id and can choose to ignore it
+
+#### Scenario: View frame receives a shell event
+
+- **WHEN** a view frame subscribes to `theme/changed` and the user changes the theme
+- **THEN** the view frame receives the same event shape as an editor frame
 
 ### Requirement: Change producers
 
@@ -276,7 +286,7 @@ The shell SHALL reserve `local/<name>` for plugin-authored topics. The name SHAL
 
 #### Scenario: Same-plugin delivery
 
-- **WHEN** one handler frame publishes `local/state` and another handler frame of the same plugin subscribes to it
+- **WHEN** one handler frame publishes `local/state` and a panel or another handler frame of the same plugin subscribes to it
 - **THEN** the subscriber receives the event and no frame of another plugin does
 
 #### Scenario: Cross-plugin isolation
@@ -319,23 +329,28 @@ The shell SHALL reserve `local/<name>` for plugin-authored topics. The name SHAL
 - **WHEN** a frame already has 32 shell or local subscriptions
 - **THEN** a 33rd local subscription is rejected without dropping the existing ones
 
+#### Scenario: View frame publishes
+
+- **WHEN** a content-view frame publishes a local topic
+- **THEN** the shell scopes and delivers it exactly as it does for an editor frame
+
 ### Requirement: Plugin-local publication
 
-A handler frame SHALL send a correlated `plugin/publish` carrying a local topic and a structured-cloneable payload. The shell SHALL validate the topic and payload, require `events:subscribe`, deliver one `shell/event` to every subscribed handler frame of the same plugin, and reply `shell/published` with the topic and sequence.
+A handler or view frame SHALL send a correlated `plugin/publish` carrying a local topic and a structured-cloneable payload. The shell SHALL validate the topic and payload, require `events:subscribe`, deliver one `shell/event` to every subscribed frame of the same plugin, and reply `shell/published` with the topic and sequence.
 
 #### Scenario: Successful publication
 
-- **WHEN** a handler publishes a valid local topic with a structured-cloneable payload
+- **WHEN** a handler or view frame publishes a valid local topic with a structured-cloneable payload
 - **THEN** the shell delivers one event to each subscribed frame of that plugin and replies `shell/published` with the topic and the sequence number
 
 #### Scenario: No subscriber still acknowledges
 
-- **WHEN** a handler publishes a local topic with no subscribers
+- **WHEN** a frame publishes a local topic with no subscribers
 - **THEN** the sequence advances and the publisher still receives `shell/published`
 
 #### Scenario: Shell topic is rejected
 
-- **WHEN** a handler publishes `theme/changed`
+- **WHEN** a frame publishes `theme/changed`
 - **THEN** the shell replies `shell/error` with `permission-denied`, delivers no event and does not change the shell topic's sequence
 
 #### Scenario: Oversized payload is explained
@@ -353,6 +368,11 @@ A handler frame SHALL send a correlated `plugin/publish` carrying a local topic 
 - **WHEN** an editor-mode frame sends `plugin/publish`
 - **THEN** the shell accepts it under the same rules as any other handler frame
 
+#### Scenario: View frame publishes
+
+- **WHEN** a panel or content-view frame sends `plugin/publish`
+- **THEN** the shell accepts it under the same rules as any other frame
+
 #### Scenario: Disposed frame cannot publish
 
 - **WHEN** a message arrives from a frame after its session was disposed
@@ -362,3 +382,4 @@ A handler frame SHALL send a correlated `plugin/publish` carrying a local topic 
 
 - **WHEN** the shell routes a local event
 - **THEN** it does not inspect, log or persist the payload and the event carries only the topic, sequence, `from` and payload
+

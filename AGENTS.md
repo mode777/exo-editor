@@ -29,7 +29,8 @@ archived change design. The post-layer-10 change `plugin-local-events`
 topics, the correlated `plugin/publish` acknowledgement,
 `capabilities.localEvents` and SDK `1.4.0`; its deployed verification is recorded
 in the archived change design. The post-layer-10 change `plugin-view-surfaces`
-adds `contributes.panels`, `contributes.contentViews`, the `view` frame mode,
+(archived as `2026-11-20-plugin-view-surfaces`) adds `contributes.panels`,
+`contributes.contentViews`, the `view` frame mode,
 `plugin/open-file`, `plugin/open-view`, `plugin/request-panel` and SDK `1.5.0`;
 its deployed verification is recorded in the change design and `ROADMAP.md`. The
 parallel Stratofold provider track
