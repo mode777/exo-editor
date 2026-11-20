@@ -125,6 +125,13 @@
       `new-bytes-${Date.now()}`,
     ),
   )
+  wire('new-file-oversized', () =>
+    post(
+      'plugin/request-new-file',
+      { text: 'x'.repeat(8 * 1024 * 1024 + 1), suggestedName: 'too-large.txt' },
+      `new-large-${Date.now()}`,
+    ),
+  )
   wire('subscribe-theme', () => subscribe('theme/changed', `theme-${Date.now()}`))
 
   window.addEventListener('message', (event) => {
