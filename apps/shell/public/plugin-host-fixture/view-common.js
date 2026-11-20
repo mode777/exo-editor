@@ -100,6 +100,13 @@
       `other-${Date.now()}`,
     ),
   )
+  wire('open-oversized', () =>
+    post(
+      'plugin/open-view',
+      { viewId: 'fixture-tutorial', payload: 'x'.repeat(65536) },
+      `big-${Date.now()}`,
+    ),
+  )
   wire('subscribe-theme', () => subscribe('theme/changed', `theme-${Date.now()}`))
 
   window.addEventListener('message', (event) => {
