@@ -159,3 +159,41 @@ shapes and should include a correlation id for request/reply patterns.
 3. Rollback is a shell redeploy: no persisted state, schema or migration is
    involved. A plugin that uses local events must keep a working fallback for a
    shell without the support bit.
+
+## Verification
+
+Deployed on 2026-11-20 at commit `877cfdf`
+(`https://mode777.github.io/exo-editor/`, JS asset `index-W51L97VC.js`) in Chrome
+Headless Shell 131.0.6778.264 on the verification server. The workspace was an
+OPFS directory containing `exo.json` with the main fixture manifest and the
+second-identity manifest, `one.local.txt`, `two.local.txt`,
+`three.local-other.txt` and `alpha.txt`.
+
+- `shell/init` carried `capabilities.localEvents: true`; the editor and
+  registration init shapes both parse it in the SDK tests.
+- The first frame subscribed to `local/fixture` at sequence 0. Pressing Publish
+  produced `shell/published { topic: 'local/fixture', seq: 1 }` and one
+  `shell/event` with `from` equal to that frame's `exo-session`; the payload
+  arrived unchanged.
+- A second frame opened later received `seq: 1` on subscribe (the current
+  late-join value, no replay). A later publish from the first frame arrived at
+  the second frame with the first frame's `from`, and a publish from the second
+  frame arrived at both frames with the second frame's `from`.
+- The second-identity plugin (`com.example.exo.fixture.other`) subscribed to the
+  same `local/fixture` name. A publish from the first identity produced no event
+  in the second identity, and a publish from the second produced none in the
+  first; each still received its own event.
+- An oversized local payload returned `too-large` with the 1 MiB limit and did
+  not advance the sequence. `theme/changed` returned `permission-denied` and
+  `local/State` returned `unsupported-topic`; no event was delivered for either.
+- The page reported no errors.
+
+Cross-plugin isolation is enforced in `EventBus.publishLocal` by the identity
+filter; the mutation check removed that filter and failed the named
+`events.test.ts` case. The registration-frame rejection, disposed-frame drop,
+topic budget and queue overflow are covered by the shell unit tests.
+
+## Open Questions
+
+None that change the specs or task breakdown. Cross-plugin messaging, replay and
+a request/response RPC layer remain explicit non-goals.

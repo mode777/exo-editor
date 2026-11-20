@@ -788,6 +788,21 @@ the handler. The local gate passed with 715 shell tests and a 155,716/157,000 js
 gzip budget; the 3,000-byte increase is recorded in
 [`docs/performance.md`](./docs/performance.md).
 
+**Follow-up (2026-11-20):** the post-layer-10 change `plugin-local-events` adds
+`plugin/publish` / `shell/published`, the identity-scoped `local/<name>` topic
+namespace, `capabilities.localEvents` and SDK `1.4.0`. It also moves the single
+`EventBus` to the workspace runtime so handler pools share it without resetting
+each other. Verified against deployed commit `877cfdf` (asset
+`index-W51L97VC.js`): a first frame published `local/fixture` at sequence 1 and
+received its own event with its own `from`; a late second frame got the current
+sequence, then received a later first-frame event and its own, with the first
+frame receiving the second frame's event. A second plugin identity on the same
+topic neither received nor leaked events. Oversized payloads returned
+`too-large`, `theme/changed` returned `permission-denied` and `local/State`
+returned `unsupported-topic`. The local gate passed with 742 shell tests and a
+157,056/159,000 js gzip budget; the 1,340-byte increase is recorded in
+[`docs/performance.md`](./docs/performance.md).
+
 ---
 
 ## Deferred beyond v1
