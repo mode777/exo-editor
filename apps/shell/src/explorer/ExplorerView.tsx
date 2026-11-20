@@ -562,9 +562,10 @@ function Explorer() {
             label="New File"
             variant="toolbar"
             disabled={!writable}
-            onClick={() =>
+            onClick={(event) => {
+              event.stopPropagation()
               templateCount > 0 ? setNewFileMenuOpen((open) => !open) : beginCreate('new-file')
-            }
+            }}
           />
           {newFileMenuOpen && (
             <div className="exo-explorer-menu" role="menu" aria-label="New File">
