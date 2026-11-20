@@ -129,7 +129,8 @@ Run against the deployed URL with the demo workspace from
 Run on 2026-11-16 against deployed commit `90172af`
 (`https://mode777.github.io/exo-editor/`) with Chrome for Testing
 131.0.6778.264 at 1280x800, using the demo workspace on an OPFS handle and the
-same `showDirectoryPicker` stub as the layer 5-9 verification.
+same `showDirectoryPicker` stub as the layer 5-9 verification. The plugin view
+surface checks below were repeated on 2026-11-20 against commit `3f69504`.
 
 - Consent dialog: focus starts on Deny; Tab reaches Allow plugin and the plugin
   homepage link; the next Tab wraps to Deny. Escape closes the Exo Code dialog
