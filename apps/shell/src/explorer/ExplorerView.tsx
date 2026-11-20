@@ -19,6 +19,7 @@ import { usePluginHost, useWorkspaceRuntime, useWorkspaceSnapshot } from '../wor
 import { requestRemoteConnect } from '../workspace/connect-bus'
 import { onExplorerCommand } from './bus'
 import type { PluginHostRecord } from '../plugins/host'
+import type { ManifestNewFile } from '../plugins/manifest'
 
 interface Row {
   entry: FileStat
@@ -105,6 +106,7 @@ function Explorer() {
   const [errors, setErrors] = useState<Map<string, WorkspaceErrorCode>>(new Map())
   const [rename, setRename] = useState<RenameState | null>(null)
   const [dialog, setDialog] = useState<DialogState | null>(null)
+  const [newFileMenuOpen, setNewFileMenuOpen] = useState(false)
   const [context, setContext] = useState<{
     x: number
     y: number
@@ -242,6 +244,59 @@ function Explorer() {
   }, [selected, visible])
 
   const explorerCommands = useMemo(() => runnerCommands(host.records).slice(0, 10), [host])
+
+  const templateGroups = useMemo(
+    () =>
+      writable
+        ? host.records
+            .filter((record) => record.phase === 'active' && record.newFiles.length > 0)
+            .map((record) => ({
+              identity: record.identity ?? '',
+              pluginId: record.manifest?.id ?? '',
+              pluginName: record.manifest?.name ?? 'Plugin',
+              templates: record.newFiles,
+            }))
+        : [],
+    [host, writable],
+  )
+  const templateCount = templateGroups.reduce((total, group) => total + group.templates.length, 0)
+
+  useEffect(() => {
+    if (!newFileMenuOpen) return
+    const close = () => setNewFileMenuOpen(false)
+    window.addEventListener('click', close)
+    window.addEventListener('keydown', close)
+    return () => {
+      window.removeEventListener('click', close)
+      window.removeEventListener('keydown', close)
+    }
+  }, [newFileMenuOpen])
+
+  const beginTemplate = (
+    template: ManifestNewFile,
+    identity: string,
+    pluginId: string,
+    pluginName: string,
+    directory: string,
+  ) => {
+    if (!writable || !session || !identity) return
+    setNewFileMenuOpen(false)
+    runtime.newFiles.beginTemplate({
+      kind: 'template',
+      templateId: template.id,
+      fileName: template.fileName,
+      identity,
+      pluginId,
+      pluginName,
+      content: {
+        bytes: template.bytes,
+        ...(template.text === undefined ? {} : { text: template.text }),
+      },
+      fallbackDirectory: directory,
+      directory,
+      session,
+    })
+  }
 
   const runExplorerCommand = (identity: string, commandId: string) => {
     if (!context) return
@@ -399,7 +454,7 @@ function Explorer() {
       }
       const path = joinPath(target.directory, name)
       if (target.kind === 'new-file') {
-        await session.write(path, new Uint8Array(), { create: true })
+        await session.write(path, new Uint8Array(), { create: true, createOnly: true })
       } else {
         await session.mkdir(path)
       }
@@ -507,8 +562,48 @@ function Explorer() {
             label="New File"
             variant="toolbar"
             disabled={!writable}
-            onClick={() => beginCreate('new-file')}
+            onClick={() =>
+              templateCount > 0 ? setNewFileMenuOpen((open) => !open) : beginCreate('new-file')
+            }
           />
+          {newFileMenuOpen && (
+            <div className="exo-explorer-menu" role="menu" aria-label="New File">
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setNewFileMenuOpen(false)
+                  beginCreate('new-file')
+                }}
+              >
+                Empty File
+              </button>
+              {templateGroups.map((group) => (
+                <div role="group" aria-label={group.pluginName} key={group.identity}>
+                  <div className="exo-explorer-menu-group">{group.pluginName}</div>
+                  {group.templates.map((template) => (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      key={template.id}
+                      onClick={() =>
+                        beginTemplate(
+                          template,
+                          group.identity,
+                          group.pluginId,
+                          group.pluginName,
+                          targetDirectory,
+                        )
+                      }
+                    >
+                      {template.label}
+                      <span className="exo-explorer-menu-hint"> {template.fileName}</span>
+                    </button>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
           <IconButton
             icon="new-folder"
             label="New Folder"

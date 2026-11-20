@@ -46,6 +46,7 @@ function manifest(overrides: Partial<PluginManifest> = {}): PluginManifest {
     panels: [],
     contentViews: [],
     commands: [],
+    newFiles: [],
     ...overrides,
   }
 }
@@ -251,6 +252,35 @@ describe('consent fingerprint', () => {
     const stored = store.get(record.manifestOrigin, record.pluginId)
     expect(stored).toMatchObject({ fingerprint: base })
     expect(stored?.version).toBe(record.version)
+  })
+
+  it('ignores new-file templates and their content', async () => {
+    const base = await computeFingerprint(manifest(), digest)
+    const template = {
+      id: 'component',
+      label: 'Component',
+      fileName: 'Component.tsx',
+      encoding: 'utf8' as const,
+      bytes: new TextEncoder().encode('export {}'),
+      text: 'export {}',
+    }
+    expect(await computeFingerprint(manifest({ newFiles: [template] }), digest)).toBe(base)
+    expect(
+      await computeFingerprint(
+        manifest({
+          newFiles: [
+            {
+              ...template,
+              label: 'Renamed',
+              fileName: 'Other.tsx',
+              bytes: new TextEncoder().encode('changed content'),
+            },
+          ],
+        }),
+        digest,
+      ),
+    ).toBe(base)
+    expect(await computeFingerprint(manifest({ newFiles: [] }), digest)).toBe(base)
   })
 
   it('re-prompts when listing is added and keeps read-only consent stable', async () => {

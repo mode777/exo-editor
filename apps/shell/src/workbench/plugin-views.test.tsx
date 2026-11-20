@@ -65,6 +65,7 @@ function record(active = true): PluginHostRecord {
       registrationOrder: order,
     })),
     commands: [],
+    newFiles: [],
   }
 }
 

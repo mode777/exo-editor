@@ -23,6 +23,7 @@
 
 .exo-explorer-header {
   display: flex;
+  position: relative;
   align-items: center;
   gap: 4px;
   min-height: 24px;
@@ -1309,6 +1310,139 @@
 }
 
 .exo-view-choice-plugin {
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
+}
+
+.exo-explorer-menu {
+  position: absolute;
+  z-index: 40;
+  min-width: 220px;
+  max-width: 360px;
+  margin-top: 4px;
+  padding: 4px;
+  border: 1px solid var(--vscode-widget-border);
+  border-radius: 4px;
+  background: var(--vscode-menu-background, var(--vscode-editorWidget-background));
+  box-shadow: 0 2px 8px var(--vscode-widget-shadow);
+  right: 8px;
+}
+
+.exo-explorer-menu button {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-radius: 3px;
+  padding: 4px 8px;
+  background: transparent;
+  color: var(--vscode-menu-foreground, var(--vscode-foreground));
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.exo-explorer-menu button:hover,
+.exo-explorer-menu button:focus-visible {
+  background: var(--vscode-menu-selectionBackground, var(--vscode-list-hoverBackground));
+  color: var(--vscode-menu-selectionForeground, var(--vscode-foreground));
+}
+
+.exo-explorer-menu button:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+.exo-explorer-menu-group {
+  padding: 6px 8px 2px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.exo-explorer-menu-hint {
+  color: var(--vscode-descriptionForeground);
+  font-size: 11px;
+}
+
+.exo-new-file {
+  width: min(620px, calc(100vw - 48px));
+}
+
+.exo-new-file p {
+  margin: 0 0 10px;
+}
+
+.exo-new-file-folders {
+  max-height: 140px;
+  overflow: auto;
+  margin-bottom: 10px;
+  border: 1px solid var(--vscode-widget-border);
+  background: var(--vscode-editor-background);
+}
+
+.exo-new-file-folders ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.exo-new-file-folders button {
+  display: block;
+  width: 100%;
+  border: 0;
+  padding: 4px 6px;
+  background: transparent;
+  color: var(--vscode-foreground);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.exo-new-file-folders button:hover,
+.exo-new-file-folders button:focus-visible {
+  background: var(--vscode-list-hoverBackground);
+}
+
+.exo-new-file-folders button:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+.exo-new-file-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.exo-new-file-name input {
+  flex: 1;
+  min-width: 0;
+}
+
+.exo-new-file-content {
+  margin: 10px 0;
+}
+
+.exo-new-file-preview {
+  max-height: 140px;
+  overflow: auto;
+  margin: 0;
+  padding: 8px;
+  border: 1px solid var(--vscode-widget-border);
+  background: var(--vscode-editor-background);
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 11px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.exo-new-file-binary {
+  margin: 0;
   color: var(--vscode-descriptionForeground);
   font-size: 12px;
 }

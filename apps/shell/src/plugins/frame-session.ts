@@ -7,11 +7,13 @@ import {
 import { dirname, isReservedPath, normalizePath } from '../workspace/paths'
 import type { FrameHandle, FrameSurface, FrameTransport, PluginMessage } from './frame'
 import type { FilePickerOpenRequest, FilePickerOutcome } from './file-picker'
+import type { NewFileOutcome, NewFileRequest } from './new-file'
 import { ListingBroker } from './listing'
 import {
   hasEventsSubscribe,
   hasWorkspaceList,
   hasWorkspaceRead,
+  hasWorkspaceWrite,
   type PluginPermission,
 } from './manifest'
 import type { EventBus, EventSubscriber } from './events'
@@ -40,7 +42,9 @@ import {
 
 export const DEFAULT_MAX_REQUEST_BYTES = 16 * 1024 * 1024
 export const MAX_VIEW_PAYLOAD_BYTES = 64 * 1024
+export const MAX_NEW_FILE_BYTES = 8 * 1024 * 1024
 export const MAX_INTENTS_PER_SECOND = 10
+export const MAX_NEW_FILE_REQUESTS_PER_SECOND = 10
 export const INTENT_WINDOW_MS = 1000
 const MAX_CACHED_FILES = 32
 
@@ -120,6 +124,7 @@ export interface FrameSessionOptions {
   clearTimeoutImpl?: typeof clearTimeout
   onActive?: () => void
   onRequestFiles?: (request: FilePickerOpenRequest) => Promise<FilePickerOutcome>
+  onRequestNewFile?: (request: NewFileRequest) => Promise<NewFileOutcome>
   onFailure: (failure: SessionFailure) => void
   onLog?: (event: SessionLogEvent) => void
   onOpenFile?: (request: OpenFileIntent) => Promise<IntentOutcome>
@@ -152,6 +157,8 @@ export function shellCodeFor(error: unknown): ShellErrorCode {
       case 'not-a-file':
       case 'not-a-directory':
         return 'not-a-file'
+      case 'already-exists':
+        return 'already-exists'
       case 'too-large':
         return 'too-large'
       case 'conflict':
@@ -225,6 +232,9 @@ export abstract class FrameSession {
   private failureSent = false
   private pickerId: string | null = null
   private pickerAbort: AbortController | null = null
+  private newFileId: string | null = null
+  private newFileAbort: AbortController | null = null
+  private newFileWindow: { start: number; count: number } | null = null
   private intentWindow: { start: number; count: number } | null = null
   private readonly commandResultListeners = new Set<(envelope: Envelope) => void>()
   private readonly closeListeners = new Set<(reason: 'closed' | 'error') => void>()
@@ -328,6 +338,13 @@ export abstract class FrameSession {
     abort?.abort()
   }
 
+  cancelNewFile(): void {
+    const abort = this.newFileAbort
+    this.newFileAbort = null
+    this.newFileId = null
+    abort?.abort()
+  }
+
   protected mountFrame(input: { entryUrl: string; visible: boolean; title: string }): void {
     if (this.phase !== 'mounting') return
     let frame: FrameHandle
@@ -361,6 +378,7 @@ export abstract class FrameSession {
     this.subscription.close()
     this.clearTimers()
     this.cancelFilePicker()
+    this.cancelNewFile()
     this.listing.reset()
     this.onClosing()
     this.notifyClosed('closed')
@@ -385,6 +403,7 @@ export abstract class FrameSession {
     this.subscription.close()
     this.clearTimers()
     this.cancelFilePicker()
+    this.cancelNewFile()
     this.listing.reset()
     this.readings.clear()
     this.readIds.clear()
@@ -468,6 +487,7 @@ export abstract class FrameSession {
     this.subscription.close()
     this.clearTimers()
     this.cancelFilePicker()
+    this.cancelNewFile()
     this.listing.reset()
     this.onClosing()
     this.frame?.close()
@@ -482,6 +502,7 @@ export abstract class FrameSession {
     this.subscription.close()
     this.clearTimers()
     this.cancelFilePicker()
+    this.cancelNewFile()
     this.listing.reset()
     this.readings.clear()
     this.readIds.clear()
@@ -543,6 +564,9 @@ export abstract class FrameSession {
         return
       case 'plugin/request-files':
         void this.handleRequestFiles(envelope)
+        return
+      case 'plugin/request-new-file':
+        void this.handleRequestNewFile(envelope)
         return
       case 'plugin/request-list':
         void this.handleRequestList(envelope)
@@ -635,6 +659,7 @@ export abstract class FrameSession {
         write: this.options.writeCapability ?? this.options.session.capabilities().writable,
         requestFiles: hasWorkspaceRead(this.plugin.permissions),
         filePicker: this.options.onRequestFiles !== undefined,
+        createFile: this.options.onRequestNewFile !== undefined,
         directoryListing: true,
         localEvents: true,
         openFile: true,
@@ -860,6 +885,139 @@ export abstract class FrameSession {
     this.log(`${this.logPrefix}-picker`, 'ok')
   }
 
+  private async handleRequestNewFile(envelope: Envelope): Promise<void> {
+    const id = envelope.id
+    if (!id) {
+      this.violation(envelope)
+      return
+    }
+    const payload = envelope.payload
+    if (
+      !isPlainObject(payload) ||
+      Object.keys(payload).some(
+        (key) =>
+          key !== 'text' && key !== 'bytes' && key !== 'suggestedName' && key !== 'directory',
+      )
+    ) {
+      this.violation(envelope)
+      return
+    }
+    const hasText = typeof payload.text === 'string'
+    const hasBytes = payload.bytes instanceof ArrayBuffer || ArrayBuffer.isView(payload.bytes)
+    if (hasText === hasBytes) {
+      this.violation(envelope)
+      return
+    }
+    if (payload.suggestedName !== undefined && typeof payload.suggestedName !== 'string') {
+      this.violation(envelope)
+      return
+    }
+    if (payload.directory !== undefined && typeof payload.directory !== 'string') {
+      this.violation(envelope)
+      return
+    }
+    if (!this.allowNewFile()) {
+      this.sendError('rate-limited', id)
+      this.log(`${this.logPrefix}-new-file`, 'rate-limited')
+      return
+    }
+    if (
+      !hasWorkspaceWrite(this.plugin.permissions) ||
+      !(this.options.writeCapability ?? this.options.session.capabilities().writable)
+    ) {
+      this.sendError('permission-denied', id)
+      this.log(`${this.logPrefix}-new-file`, 'permission-denied')
+      return
+    }
+    if (!this.visible() || !this.hasFocus()) {
+      this.sendError('permission-denied', id)
+      this.log(`${this.logPrefix}-new-file`, 'permission-denied')
+      return
+    }
+    if (this.newFileId !== null) {
+      this.sendError('rate-limited', id)
+      this.log(`${this.logPrefix}-new-file`, 'rate-limited')
+      return
+    }
+    const handler = this.options.onRequestNewFile
+    if (!handler) {
+      this.sendError('internal', id)
+      this.log(`${this.logPrefix}-new-file`, 'internal')
+      return
+    }
+
+    let bytes: Uint8Array
+    let text: string | undefined
+    if (hasText) {
+      text = payload.text as string
+      bytes = new TextEncoder().encode(text)
+    } else {
+      const raw = payload.bytes
+      if (raw instanceof ArrayBuffer) {
+        bytes = new Uint8Array(raw.slice(0))
+      } else {
+        const view = raw as ArrayBufferView
+        const copy = new Uint8Array(view.byteLength)
+        copy.set(new Uint8Array(view.buffer, view.byteOffset, view.byteLength))
+        bytes = copy
+      }
+    }
+    if (bytes.byteLength > MAX_NEW_FILE_BYTES) {
+      this.sendError(
+        'too-large',
+        id,
+        `Generated files are limited to ${MAX_NEW_FILE_BYTES} bytes; this request is ${bytes.byteLength} bytes.`,
+      )
+      this.log(`${this.logPrefix}-new-file`, 'too-large')
+      return
+    }
+
+    const abort = new AbortController()
+    this.newFileId = id
+    this.newFileAbort = abort
+    let outcome: NewFileOutcome
+    try {
+      outcome = await handler({
+        kind: 'request',
+        identity: this.plugin.identity,
+        pluginId: this.plugin.pluginId,
+        pluginName: this.plugin.pluginName,
+        content: { bytes, ...(text === undefined ? {} : { text }) },
+        fallbackDirectory: dirname(this.options.readBasePath ?? '/'),
+        ...(payload.suggestedName === undefined ? {} : { suggestedName: payload.suggestedName }),
+        ...(payload.directory === undefined ? {} : { directory: payload.directory }),
+        session: this.options.session,
+        signal: abort.signal,
+      })
+    } catch {
+      if (this.phase === 'active' && this.newFileId === id) {
+        this.sendError('internal', id)
+        this.log(`${this.logPrefix}-new-file`, 'internal')
+      }
+      return
+    } finally {
+      if (this.newFileId === id) {
+        this.newFileId = null
+        this.newFileAbort = null
+      }
+    }
+
+    if (this.phase !== 'active' || abort.signal.aborted) return
+    if ('silent' in outcome) return
+    if ('cancelled' in outcome) {
+      this.post('shell/new-file-result', { cancelled: true }, id)
+      this.log(`${this.logPrefix}-new-file`, 'cancelled')
+      return
+    }
+    if (!outcome.ok) {
+      this.sendError(outcome.code, id, outcome.message)
+      this.log(`${this.logPrefix}-new-file`, outcome.code)
+      return
+    }
+    this.post('shell/new-file-result', { path: outcome.path, version: outcome.version }, id)
+    this.log(`${this.logPrefix}-new-file`, 'created', outcome.path)
+  }
+
   private async handleRequestList(envelope: Envelope): Promise<void> {
     const id = envelope.id
     if (!id) {
@@ -999,6 +1157,16 @@ export abstract class FrameSession {
     }
     if (this.intentWindow.count >= MAX_INTENTS_PER_SECOND) return false
     this.intentWindow.count += 1
+    return true
+  }
+
+  private allowNewFile(): boolean {
+    const now = Date.now()
+    if (!this.newFileWindow || now - this.newFileWindow.start >= INTENT_WINDOW_MS) {
+      this.newFileWindow = { start: now, count: 0 }
+    }
+    if (this.newFileWindow.count >= MAX_NEW_FILE_REQUESTS_PER_SECOND) return false
+    this.newFileWindow.count += 1
     return true
   }
 

@@ -8,7 +8,7 @@
     "name": "Exo"
   },
   "engines": {
-    "exo": ">=0.4.0"
+    "exo": ">=0.5.0"
   },
   "runtime": {
     "entry": "plugin.html"
@@ -43,6 +43,26 @@
         "id": "fixture-tutorial",
         "title": "Fixture Tutorial",
         "entry": "view-content.html"
+      },
+      {
+        "id": "fixture-generator",
+        "title": "Fixture Generator",
+        "entry": "view-content.html"
+      }
+    ],
+    "newFiles": [
+      {
+        "id": "fixture.text",
+        "label": "Fixture Text Template",
+        "fileName": "fixture-template.txt",
+        "content": "Hello from the fixture template\n"
+      },
+      {
+        "id": "fixture.binary",
+        "label": "Fixture Binary Template",
+        "fileName": "fixture-pixel.bin",
+        "encoding": "base64",
+        "content": "AAEC/w=="
       }
     ],
     "commands": [

@@ -5,7 +5,7 @@
  */
 
 export const PROTOCOL_VERSION = '1'
-export const SDK_VERSION = '1.6.0'
+export const SDK_VERSION = '1.7.0'
 
 export const READY_TIMEOUT_MS = 10_000
 export const REGISTRATION_TIMEOUT_MS = 10_000
@@ -13,6 +13,7 @@ export const MAX_IN_FLIGHT_REQUESTS = 64
 export const MAX_ID_LENGTH = 64
 export const MAX_LOCAL_EVENT_BYTES = 1024 * 1024
 export const MAX_VIEW_PAYLOAD_BYTES = 64 * 1024
+export const MAX_NEW_FILE_BYTES = 8 * 1024 * 1024
 
 const LOCAL_TOPIC_PATTERN = /^local\/[a-z0-9][a-z0-9._-]{0,63}$/
 
@@ -39,6 +40,7 @@ export type ShellErrorCode =
   | 'not-found'
   | 'not-a-file'
   | 'not-a-directory'
+  | 'already-exists'
   | 'too-large'
   | 'conflict'
   | 'rate-limited'
@@ -94,6 +96,8 @@ export interface EditorCapabilities {
   requestFiles: boolean
   /** Shell support bit for `plugin/request-files`; false on older shells. */
   filePicker: boolean
+  /** Shell support bit for `plugin/request-new-file`; false on older shells. */
+  createFile: boolean
   /** Shell support bit for `plugin/request-list`; false on older shells. */
   directoryListing: boolean
   /** Shell support bit for plugin-local publication and subscription. */
@@ -113,12 +117,31 @@ export type ViewCapabilities = EditorCapabilities
 export interface RegistrationCapabilities {
   /** Shell support bit for plugin-local publication and subscription. */
   localEvents: boolean
+  /** Shell support bit for `contributes.newFiles` registration. */
+  newFiles: boolean
 }
 
 export interface FilePickerOptions {
   multiple?: boolean
   /** Optional workspace-relative or `/`-rooted start hint. */
   directory?: string
+}
+
+export type NewFileContent = { text: string } | { bytes: ArrayBuffer }
+
+export interface NewFileOptions {
+  /** Exactly one of `text` or `bytes` is required. */
+  text?: string
+  bytes?: ArrayBuffer | ArrayBufferView
+  /** A one-segment name hint; the shell validates it. */
+  suggestedName?: string
+  /** An optional workspace-relative or `/`-rooted start hint. */
+  directory?: string
+}
+
+export interface NewFileResult {
+  path: string
+  version: string
 }
 
 export interface DirectoryEntry {
@@ -213,7 +236,7 @@ export type RegistrationRejectionReason =
 export interface RejectedContribution {
   index: number
   reason: RegistrationRejectionReason
-  kind?: 'fileEditor' | 'panel' | 'contentView' | 'command'
+  kind?: 'fileEditor' | 'panel' | 'contentView' | 'command' | 'newFile'
   message?: string
 }
 
@@ -222,6 +245,7 @@ export interface RegistrationAck {
   acceptedPanels: string[]
   acceptedContentViews: string[]
   acceptedCommands: string[]
+  acceptedNewFiles: string[]
   rejected: RejectedContribution[]
 }
 

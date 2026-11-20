@@ -79,6 +79,11 @@ export interface WriteOptions {
   ifVersion?: string
   /** Create parent directories. Default false. */
   create?: boolean
+  /**
+   * Reject with 'already-exists' when the target exists. A create-only write
+   * never truncates or replaces an existing target observed at check time.
+   */
+  createOnly?: boolean
 }
 
 export interface ListOptions {

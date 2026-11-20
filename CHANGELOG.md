@@ -3,6 +3,52 @@
 All notable changes to Exo Editor are recorded here. The version axes and the
 release process are in [`docs/releases.md`](./docs/releases.md).
 
+## [0.5.0] - 2026-11-20
+
+Additive post-release update: plugin new-file creation and manifest templates.
+
+### Added
+
+- `contributes.newFiles` (at most 20) with `id`, `label`, `fileName`, optional
+  `encoding` (`utf8` or `base64`) and `content`, capped at 64 KiB per decoded
+  template and 128 KiB per plugin. Names are one segment and never `exo.json` or
+  `.exo`.
+- `plugin/register.newFiles` and additive `acceptedNewFiles` in
+  `shell/register-ack`. A template activates only after
+  `plugin/register-complete` and requires `workspace:write`.
+- The correlated `plugin/request-new-file` / `shell/new-file-result` flow with an
+  optional suggested name and directory hint, the shell-owned Save As dialog, a
+  bounded text preview or binary label, and an 8 MiB generated-file cap.
+- `WriteOptions.createOnly` in the workspace contract. The memory provider checks
+  and writes atomically; the folder and Stratofold providers pre-check and
+  document the residual check-to-write race because neither exposes a
+  target-absent conditional create.
+- Explorer New File templates grouped by plugin, palette entries per template,
+  and the shell-owned Save As dialog. A runtime-created file is not opened
+  automatically; a template-created file opens because the user chose it.
+- `capabilities.createFile` in editor and view init and
+  `capabilities.newFiles` in registration init; absence means an older shell.
+- `@exo/plugin-sdk` `1.7.0` with `requestNewFile()` on editor and view clients
+  and `registerNewFile()` on the registration client.
+- Templates are listed in the first-grant consent prompt and deliberately
+  excluded from the consent fingerprint.
+
+### Compatibility
+
+- Shell: `0.5.0`
+- Protocol: `1`
+- Manifest schema: `1`
+- SDK: `1.7.0`
+
+### Breaking
+
+- None. The manifest field, registration field, messages, capability and SDK
+  helpers are additive within protocol major `1`. A plugin that adopts the field
+  must declare an `engines.exo` range that includes `0.5.0`; an older shell
+  reports `incompatible-engine` rather than mounting a partial surface. Existing
+  Empty File creation now refuses an existing name instead of silently
+  overwriting it.
+
 ## [0.4.0] - 2026-11-20
 
 Additive post-release update: plugin commands in shell-owned surfaces.

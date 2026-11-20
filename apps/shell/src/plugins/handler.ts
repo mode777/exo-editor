@@ -2,6 +2,7 @@ import type { WorkspacePath, WorkspaceSession } from '../workspace/contract'
 import { basename, dirname } from '../workspace/paths'
 import type { FrameTransport } from './frame'
 import type { FilePickerOpenRequest, FilePickerOutcome } from './file-picker'
+import type { NewFileOutcome, NewFileRequest } from './new-file'
 import type { EventBus } from './events'
 import type { EditorCandidate } from './registry'
 import type { SettingValues } from './settings'
@@ -91,6 +92,8 @@ export interface HandlerSessionOptions {
   onSaveRequested?: () => void
   /** Open the shell-owned file picker; absent means the support bit is false. */
   onRequestFiles?: (request: FilePickerOpenRequest) => Promise<FilePickerOutcome>
+  /** Open the shell-owned Save As dialog; absent means the support bit is false. */
+  onRequestNewFile?: (request: NewFileRequest) => Promise<NewFileOutcome>
   onDirty: (dirty: boolean) => void
   onFailure: (failure: HandlerFailure) => void
   onVersion?: (version: string) => void
@@ -213,6 +216,7 @@ export class HandlerSession extends FrameSession {
       clearTimeoutImpl: options.clearTimeoutImpl,
       onActive: options.onActive,
       onRequestFiles: options.onRequestFiles,
+      onRequestNewFile: options.onRequestNewFile,
       onFailure: failure,
       onLog: options.onLog,
       onOpenFile: options.onOpenFile,

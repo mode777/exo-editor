@@ -20,7 +20,7 @@ function init(): RegistrationInit {
     permissions: ['workspace:read', 'workspace:write'],
     locale: 'en',
     settings: {},
-    capabilities: { localEvents: true },
+    capabilities: { localEvents: true, newFiles: true },
   }
 }
 
@@ -138,6 +138,7 @@ describe('registration client', () => {
       acceptedPanels: ['outline'],
       acceptedContentViews: ['tutorial'],
       acceptedCommands: [],
+      acceptedNewFiles: [],
       rejected: [{ index: 0, kind: 'panel', reason: 'not-declared' }],
     })
   })
@@ -180,12 +181,56 @@ describe('registration client', () => {
         write: true,
         requestFiles: true,
         filePicker: true,
+        createFile: true,
         directoryListing: true,
         localEvents: true,
       },
       limits: { maxFileSize: 1, maxRequestBytes: 1 },
     } as unknown as RegistrationInit
     expect(() => new RegistrationClient(gate, editorInit)).toThrow(/register-mode/)
+    expect(transport.posted).toHaveLength(0)
+    gate.close()
+  })
+})
+
+describe('new-file template registration', () => {
+  it('sends a template id and exposes acceptedNewFiles', async () => {
+    const { transport, registration } = await connect()
+    registration.registerNewFile('component')
+    expect(transport.last('plugin/register')?.payload).toEqual({ newFiles: ['component'] })
+
+    const pending = registration.complete()
+    const ack = transport.last('plugin/register-complete')
+    transport.emit({
+      exo: 1,
+      type: 'shell/register-ack',
+      replyTo: ack?.id,
+      payload: {
+        accepted: [],
+        acceptedPanels: [],
+        acceptedContentViews: [],
+        acceptedCommands: [],
+        acceptedNewFiles: ['component'],
+        rejected: [],
+      },
+    })
+    await expect(pending).resolves.toMatchObject({ acceptedNewFiles: ['component'] })
+  })
+
+  it('rejects registration when an older shell omits the support bit', () => {
+    const transport = new FakePluginTransport({
+      hostOrigin: SHELL_ORIGIN,
+      sessionId: SESSION_ID,
+      mode: 'register',
+    })
+    const gate = new MessageGate(transport)
+    const registration = new RegistrationClient(gate, {
+      ...init(),
+      capabilities: { localEvents: true, newFiles: false },
+    })
+    expect(() => registration.registerNewFile('component')).toThrowError(
+      expect.objectContaining({ code: 'unsupported-message' }),
+    )
     expect(transport.posted).toHaveLength(0)
     gate.close()
   })

@@ -54,6 +54,14 @@ instance plus the session echo, not the origin string.
   stable snapshot, so re-list without a cursor to observe new files. A file path
   returns `not-a-directory`, a missing directory `not-found`, and a malformed or
   expired cursor also `not-found`.
+- Create: `plugin/request-new-file` asks the shell to create one file from text or
+  exact bytes. Check `capabilities.createFile` first and declare
+  `workspace:write`. Send exactly one of `text` or `bytes`; `suggestedName` and
+  `directory` are hints. The shell opens a Save As dialog, writes create-only and
+  replies `shell/new-file-result { path, version }` or `{ cancelled: true }`.
+  `already-exists` keeps the dialog open; `too-large` names the 8 MiB limit.
+  Only an active, visible, focused frame may ask, and only one dialog exists per
+  shell. The shell does not open the file; call `open-file` if that is useful.
 - Dirty: the plugin reports `plugin/dirty`. The shell never infers it from
   content.
 - Save: the shell sends `shell/request-save`; the handler replies with

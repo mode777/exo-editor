@@ -36,7 +36,9 @@ function parseAck(payload: unknown): RegistrationAck | null {
   const acceptedPanels = parseStringList(payload.acceptedPanels)
   const acceptedContentViews = parseStringList(payload.acceptedContentViews)
   const acceptedCommands = parseStringList(payload.acceptedCommands)
-  if (!acceptedPanels || !acceptedContentViews || !acceptedCommands) return null
+  const acceptedNewFiles = parseStringList(payload.acceptedNewFiles)
+  if (!acceptedPanels || !acceptedContentViews || !acceptedCommands || !acceptedNewFiles)
+    return null
   if (!Array.isArray(payload.rejected)) return null
   const rejected: RejectedContribution[] = []
   for (const item of payload.rejected) {
@@ -56,7 +58,8 @@ function parseAck(payload: unknown): RegistrationAck | null {
       item.kind !== 'fileEditor' &&
       item.kind !== 'panel' &&
       item.kind !== 'contentView' &&
-      item.kind !== 'command'
+      item.kind !== 'command' &&
+      item.kind !== 'newFile'
     ) {
       return null
     }
@@ -65,7 +68,7 @@ function parseAck(payload: unknown): RegistrationAck | null {
       reason: item.reason as RegistrationRejectionReason,
       ...(item.kind === undefined
         ? {}
-        : { kind: item.kind as 'fileEditor' | 'panel' | 'contentView' | 'command' }),
+        : { kind: item.kind as 'fileEditor' | 'panel' | 'contentView' | 'command' | 'newFile' }),
       ...(item.message === undefined ? {} : { message: item.message }),
     })
   }
@@ -74,6 +77,7 @@ function parseAck(payload: unknown): RegistrationAck | null {
     acceptedPanels,
     acceptedContentViews,
     acceptedCommands,
+    acceptedNewFiles,
     rejected,
   }
 }
@@ -157,7 +161,21 @@ export class RegistrationClient {
     this.sendViewRegistration('commands', id)
   }
 
-  private sendViewRegistration(kind: 'panels' | 'contentViews' | 'commands', id: string): void {
+  /** Register a declared new-file template id; it activates after completion. */
+  registerNewFile(id: string): void {
+    if (!this.init.capabilities.newFiles) {
+      throw new ExoProtocolError(
+        'unsupported-message',
+        'This shell does not support new-file template registration.',
+      )
+    }
+    this.sendViewRegistration('newFiles', id)
+  }
+
+  private sendViewRegistration(
+    kind: 'panels' | 'contentViews' | 'commands' | 'newFiles',
+    id: string,
+  ): void {
     if (this.completed || this.completing) {
       throw new ExoProtocolError(
         'protocol-violation',

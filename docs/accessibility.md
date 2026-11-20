@@ -15,6 +15,7 @@ Exo owns these surfaces and checks them:
 - settings dialog, including plugin settings, raw `exo.json` and the plugin log
 - consent dialog
 - workspace file picker (shell-owned plugin selection dialog)
+- new-file Save As dialog
 - unsaved-changes dialog
 - remote-connect dialog and the reconnect banner
 
@@ -44,10 +45,14 @@ npm test --workspace @exo/shell -- --run \
   fails the suite.
 - `src/components/useModalDialog.test.tsx` covers initial focus, Tab and
   Shift+Tab wrap, Escape and focus restoration for the shared modal hook used by
-  the consent, settings, close-prompt, remote-connect and file-picker dialogs.
+  the consent, settings, close-prompt, remote-connect, file-picker and new-file
+  dialogs.
 - `src/document/FilePickerDialog.test.tsx` covers the picker's initial focus,
   arrow-key row navigation, Escape cancellation, bidi-isolated paths and
   reserved-entry filtering.
+- `src/document/NewFileDialog.test.tsx` covers the Save As dialog's initial focus
+  on the name field, plugin disclosure, path and size, text preview, binary
+  label, folder navigation, reserved-folder filtering and the collision state.
 - `src/workbench/SecondaryViewPicker.test.tsx` covers the secondary-view picker's
   list, initial focus, Arrow Up/Down movement, Escape close and an axe scan.
 - `src/document/ContentViewSurface.test.tsx` covers the content-view chrome,
@@ -97,10 +102,12 @@ Run against the deployed URL with the demo workspace from
    cycle inside it, Escape closes it and focus returns to the status-bar control
    or palette entry that opened it.
 5. Repeat the focus trap and Escape check for the consent dialog, the
-   unsaved-changes prompt, the remote-connect dialog and the plugin file picker.
-   In the picker, use Arrow Up/Down and Home/End between rows, Enter to open a
-   folder or select a file, and Escape to cancel; focus returns to the plugin
-   frame.
+   unsaved-changes prompt, the remote-connect dialog, the plugin file picker and
+   the new-file Save As dialog. In the picker, use Arrow Up/Down and Home/End
+   between rows, Enter to open a folder or select a file, and Escape to cancel;
+   focus returns to the plugin frame. In the Save As dialog, focus starts in the
+   name field, the folder buttons and name are Tab-reachable, the final path and
+   size are readable, and Escape cancels without writing.
 6. Deny a plugin consent. The plugin entry reports the decision and no second
    alert repeats it.
 7. Open a read-only workspace. The read-only banner is announced once; Retry and
@@ -157,6 +164,9 @@ surface checks below were repeated on 2026-11-20 against commit `3f69504`.
 - File picker (added 2026-11-18 at commit `a868f08`): the dialog opened from the
   visible fixture, focus entered the dialog, Arrow Down moved between rows,
   Escape closed it and the fixture recorded an empty selection. Result: pass.
+- New-file Save As dialog: not yet verified against the deployed shell in a
+  browser; the unit and axe suites are the only recorded evidence for this
+  surface.
 - Plugin view surfaces (added 2026-11-20 at commit `3f69504`): the activity item
   was named `Fixture Panel — Exo Host Fixture`; the secondary "Select View"
   action opened the picker, both options named their plugin, focus entered the

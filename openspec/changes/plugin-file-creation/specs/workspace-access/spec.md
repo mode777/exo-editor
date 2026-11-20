@@ -38,24 +38,33 @@ The session SHALL accept a `createOnly` write option and SHALL pass it to the pr
 
 ### Requirement: Create-only provider parity
 
-The memory and remote providers SHALL use an atomic conditional create. The local folder provider SHALL use its best available check and SHALL document the residual check-to-write race; the shell SHALL NOT claim an atomic guarantee the provider cannot enforce.
+The memory provider SHALL use an atomic conditional create. The local folder and
+Stratofold providers SHALL use their best available check and SHALL document the
+residual check-to-write race; the shell SHALL NOT claim an atomic guarantee the
+provider cannot enforce. A create-only write SHALL never truncate a target that
+existed at check time.
 
 #### Scenario: Atomic create
 
-- **WHEN** a provider supports an atomic conditional create and another writer creates the target between the check and the write
-- **THEN** the provider fails the create with `already-exists` and leaves that writer's content intact
+- **WHEN** the memory provider performs a create-only write and another writer creates the target between operations
+- **THEN** the create fails with `already-exists` and leaves that writer's content intact
 
 #### Scenario: Folder residual race
 
 - **WHEN** the local folder provider cannot use an atomic create primitive and an external writer creates the target between its check and its write
 - **THEN** the provider documents the residual race in its provider note and the shell does not claim an atomic guarantee it cannot enforce
 
+#### Scenario: Stratofold residual race
+
+- **WHEN** the Stratofold provider cannot express a target-absent conditional upload
+- **THEN** it pre-checks, reports `already-exists` for a target observed at check time, documents the residual race, and never treats `If-Match: "*"` as create-only
+
 #### Scenario: Remote provider parity
 
 - **WHEN** the conformance suite runs the create-only cases against the memory, folder and Stratofold providers
 - **THEN** all three return the same paths and error codes, and the existing content is unchanged when the target exists
 
-#### Scenario: Remote conditional create
+#### Scenario: Remote conditional upload
 
-- **WHEN** the Stratofold provider performs a create-only write
+- **WHEN** the Stratofold provider performs an update with a known version
 - **THEN** it uses its conditional upload rather than an unconditional overwrite

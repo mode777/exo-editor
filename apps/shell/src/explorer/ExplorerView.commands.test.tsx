@@ -6,7 +6,7 @@ import { WorkspaceRuntimeProvider } from '../workspace/context'
 import { MemoryWorkspaceProvider } from '../workspace/providers/memory'
 import { MemoryHandleStore } from '../workspace/providers/folder/handle-store'
 import type { PluginHost, PluginHostRecord } from '../plugins/host'
-import type { RegisteredCommand } from '../plugins/registration'
+import type { RegisteredCommand, RegisteredNewFile } from '../plugins/registration'
 import { clearWorkspaceTabs, configurePresetStore } from '../workbench/tabs'
 import { ExplorerView } from './ExplorerView'
 import { describeAxeViolations, runAxe } from '../test-a11y'
@@ -26,7 +26,10 @@ function command(overrides: Partial<RegisteredCommand> = {}): RegisteredCommand 
   }
 }
 
-function record(commands: RegisteredCommand[]): PluginHostRecord {
+function record(
+  commands: RegisteredCommand[],
+  newFiles: RegisteredNewFile[] = [],
+): PluginHostRecord {
   return {
     manifestUrl: 'https://plugins.example.com/test/exo-manifest.json',
     entryIndex: 0,
@@ -38,6 +41,7 @@ function record(commands: RegisteredCommand[]): PluginHostRecord {
     panels: [],
     contentViews: [],
     commands,
+    newFiles,
     manifest: {
       schemaVersion: 1,
       manifestUrl: 'https://plugins.example.com/test/exo-manifest.json',
@@ -54,6 +58,7 @@ function record(commands: RegisteredCommand[]): PluginHostRecord {
       panels: [],
       contentViews: [],
       commands,
+      newFiles,
     },
   }
 }
@@ -98,7 +103,7 @@ afterEach(async () => {
   document.body.innerHTML = ''
 })
 
-async function render(commands: RegisteredCommand[]) {
+async function render(commands: RegisteredCommand[], newFiles: RegisteredNewFile[] = []) {
   const runtime = new WorkspaceRuntime({
     providerFactory: () =>
       new MemoryWorkspaceProvider({
@@ -110,7 +115,7 @@ async function render(commands: RegisteredCommand[]) {
     handleStore: new MemoryHandleStore(),
     eventTarget: new EventTarget(),
     now: () => 1,
-    pluginHost: host([record(commands)]),
+    pluginHost: host([record(commands, newFiles)]),
   })
   await runtime.openFolder()
   const invoke = vi.spyOn(runtime.commands, 'invoke').mockResolvedValue({ ok: true })
@@ -208,5 +213,49 @@ describe('explorer plugin commands', () => {
     expect(pluginItems).toHaveLength(10)
     expect(menu.textContent).not.toContain('Palette Only')
     expect(menu.querySelector('[role="separator"]')).not.toBeNull()
+  })
+})
+
+describe('explorer new-file templates', () => {
+  const templates: RegisteredNewFile[] = [
+    {
+      id: 'component',
+      label: 'Component',
+      fileName: 'Component.tsx',
+      encoding: 'utf8',
+      bytes: new TextEncoder().encode('export {}'),
+      text: 'export {}',
+      registrationOrder: 0,
+    },
+  ]
+
+  it('lists Empty File and each template grouped by plugin name', async () => {
+    const { container, runtime } = await render([], templates)
+    const newFile = Array.from(container.querySelectorAll('button')).find(
+      (element) => element.getAttribute('aria-label') === 'New File',
+    )
+    await act(async () => {
+      newFile?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+    })
+    const menu = container.querySelector('[role="menu"]')
+    expect(menu).not.toBeNull()
+    expect(menu?.textContent).toContain('Empty File')
+    expect(menu?.textContent).toContain('Example Plugin')
+    expect(menu?.textContent).toContain('Component')
+    expect(menu?.textContent).toContain('Component.tsx')
+
+    const templateButton = Array.from(menu?.querySelectorAll('button') ?? []).find((element) =>
+      element.textContent?.includes('Component'),
+    )
+    await act(async () => {
+      templateButton?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+    })
+    expect(runtime.newFiles.getSnapshot()).toMatchObject({
+      kind: 'template',
+      pluginName: 'Example Plugin',
+      name: 'Component.tsx',
+      directory: '/',
+    })
+    runtime.newFiles.cancel()
   })
 })

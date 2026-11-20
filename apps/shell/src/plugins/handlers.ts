@@ -8,6 +8,7 @@ import { basename, dirname } from '../workspace/paths'
 import { SHELL_VERSION } from '../version'
 import { DomFrameTransport, type FrameTransport } from './frame'
 import type { FilePickerOpenRequest, FilePickerOutcome } from './file-picker'
+import type { NewFileOutcome, NewFileRequest } from './new-file'
 import {
   DEFAULT_MAX_REQUEST_BYTES,
   HandlerSession,
@@ -78,6 +79,8 @@ export interface HandlerPoolOptions {
   onSaveRequested?: (path: WorkspacePath) => void
   /** Open the one shell-owned picker; the pool supplies the active/focus gate. */
   onRequestFiles?: (request: FilePickerOpenRequest) => Promise<FilePickerOutcome>
+  /** Open the one shell-owned Save As dialog; the pool supplies the gate. */
+  onRequestNewFile?: (request: NewFileRequest) => Promise<NewFileOutcome>
   /** Whether another frame's picker is already open. */
   isPickerOpen?: () => boolean
   onOpenFile?: (request: OpenFileIntent, source: IntentSource) => Promise<IntentOutcome>
@@ -137,6 +140,8 @@ export class HandlerPool {
   private readonly onSaveRequested: ((path: WorkspacePath) => void) | undefined
   private readonly onRequestFiles:
     ((request: FilePickerOpenRequest) => Promise<FilePickerOutcome>) | undefined
+  private readonly onRequestNewFile:
+    ((request: NewFileRequest) => Promise<NewFileOutcome>) | undefined
   private readonly isPickerOpen: (() => boolean) | undefined
   private readonly onOpenFile:
     ((request: OpenFileIntent, source: IntentSource) => Promise<IntentOutcome>) | undefined
@@ -172,6 +177,7 @@ export class HandlerPool {
     this.onHandlerClosed = options.onHandlerClosed
     this.onSaveRequested = options.onSaveRequested
     this.onRequestFiles = options.onRequestFiles
+    this.onRequestNewFile = options.onRequestNewFile
     this.isPickerOpen = options.isPickerOpen
     this.onOpenFile = options.onOpenFile
     this.onOpenView = options.onOpenView
@@ -293,6 +299,18 @@ export class HandlerPool {
         }
         return (
           this.onRequestFiles?.(request) ??
+          Promise.resolve({ ok: false as const, code: 'internal' as const })
+        )
+      },
+      onRequestNewFile: (request) => {
+        if (input.candidate.rendering !== 'frame') {
+          return Promise.resolve({ ok: false as const, code: 'permission-denied' as const })
+        }
+        if (!this.surfaces.has(input.path) || !session.active || !session.hasFocus()) {
+          return Promise.resolve({ ok: false as const, code: 'permission-denied' as const })
+        }
+        return (
+          this.onRequestNewFile?.(request) ??
           Promise.resolve({ ok: false as const, code: 'internal' as const })
         )
       },

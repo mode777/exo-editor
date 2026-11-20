@@ -56,22 +56,24 @@ document (mixes two different ownership models).
 
 Add `createOnly?: boolean` to `WriteOptions`. A create-only write first rejects
 an existing target with `already-exists`, then writes. The memory provider checks
-and writes synchronously. The Stratofold provider uses its conditional upload
-with `"*"` and maps a failed precondition to `already-exists`. The folder
-provider checks with `getFileHandle`/`getFile`, then writes with
-`createWritable`; the File System Access API has no atomic create, so a
-concurrent external writer can win the last instant.
+and writes synchronously, so its create is atomic. The folder provider checks
+with `getFileHandle`/`getFile`, then writes with `createWritable`; the File
+System Access API has no atomic create. The Stratofold provider also pre-checks:
+`@stratofold/client` 0.12.0's only conditional upload is `If-Match`, where
+`"*"` requires the target to **exist** and is therefore the update-only
+condition, not create-only. The client exposes no target-absent conditional.
 
-The shell does not claim an atomic guarantee for the folder provider. Its
-provider note records the residual race, and the dialog's own create is
-serialized, so the race requires a second external program. This is the honest
-trade-off: disabling new-file creation on folder workspaces (the primary case)
-or pretending the check is atomic would both be worse.
+The shell does not claim an atomic guarantee for the folder or Stratofold
+providers. Both provider notes record the residual check-to-write race, and the
+dialog serializes the shell's own creates, so the race requires a second writer.
+This is the honest trade-off: disabling new-file creation on folder workspaces
+(the primary case) or pretending the check is atomic would both be worse.
 
 Alternatives: `overwrite: false` (changes the default semantics of every write),
-a temporary file plus rename (FSA move is not available in the supported matrix),
-or a shell-level stat-only check (does not prevent the same race and loses the
-remote provider's atomic condition).
+a temporary file plus rename (FSA move is not available in the supported
+matrix), a shell-level stat-only check (same race and loses the memory
+provider's atomic guarantee), or inventing an `If-None-Match` upload the
+published client and server do not document.
 
 ### D3 - Templates are validated manifest data
 
@@ -153,15 +155,17 @@ than being written by the text surface.
 ## Risks / Trade-offs
 
 - **Folder create is not atomic** -> pre-check plus provider write; the residual
-  external race is documented in the provider note. The memory and remote paths
-  are atomic.
+  external race is documented in the provider note. The memory path is atomic.
+- **Stratofold create is not atomic** -> the published client has no
+  target-absent conditional, so the adapter pre-checks and documents the race.
+  It never replaces an existing target it observed.
 - **Large payloads** -> 8 MiB cap, local preflight, one message, no chunking.
   Above that the plugin must split or use a future chunked API.
 - **Binary templates inflate the manifest** -> 64 KiB per template, 128 KiB total
   and base64 validation. The 256 KiB manifest cap remains the outer bound.
-- **Remote provider conditional create** -> Stratofold uses `ifVersion: "*"`; a
-  provider that cannot express create-only reports `unsupported` for that write
-  rather than silently overwriting.
+- **Remote provider conditional create** -> the adapter uses a pre-check and
+  reports `already-exists`; the provider note records why `If-Match: "*"` cannot
+  express create-only.
 - **Overwrite regression in the existing explorer flow** -> the existing Empty
   File path is moved to `createOnly` and the conformance suite covers an existing
   target.
@@ -178,7 +182,8 @@ than being written by the text surface.
    shell `0.5.0`, SDK `1.7.0`, protocol `1` and keeps manifest schema `1`.
 2. Add `createOnly` to `WriteOptions` with a default of `false`; existing writes
    are unchanged. Implement it in the memory, folder and Stratofold providers and
-   add conformance cases.
+   add conformance cases. The memory provider is atomic; the folder and
+   Stratofold providers pre-check and document the residual race.
 3. Move the explorer's existing Empty File write to `createOnly`; this fixes the
    current silent-overwrite behavior without changing the user flow.
 4. Old shells omit `capabilities.createFile`/`newFiles`; the SDK rejects locally

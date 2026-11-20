@@ -32,6 +32,7 @@ reverting. Findings are recorded in [Findings](#findings).
 | 12 | Plugin-local event isolation | `plugin-events` - Plugin-local topic namespace; Delivery semantics; Limits and failure isolation | `plugins/events.ts` (identity filter, per-identity sequences, per-frame rate), `plugins/handler.ts` (`plugin/publish` validation) | `events.test.ts`, `handler.test.ts`, `registration.test.ts`, `sdk-conformance.test.ts` |
 | 13 | View surfaces and navigation intents | `plugin-views` - Panel contributions; Content-view contributions; Navigation and panel intents; Cross-plugin content views; View lifecycle | `plugins/frame-session.ts` (shared gate, path and intent checks), `plugins/view-session.ts`, `plugins/view-pool.ts` (lazy mount, caps, surfaces), `workspace/runtime.ts` (open-file/view/panel resolution) | `view-session.test.ts`, `view-pool.test.ts`, `runtime.views.test.ts`, `plugin-views.test.tsx`, `ContentViewSurface.test.tsx`, `SecondaryViewPicker.test.tsx` |
 | 14 | Plugin command surface | `plugin-commands` - Command contribution semantics; Command registration activation; Command invocation; Command results and failures; Command runtime limits; Command attribution and isolation; Command teardown | `plugins/commands.ts` (registry, single controller, target resolution, timers, limits, notices), `plugins/frame-session.ts` (`shell/command` delivery, active-phase result routing, init support bit), `plugins/registration.ts` (subset, dedupe, `target-not-registered`), `workbench/commands.ts` (synthetic palette ids), `explorer/ExplorerView.tsx`, `document/DocumentArea.tsx` | `commands.test.ts`, `registration.test.ts`, `host.test.ts`, `commands.test.ts` (palette), `ExplorerView.commands.test.tsx`, `DocumentArea.commands.test.tsx`, `CommandNotices.test.tsx` |
+| 15 | New-file creation | `plugin-file-creation` all requirements; `workspace-access` - Create-only writes; Create-only provider parity; `plugin-protocol` - New-file creation request; New-file capability negotiation; Limits; `editor-shell` - Explorer new-file templates; New-file Save As dialog; `plugin-host` - New-file template registration | `plugins/new-file.ts` (single dialog, create-only write, cancellation, reset), `plugins/frame-session.ts` (shape, permission, focus, size and rate gates, correlated result), `plugins/manifest.ts` (decoded limits, reserved names), `plugins/registration.ts` (declared id, `workspace:write`), `workspace/providers/*` (`createOnly`), `document/NewFileDialog.tsx`, `explorer/ExplorerView.tsx` | `new-file.test.ts`, `handler.test.ts`, `NewFileDialog.test.tsx`, `manifest.test.ts`, `registration.test.ts`, `host.test.ts`, `conformance.ts`, `consent.test.ts`, `ExplorerView.commands.test.tsx`, `new-file.test.ts` (SDK) |
 
 ## Control details
 
@@ -334,6 +335,51 @@ reverting. Findings are recorded in [Findings](#findings).
   `commands.reset()` from `WorkspaceRuntime.deactivate`: the workspace-reset test
   observes stale notices and fails.
 
+### 15. New-file creation
+
+- Requirements: `plugin-file-creation` all requirements; `workspace-access`
+  "Create-only writes" and "Create-only provider parity"; `plugin-protocol`
+  "New-file creation request", "New-file capability negotiation" and "Limits";
+  `plugin-manifest` section 3.4; `editor-shell` "Explorer new-file templates" and
+  "New-file Save As dialog"; `plugin-host` "New-file template registration".
+- Enforcement: the manifest validator decodes base64 once, caps each template at
+  64 KiB and the plugin at 128 KiB total, and rejects multi-segment or reserved
+  default names. Registration accepts only declared ids and only with
+  `workspace:write`; templates activate after `plugin/register-complete` and are
+  removed with the plugin. A runtime request must be an active, visible, focused
+  editor (`rendering: "frame"`) or view frame with `workspace:write` and a
+  writable session. `FrameSession` requires exactly one content field, enforces
+  the 8 MiB cap and a ten-per-second per-frame budget, and the controller allows
+  one dialog per shell. The write goes through the plugin-scoped workspace facade
+  with `createOnly: true`, so a reserved or existing target is refused and never
+  truncated. The dialog is shell-owned: the plugin supplies only a validated name
+  hint and content; it supplies no title, description or path. Cancellation,
+  frame disposal, plugin removal and workspace switch close it without a write;
+  a late result is dropped. Logs carry ids, paths and codes, never content.
+- Tests: `new-file.test.ts` covers create-only success, binary bytes, collision,
+  reserved names, a single dialog, cancellation, disposal, reset, hint fallback
+  and the template/request open difference; `handler.test.ts` covers the
+  request shape, size, permission, focus, cancellation, error and disposal
+  paths; `manifest.test.ts` covers decoding, limits, names and duplicates;
+  `registration.test.ts` and `host.test.ts` cover activation, permission,
+  undeclared ids and teardown; `conformance.ts` covers `already-exists`,
+  directory targets, parent creation and preserved content on all providers;
+  `NewFileDialog.test.tsx` covers disclosure, focus, navigation, binary content
+  and the collision state; `consent.test.ts` pins the fingerprint exclusion;
+  `ExplorerView.commands.test.tsx` covers the grouped menu; the SDK
+  `new-file.test.ts` covers text, bytes, cancellation, size, support, permission,
+  pending and malformed-result paths.
+- Mutation: remove the `createOnly` check in the memory provider: the
+  conformance "creates only a missing target" assertion overwrites the existing
+  file and fails. Remove `hasWorkspaceWrite` from the `plugin/request-new-file`
+  gate: the read-only handler test opens a dialog and fails. Remove the
+  `hasFocus` check: the hidden-frame case is accepted and fails. Remove the
+  `MAX_NEW_FILE_BYTES` check: the oversized case reaches the handler and fails.
+  Remove `newFiles.reset()` from `WorkspaceRuntime.deactivate`: the template
+  remains offerable from the released workspace. Remove the fingerprint
+  exclusion by adding `newFiles` to `fingerprintInput`: the consent exclusion
+  test fails on a content change.
+
 ## Findings
 
 | ID | Severity | Finding | Disposition |
@@ -345,6 +391,7 @@ reverting. Findings are recorded in [Findings](#findings).
 | F5 | moderate (dev) | `npm audit` reports a `minimatch` ReDoS in the TypeScript ESLint dependency tree. | Accepted: development-only tooling, no runtime or deployed artifact, inputs are repository files rather than untrusted plugin data. Update with the next tooling bump. |
 | F6 | low | Panels and content views are excluded from the consent fingerprint, so an already-approved plugin can add an activity-bar item, a side panel or a content-view tab without a new prompt. | Accepted by design: the surfaces are user-invoked, grant no autonomous data or file access, and every shell chrome surface names the plugin so a new surface cannot impersonate the shell. The first-grant prompt lists them and the security review tracks the mitigation; adding them to the fingerprint is a one-change follow-up with a single re-prompt if required later. |
 | F7 | low | Commands are excluded from the consent fingerprint and a misleading title could imitate shell chrome or describe an action broadly. | Accepted by design: commands are user-invoked, run only in frames the user already approved with their existing permissions, grant no autonomous access and cannot use a shell command id. Every palette entry, explorer entry and editor action names the contributing plugin, the first-grant prompt lists each command with its target and placements, and the plugin log attributes every invocation. A future fingerprint inclusion is a one-change follow-up with a single re-prompt. |
+| F8 | low | New-file templates are excluded from the consent fingerprint, so an approved plugin can change what a template writes without a new prompt. | Accepted by design: a template only writes content the user confirms in a shell-owned dialog, after seeing the size and a bounded preview; it grants no autonomous access. The first-grant prompt lists each label and default name, the plugin name is in the dialog, and content changes remain visible and editable. The residual folder and Stratofold check-to-write race requires an external writer and is documented in the provider notes. |
 
 No open finding above accepted severity. There is no server, secret, account or
 first-party API in the deployed artifact. The dependency audit result is part of

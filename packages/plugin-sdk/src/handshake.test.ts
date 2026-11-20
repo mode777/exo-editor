@@ -30,7 +30,7 @@ function registerInit(overrides: Partial<RegistrationInit> = {}): RegistrationIn
   return {
     ...base('register'),
     mode: 'register',
-    capabilities: { localEvents: true },
+    capabilities: { localEvents: true, newFiles: true },
     ...overrides,
   }
 }
@@ -52,6 +52,7 @@ function editorInit(overrides: Partial<EditorInit> = {}): EditorInit {
       write: true,
       requestFiles: true,
       filePicker: true,
+      createFile: true,
       directoryListing: true,
       localEvents: true,
       openFile: true,
@@ -162,6 +163,7 @@ describe('handshake', () => {
           write: true,
           requestFiles: true,
           filePicker: true,
+          createFile: true,
           directoryListing: 'yes',
         } as unknown as EditorInit['capabilities'],
       }),
@@ -215,6 +217,7 @@ describe('handshake', () => {
           write: true,
           requestFiles: true,
           filePicker: true,
+          createFile: true,
           directoryListing: true,
           localEvents: 'yes',
         } as unknown as EditorInit['capabilities'],

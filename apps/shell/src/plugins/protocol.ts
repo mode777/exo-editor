@@ -30,6 +30,7 @@ export type ShellErrorCode =
   | 'not-found'
   | 'not-a-file'
   | 'not-a-directory'
+  | 'already-exists'
   | 'too-large'
   | 'conflict'
   | 'rate-limited'

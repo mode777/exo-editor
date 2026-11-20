@@ -2,6 +2,7 @@ import type { WorkspaceSession } from '../workspace/contract'
 import { SHELL_VERSION } from '../version'
 import { DomFrameTransport, type FrameTransport } from './frame'
 import type { FilePickerOpenRequest, FilePickerOutcome } from './file-picker'
+import type { NewFileOutcome, NewFileRequest } from './new-file'
 import { EventBus, type ThemeName } from './events'
 import type { PluginPermission } from './manifest'
 import {
@@ -97,6 +98,7 @@ export interface ViewPoolOptions {
   maxRequestBytes?: number
   events?: EventBus
   onRequestFiles?: (request: FilePickerOpenRequest) => Promise<FilePickerOutcome>
+  onRequestNewFile?: (request: NewFileRequest) => Promise<NewFileOutcome>
   onOpenFile?: (request: OpenFileIntent, source: IntentSource) => Promise<IntentOutcome>
   onOpenView?: (request: OpenViewIntent, source: IntentSource) => Promise<IntentOutcome>
   onRequestPanel?: (request: PanelIntent, source: IntentSource) => Promise<PanelIntentOutcome>
@@ -144,6 +146,8 @@ export class ViewPool {
   private readonly maxRequestBytes: number
   private readonly onRequestFiles:
     ((request: FilePickerOpenRequest) => Promise<FilePickerOutcome>) | undefined
+  private readonly onRequestNewFile:
+    ((request: NewFileRequest) => Promise<NewFileOutcome>) | undefined
   private readonly onOpenFile:
     ((request: OpenFileIntent, source: IntentSource) => Promise<IntentOutcome>) | undefined
   private readonly onOpenView:
@@ -177,6 +181,7 @@ export class ViewPool {
     this.clearTimeoutImpl = options.clearTimeoutImpl
     this.maxRequestBytes = options.maxRequestBytes ?? DEFAULT_MAX_REQUEST_BYTES
     this.onRequestFiles = options.onRequestFiles
+    this.onRequestNewFile = options.onRequestNewFile
     this.onOpenFile = options.onOpenFile
     this.onOpenView = options.onOpenView
     this.onRequestPanel = options.onRequestPanel
@@ -545,6 +550,15 @@ export class ViewPool {
         this.publish()
       },
       onRequestFiles: this.onRequestFiles,
+      onRequestNewFile: (request) => {
+        if (!record.handle.visible || !record.session?.active || !record.session?.hasFocus()) {
+          return Promise.resolve({ ok: false as const, code: 'permission-denied' as const })
+        }
+        return (
+          this.onRequestNewFile?.(request) ??
+          Promise.resolve({ ok: false as const, code: 'internal' as const })
+        )
+      },
       onFailure: (failure) => {
         record.handle.phase = 'failed'
         record.handle.error = {

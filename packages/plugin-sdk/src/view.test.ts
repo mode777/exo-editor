@@ -13,6 +13,7 @@ function capabilities(overrides: Partial<EditorCapabilities> = {}): EditorCapabi
     write: true,
     requestFiles: true,
     filePicker: true,
+    createFile: true,
     directoryListing: true,
     localEvents: true,
     openFile: true,

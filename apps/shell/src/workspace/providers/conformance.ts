@@ -92,6 +92,38 @@ export function runProviderConformance(
       expect(text(await handle.read('/a.txt'))).toBe('newer')
     })
 
+    it('creates only a missing target and preserves existing content', async () => {
+      const handle = await seeded(createProvider())
+      const created = await handle.write('/fresh.txt', bytes('fresh'), {
+        create: true,
+        createOnly: true,
+      })
+      expect(created).toMatchObject({ path: '/fresh.txt', kind: 'file' })
+      expect(text(await handle.read('/fresh.txt'))).toBe('fresh')
+
+      await expectCode(
+        () => handle.write('/fresh.txt', bytes('clobber'), { createOnly: true }),
+        'already-exists',
+      )
+      expect(text(await handle.read('/fresh.txt'))).toBe('fresh')
+      expect((await handle.stat('/fresh.txt')).version).toBe(created.version)
+
+      await handle.mkdir('/folder')
+      await expectCode(
+        () => handle.write('/folder', bytes('x'), { createOnly: true }),
+        'not-a-file',
+      )
+    })
+
+    it('creates missing parents for a create-only write when create is set', async () => {
+      const handle = await seeded(createProvider())
+      await handle.write('/nested/new/child.txt', bytes('child'), {
+        create: true,
+        createOnly: true,
+      })
+      expect(text(await handle.read('/nested/new/child.txt'))).toBe('child')
+    })
+
     it('creates and removes directories', async () => {
       const handle = await seeded(createProvider())
       await handle.mkdir('/nested/deep', { recursive: true })

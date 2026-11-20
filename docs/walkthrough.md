@@ -72,6 +72,16 @@ the deployed URL below, not a local dev server or local build.
     notice names the plugin and can be dismissed. Disable the fixture: every
     palette, menu and action entry disappears and no new invocation reaches its
     frames.
+15. **Create a new file.** With the fixture active in a writable workspace, open
+    the explorer New File menu: it offers Empty File and the fixture templates
+    under the plugin name. Choose a text template; the Save As dialog names the
+    plugin, starts in the selected folder, pre-fills the default name, shows the
+    size and a bounded preview. Confirm: the file is created create-only and
+    opens. Repeat with an existing name and confirm the collision keeps the
+    dialog open and leaves the existing content unchanged. Choose a binary
+    template and confirm the dialog shows a byte size and no preview. Invoke a
+    content view that asks the shell to create a file; it gets the path and
+    version, the shell does not open a tab, and Escape cancels without a write.
 
 ## Screenshots
 

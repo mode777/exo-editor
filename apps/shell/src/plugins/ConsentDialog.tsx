@@ -194,6 +194,24 @@ export function ConsentDialog({ request, shellOrigin, onApprove, onDeny }: Conse
           )}
         </section>
 
+        <section className="exo-consent-section" aria-labelledby="exo-consent-new-files">
+          <h3 id="exo-consent-new-files">New files it can offer</h3>
+          {manifest.newFiles.length === 0 ? (
+            <p className="exo-settings-hint">This plugin offers no new-file templates.</p>
+          ) : (
+            <ul className="exo-consent-list">
+              {manifest.newFiles.map((template) => (
+                <li key={template.id}>
+                  <strong>{template.label}</strong> — <code>{template.fileName}</code>
+                  <div className="exo-consent-page">
+                    Creates a fixed template&rsquo;s content at a name you confirm.
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
         <section className="exo-consent-section" aria-labelledby="exo-consent-permissions">
           <h3 id="exo-consent-permissions">Permissions</h3>
           {manifest.permissions.length === 0 ? (

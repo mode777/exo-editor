@@ -167,6 +167,41 @@ on every surface. Set `engines.exo` to a range that includes `0.4.0`, so an olde
 shell fails with `incompatible-engine` instead of rejecting the unknown field.
 See the [manifest contract](../contracts/plugin-manifest.md#33-commands).
 
+## New-file templates
+
+A template offers a fixed file the user can create from the explorer New File
+menu or the palette. It is plain manifest data, at most 20 entries, 64 KiB per
+decoded template and 128 KiB total:
+
+```json
+"contributes": {
+  "newFiles": [
+    {
+      "id": "component",
+      "label": "TypeScript component",
+      "fileName": "Component.tsx",
+      "content": "export function Component() {}\n"
+    },
+    {
+      "id": "pixel",
+      "label": "One-pixel PNG",
+      "fileName": "pixel.png",
+      "encoding": "base64",
+      "content": "iVBORw0KGgo="
+    }
+  ]
+}
+```
+
+`content` is UTF-8 unless `encoding` is `base64`, which must be strict base64.
+The shell decodes it once at validation and never evaluates template syntax.
+`fileName` is one segment and must not be `exo.json` or `.exo`; it is only the
+default in an editable shell-owned dialog. Your registration frame registers a
+subset with `registerNewFile(id)` after approval. Templates require
+`workspace:write`; without it, registration is rejected and nothing is offered.
+Templates are excluded from the consent fingerprint, listed in the first-grant
+prompt, and removed when the plugin stops. Set `engines.exo` to include `0.5.0`.
+
 ## Permissions
 
 | Permission | What it allows |

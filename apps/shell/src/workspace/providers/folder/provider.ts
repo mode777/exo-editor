@@ -289,6 +289,23 @@ class FolderHandle implements WorkspaceHandle {
         : await this.getDirectory(parentPath)
       const name = basename(target)
 
+      if (options.createOnly) {
+        // The File System Access API has no atomic create. Check, then create:
+        // a concurrent external writer can still win the last instant, and the
+        // provider note records that residual race.
+        const existing = await this.tryStatInside(target, options.signal)
+        if (existing?.kind === 'directory') {
+          throw new WorkspaceError('not-a-file', 'The path is a directory.', {
+            path: target,
+          })
+        }
+        if (existing) {
+          throw new WorkspaceError('already-exists', 'The file already exists.', {
+            path: target,
+          })
+        }
+      }
+
       let fileHandle: FileSystemFileHandle
       try {
         fileHandle = await parent.getFileHandle(name)
@@ -564,6 +581,16 @@ class FolderHandle implements WorkspaceHandle {
     } catch (error) {
       const mapped = mapFsaError(error, path)
       if (mapped.code === 'not-found') return false
+      throw error
+    }
+  }
+
+  private async tryStatInside(path: WorkspacePath, signal?: AbortSignal): Promise<FileStat | null> {
+    try {
+      return await this.statInside(path, signal)
+    } catch (error) {
+      const mapped = mapFsaError(error, path)
+      if (mapped.code === 'not-found') return null
       throw error
     }
   }

@@ -196,6 +196,16 @@ class StratofoldHandle implements WorkspaceHandle {
       if (existing?.kind === 'directory') {
         throw new WorkspaceError('not-a-file', 'The path is not a file.', { path: target })
       }
+      if (options.createOnly) {
+        // The published client's only conditional upload is `If-Match`, and
+        // `"*"` requires the target to exist, so it cannot express create-only.
+        // Pre-check and document the residual check-to-write race.
+        if (existing) {
+          throw new WorkspaceError('already-exists', 'The file already exists.', {
+            path: target,
+          })
+        }
+      }
       if (!existing) {
         if (!options.create) {
           throw new WorkspaceError('not-found', 'The path does not exist.', { path: target })
@@ -205,7 +215,7 @@ class StratofoldHandle implements WorkspaceHandle {
       const body = data.slice().buffer as ArrayBuffer
       await this.client.upload(this.remote(target), body, {
         signal: options.signal,
-        ifVersion: options.ifVersion,
+        ifVersion: options.createOnly ? undefined : options.ifVersion,
       })
       if (options.signal?.aborted) {
         throw new WorkspaceError('aborted', 'The workspace operation was cancelled.', {

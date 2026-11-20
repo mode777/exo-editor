@@ -170,6 +170,31 @@
         }
       }
     },
+    "newFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "fileName", "content"],
+      "properties": {
+        "id": { "$ref": "#/$defs/contributionId" },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "fileName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[^/\\\\\\u0000]+$",
+          "$comment": "One path segment; the validator also rejects \".\", \"..\", exo.json and .exo."
+        },
+        "encoding": { "enum": ["utf8", "base64"] },
+        "content": {
+          "type": "string",
+          "$comment": "At most 64 KiB after decoding, 128 KiB per plugin in total; the validator decodes and enforces it."
+        }
+      }
+    },
     "settingKey": {
       "type": "string",
       "minLength": 1,
@@ -247,6 +272,11 @@
           "type": "array",
           "maxItems": 32,
           "items": { "$ref": "#/$defs/command" }
+        },
+        "newFiles": {
+          "type": "array",
+          "maxItems": 20,
+          "items": { "$ref": "#/$defs/newFile" }
         },
         "configuration": { "$ref": "#/$defs/configuration" }
       }

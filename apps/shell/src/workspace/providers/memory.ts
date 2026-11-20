@@ -272,6 +272,18 @@ export class MemoryWorkspaceProvider implements WorkspaceProvider {
       this.assertUsableOperation(options.signal)
       const target = normalizePath(path)
       const existing = this.nodes.get(target)
+      if (options.createOnly) {
+        if (existing?.kind === 'directory') {
+          throw new WorkspaceError('not-a-file', 'The path is a directory.', {
+            path: target,
+          })
+        }
+        if (existing) {
+          throw new WorkspaceError('already-exists', 'The file already exists.', {
+            path: target,
+          })
+        }
+      }
       if (options.ifVersion !== undefined) {
         if (!existing) {
           throw new WorkspaceError('not-found', 'The file does not exist.', {

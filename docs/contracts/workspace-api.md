@@ -95,6 +95,11 @@ export interface WriteOptions {
   ifVersion?: string
   /** Create parent directories. Default false. */
   create?: boolean
+  /**
+   * Reject with 'already-exists' when the target exists. A create-only write
+   * never truncates or replaces a target observed at check time.
+   */
+  createOnly?: boolean
 }
 
 export interface ListOptions {
@@ -250,6 +255,7 @@ and moves, and records the plugin id and code in the session log.
 | Missing path | `not-found` |
 | Wrong kind (`read` on a directory, `list` on a file) | `not-a-file` / `not-a-directory` |
 | `mkdir`/`move` without overwrite onto an existing path | `already-exists` |
+| A `createOnly` write whose target exists at check time | `already-exists` |
 | Provider permission not granted | `permission-denied` |
 | `ifVersion` mismatch | `conflict` |
 | Path traversal, reserved path or a path the caller may not see | `permission-denied` |
@@ -285,6 +291,11 @@ plugin frame.
   re-statting immediately before opening the writable and comparing `version`;
   the API offers no atomic compare-and-swap, so the window is narrow but real and
   documented.
+- A `createOnly` write pre-checks the target with `getFileHandle`/`getFile` and
+  rejects with `already-exists` (or `not-a-file` for a directory) before opening
+  the writable. The API has no atomic create, so the residual check-to-write race
+  remains; a concurrent external writer can win the last instant. The shell
+  serializes its own creates and does not claim an atomic guarantee.
 - `version` is `${lastModified}:${size}`. It is opaque to callers and is not a
   content hash.
 
@@ -297,6 +308,8 @@ is not mounted as a fallback for unsupported browsers:
   `persistent: false`, `caseSensitive: true`, `writable: true`.
 - `version` is a monotonic counter per file (`m1`, `m2`, ...); `mtime` comes from
   an injectable clock. The same operation sequence always produces the same stats.
+- `createOnly` checks and writes in one synchronous operation, so it is the
+  atomic reference implementation for both providers.
 - Watch callbacks are delivered in operation order; aborting an operation never
   emits a change.
 - Exposes the same error codes, including `conflict`.
@@ -331,6 +344,12 @@ gaps and the upstream asks live in
   because the server's limit is not discoverable.
 - `version` is the server's opaque content version. `ifVersion` becomes a
   conditional upload; a mismatch rejects with `conflict` and no publish.
+- A `createOnly` write pre-checks the target with `stat` and rejects with
+  `already-exists` (or `not-a-file` for a directory) before uploading. The
+  published client's conditional upload is `If-Match`, and `"*"` requires the
+  target to exist, so it cannot express create-only. The residual check-to-write
+  race is documented in the provider note; the shell does not claim an atomic
+  remote create.
 - A zero-length write is an ordinary write: it creates an empty file or replaces
   existing content, returns the new metadata and rotates the version. This needs
   a Stratofold 0.12.0 or newer server; an older server reports the empty upload

@@ -8,6 +8,7 @@ import {
 } from 'vscode-workbench'
 import { DocumentArea } from './document/DocumentArea'
 import { FilePickerDialog } from './document/FilePickerDialog'
+import { NewFileDialog } from './document/NewFileDialog'
 import { OpenWithDialog } from './document/OpenWithDialog'
 import { ClosePromptDialog } from './components/ClosePromptDialog'
 import { requestExplorerCommand } from './explorer/bus'
@@ -34,11 +35,13 @@ import { workspaceErrorMessage, type WorkspacePath } from './workspace/contract'
 import {
   useDirtyDocuments,
   useFilePicker,
+  useNewFile,
   usePluginHost,
   useWorkspaceSnapshot,
   WorkspaceRuntimeProvider,
 } from './workspace/context'
 import { WorkspaceRuntime } from './workspace/runtime'
+import { dirname } from './workspace/paths'
 
 configurePresetStore()
 
@@ -75,6 +78,7 @@ function Shell({ runtime }: { runtime: WorkspaceRuntime }) {
   const dirty = useDirtyDocuments()
   const host = usePluginHost()
   const filePicker = useFilePicker()
+  const newFile = useNewFile()
   const pluginWorkbench = useMemo(() => derivePluginWorkbench(host), [host])
   const secondaryViews = useMemo(
     () =>
@@ -299,6 +303,34 @@ function Shell({ runtime }: { runtime: WorkspaceRuntime }) {
           run: () => runtime.openContentView(identity, view.id),
         })
       }
+      for (const template of record.newFiles) {
+        commands.push({
+          id: `exo.new-file.${encodeURIComponent(identity)}.${template.id}`,
+          title: `New ${template.label}`,
+          category: `New File · ${record.manifest.name}`,
+          run: () => {
+            const session = runtime.getSession()
+            if (!session) return
+            const selection = runtime.getSnapshot().selection
+            const directory = selection ? dirname(selection) : '/'
+            runtime.newFiles.beginTemplate({
+              kind: 'template',
+              templateId: template.id,
+              fileName: template.fileName,
+              identity,
+              pluginId: record.manifest?.id ?? '',
+              pluginName: record.manifest?.name ?? 'Plugin',
+              content: {
+                bytes: template.bytes,
+                ...(template.text === undefined ? {} : { text: template.text }),
+              },
+              fallbackDirectory: directory,
+              directory,
+              session,
+            })
+          },
+        })
+      }
     }
     return commands
   }, [runtime])
@@ -400,6 +432,14 @@ function Shell({ runtime }: { runtime: WorkspaceRuntime }) {
           request={filePicker}
           onCancel={() => runtime.filePicker.cancel()}
           onSelect={(paths) => runtime.filePicker.select(paths)}
+        />
+      )}
+      {newFile && (
+        <NewFileDialog
+          key={`${newFile.kind}:${newFile.identity}:${newFile.directory}:${newFile.name}`}
+          request={newFile}
+          onCancel={() => runtime.newFiles.cancel()}
+          onSubmit={(directory, name) => void runtime.newFiles.submit(directory, name)}
         />
       )}
       {snapshot.remote?.rejected && (

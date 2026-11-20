@@ -854,6 +854,16 @@ panel mount measured median 33 / max 37 ms against the 2,000 ms ceiling. The
 command surfaces also passed the 200% zoom equivalent (640x400) with no clipping
 or horizontal overflow.
 
+**Follow-up (2026-11-20):** the post-layer-10 change `plugin-file-creation` adds
+`contributes.newFiles`, the shell-owned Save As dialog, the correlated
+`plugin/request-new-file` / `shell/new-file-result` messages, the create-only
+`WriteOptions.createOnly` path, `capabilities.createFile`/`capabilities.newFiles`
+and SDK `1.7.0`; shell `0.5.0`. Templates and runtime requests share one
+controller and one create-only write. The memory provider is atomic; the folder
+and Stratofold providers pre-check and document the residual check-to-write race
+because neither exposes a target-absent conditional create. Deployed verification
+is recorded with the change once the browser pass is complete.
+
 ---
 
 ## Deferred beyond v1

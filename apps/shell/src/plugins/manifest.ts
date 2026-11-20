@@ -15,6 +15,10 @@ export const MANIFEST_MAX_EDITORS = 20
 export const MANIFEST_MAX_PANELS = 8
 export const MANIFEST_MAX_CONTENT_VIEWS = 16
 export const MANIFEST_MAX_COMMANDS = 32
+export const MANIFEST_MAX_NEW_FILES = 20
+export const MANIFEST_MAX_NEW_FILE_BYTES = 64 * 1024
+export const MANIFEST_MAX_NEW_FILE_TOTAL_BYTES = 128 * 1024
+export const MANIFEST_MAX_NEW_FILE_NAME = 128
 export const MANIFEST_MAX_VIEW_TITLE = 80
 export const MANIFEST_MAX_COMMAND_TITLE = 40
 export const MANIFEST_MAX_ICON = 40
@@ -56,12 +60,14 @@ export const MANIFEST_COMMAND_MENUS = [
   'explorer/context',
   'editor/title',
 ] as const
+export const MANIFEST_NEW_FILE_ENCODINGS = ['utf8', 'base64'] as const
 
 export type PluginPermission = (typeof PLUGIN_PERMISSIONS)[number]
 export type ManifestSettingType = (typeof MANIFEST_SETTING_TYPES)[number]
 export type ManifestRendering = (typeof MANIFEST_RENDERINGS)[number]
 export type ManifestPanelLocation = (typeof MANIFEST_PANEL_LOCATIONS)[number]
 export type ManifestCommandMenu = (typeof MANIFEST_COMMAND_MENUS)[number]
+export type ManifestNewFileEncoding = (typeof MANIFEST_NEW_FILE_ENCODINGS)[number]
 export type SettingValue = boolean | string | number
 
 /** `workspace:write` implies read, so either permission grants reads. */
@@ -168,6 +174,18 @@ export interface ManifestCommand {
   menus: ManifestCommandMenu[]
 }
 
+export interface ManifestNewFile {
+  id: string
+  label: string
+  /** One path segment; the dialog pre-fills it and the user may change it. */
+  fileName: string
+  encoding: ManifestNewFileEncoding
+  /** Decoded bytes. Base64 content is decoded once during validation. */
+  bytes: Uint8Array
+  /** UTF-8 content for the bounded preview; absent for binary templates. */
+  text?: string
+}
+
 export interface ManifestConfiguration {
   properties: Record<string, ManifestSetting>
 }
@@ -193,6 +211,7 @@ export interface PluginManifest {
   panels: ManifestPanel[]
   contentViews: ManifestContentView[]
   commands: ManifestCommand[]
+  newFiles: ManifestNewFile[]
   configuration?: ManifestConfiguration
 }
 
@@ -802,6 +821,106 @@ function parseCommands(
   return commands
 }
 
+function parseNewFiles(value: unknown): ManifestNewFile[] | ManifestIssue {
+  if (!Array.isArray(value) || value.length > MANIFEST_MAX_NEW_FILES) {
+    return issue('invalid-manifest', { field: '/contributes/newFiles' })
+  }
+  const templates: ManifestNewFile[] = []
+  const ids = new Set<string>()
+  let totalBytes = 0
+  for (let index = 0; index < value.length; index += 1) {
+    const raw = value[index]
+    const base = pointer('contributes', 'newFiles', index)
+    if (!isPlainObject(raw)) return issue('invalid-manifest', { field: base })
+    const unknown = unknownKeys(raw, ['id', 'label', 'fileName', 'encoding', 'content'], base)
+    if (unknown) return unknown
+    if (typeof raw.id !== 'string' || !CONTRIBUTION_ID.test(raw.id)) {
+      return issue('invalid-manifest', { field: `${base}/id` })
+    }
+    if (ids.has(raw.id)) {
+      return issue('invalid-manifest', {
+        field: `${base}/id`,
+        message: 'A new-file template id may be declared only once.',
+      })
+    }
+    ids.add(raw.id)
+    if (!isStringInRange(raw.label, 1, MANIFEST_MAX_LABEL)) {
+      return issue('invalid-manifest', { field: `${base}/label` })
+    }
+    if (
+      typeof raw.fileName !== 'string' ||
+      raw.fileName.length === 0 ||
+      raw.fileName.length > MANIFEST_MAX_NEW_FILE_NAME ||
+      raw.fileName === '.' ||
+      raw.fileName === '..' ||
+      raw.fileName.includes('/') ||
+      raw.fileName.includes('\\') ||
+      raw.fileName.includes('\0')
+    ) {
+      return issue('invalid-manifest', { field: `${base}/fileName` })
+    }
+    const reservedName = raw.fileName.toLowerCase()
+    if (reservedName === 'exo.json' || reservedName === '.exo') {
+      return issue('invalid-manifest', { field: `${base}/fileName` })
+    }
+    if (raw.content === undefined || typeof raw.content !== 'string') {
+      return issue('invalid-manifest', { field: `${base}/content` })
+    }
+    let encoding: ManifestNewFileEncoding = 'utf8'
+    if (raw.encoding !== undefined) {
+      if (
+        typeof raw.encoding !== 'string' ||
+        !(MANIFEST_NEW_FILE_ENCODINGS as readonly string[]).includes(raw.encoding)
+      ) {
+        return issue('invalid-manifest', { field: `${base}/encoding` })
+      }
+      encoding = raw.encoding as ManifestNewFileEncoding
+    }
+    let bytes: Uint8Array
+    let text: string | undefined
+    if (encoding === 'base64') {
+      const decoded = decodeBase64(raw.content)
+      if (!decoded) return issue('invalid-manifest', { field: `${base}/content` })
+      bytes = decoded
+    } else {
+      bytes = new TextEncoder().encode(raw.content)
+      text = raw.content
+    }
+    if (bytes.byteLength > MANIFEST_MAX_NEW_FILE_BYTES) {
+      return issue('invalid-manifest', { field: `${base}/content` })
+    }
+    totalBytes += bytes.byteLength
+    if (totalBytes > MANIFEST_MAX_NEW_FILE_TOTAL_BYTES) {
+      return issue('invalid-manifest', { field: '/contributes/newFiles' })
+    }
+    templates.push({
+      id: raw.id,
+      label: raw.label,
+      fileName: raw.fileName,
+      encoding,
+      bytes,
+      ...(text === undefined ? {} : { text }),
+    })
+  }
+  return templates
+}
+
+const BASE64_CONTENT = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/
+
+function decodeBase64(value: string): Uint8Array | null {
+  if (value.length % 4 !== 0 || !BASE64_CONTENT.test(value)) return null
+  try {
+    const binary = globalThis.atob(value)
+    const bytes = new Uint8Array(binary.length)
+    for (let index = 0; index < binary.length; index += 1) {
+      bytes[index] = binary.charCodeAt(index)
+    }
+    return bytes
+  } catch {
+    return null
+  }
+}
+
 function parseConfiguration(value: unknown): ManifestConfiguration | ManifestIssue {
   const base = '/contributes/configuration'
   if (!isPlainObject(value)) return issue('invalid-manifest', { field: base })
@@ -925,12 +1044,13 @@ export function validateManifest(
   let panels: ManifestPanel[] = []
   let contentViews: ManifestContentView[] = []
   let commands: ManifestCommand[] = []
+  let newFiles: ManifestNewFile[] = []
   let configuration: ManifestConfiguration | undefined
   if (hasOwn(value, 'contributes')) {
     if (!isPlainObject(value.contributes)) return invalid('/contributes')
     const contributesUnknown = unknownKeys(
       value.contributes,
-      ['fileEditors', 'panels', 'contentViews', 'commands', 'configuration'],
+      ['fileEditors', 'panels', 'contentViews', 'commands', 'newFiles', 'configuration'],
       '/contributes',
     )
     if (contributesUnknown) return { ok: false, error: contributesUnknown }
@@ -974,6 +1094,11 @@ export function validateManifest(
       if (!Array.isArray(parsed)) return { ok: false, error: parsed }
       commands = parsed
     }
+    if (hasOwn(value.contributes, 'newFiles')) {
+      const parsed = parseNewFiles(value.contributes.newFiles)
+      if (!Array.isArray(parsed)) return { ok: false, error: parsed }
+      newFiles = parsed
+    }
   }
 
   return {
@@ -1001,6 +1126,7 @@ export function validateManifest(
       panels,
       contentViews,
       commands,
+      newFiles,
       ...(configuration ? { configuration } : {}),
     },
   }

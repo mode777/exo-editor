@@ -42,6 +42,13 @@ plus the shell text surface. The recorded acceptance path is
   `exo.json`/`.exo`, paginates with `nextCursor`, and answers a file path with
   `not-a-directory` and a missing directory with `not-found`. A plugin without
   `workspace:list` receives `permission-denied` and lists nothing.
+- New-file templates appear in the explorer New File menu and the palette only
+  after registration, with Empty File still available; a read-only workspace
+  offers none. The Save As dialog names the plugin, pre-fills the default name,
+  shows the size and a bounded preview (or a binary label), writes create-only
+  and keeps the dialog open on `already-exists`. Cancelling, disabling the
+  plugin or switching workspaces writes nothing. A runtime request gets the path
+  and version but no automatic tab.
 - Dirty state reaches the tab, Save writes exact text or bytes, a conflict
   leaves the buffer and disk intact.
 - An external change is visible and does not silently replace a dirty buffer.

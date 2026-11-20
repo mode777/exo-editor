@@ -15,7 +15,7 @@ describe('deployed plugin fixture', () => {
     const result = validateManifest(
       JSON.parse(raw) as unknown,
       'https://mode777.github.io/exo-editor/plugin-host-fixture/exo-manifest.json',
-      '0.4.0',
+      '0.5.0',
     )
     expect(result.ok).toBe(true)
     if (!result.ok) return
@@ -34,7 +34,19 @@ describe('deployed plugin fixture', () => {
       'fixture-inspector',
       'fixture-inspector-2',
     ])
-    expect(result.manifest.contentViews.map((view) => view.id)).toEqual(['fixture-tutorial'])
+    expect(result.manifest.contentViews.map((view) => view.id)).toEqual([
+      'fixture-tutorial',
+      'fixture-generator',
+    ])
+    expect(result.manifest.newFiles.map((template) => template.id)).toEqual([
+      'fixture.text',
+      'fixture.binary',
+    ])
+    expect(result.manifest.newFiles[1]).toMatchObject({
+      fileName: 'fixture-pixel.bin',
+      encoding: 'base64',
+    })
+    expect([...result.manifest.newFiles[1].bytes]).toEqual([0, 1, 2, 255])
     expect(result.manifest.commands).toEqual([
       {
         id: 'fixture.format',
@@ -129,7 +141,7 @@ describe('deployed plugin fixture', () => {
     const result = validateManifest(
       JSON.parse(raw) as unknown,
       'https://mode777.github.io/exo-editor/plugin-host-fixture/other-manifest.json',
-      '0.4.0',
+      '0.5.0',
     )
     expect(result.ok).toBe(true)
     if (!result.ok) return

@@ -45,6 +45,7 @@ function manifest(overrides: Partial<PluginManifest> = {}): PluginManifest {
     panels: [],
     contentViews: [],
     commands: [],
+    newFiles: [],
     ...overrides,
   }
 }
@@ -799,5 +800,103 @@ describe('registration session', () => {
         (entry) => (entry.message as { type?: string }).type === 'shell/published',
       ),
     ).toHaveLength(0)
+  })
+})
+
+describe('new-file registration', () => {
+  const templates = [
+    {
+      id: 'component',
+      label: 'Component',
+      fileName: 'Component.tsx',
+      encoding: 'utf8' as const,
+      bytes: new TextEncoder().encode('export {}'),
+      text: 'export {}',
+    },
+    {
+      id: 'image',
+      label: 'Image',
+      fileName: 'image.bin',
+      encoding: 'base64' as const,
+      bytes: new Uint8Array([0, 255]),
+    },
+  ]
+
+  function writableManifest() {
+    return manifest({
+      permissions: ['workspace:read', 'workspace:write'],
+      newFiles: templates,
+    })
+  }
+
+  function send(context: ReturnType<typeof start>, payload: Record<string, unknown>) {
+    context.frame.emit(
+      { exo: 1, type: 'plugin/register', payload },
+      context.manifest.manifestOrigin,
+    )
+  }
+
+  it('advertises the newFiles support bit', () => {
+    const context = start()
+    ready(context)
+    expect(postedType(context.frame, 'shell/init')?.payload).toMatchObject({
+      capabilities: { newFiles: true },
+    })
+  })
+
+  it('registers a subset and exposes it in the ack and outcome', () => {
+    const context = start({ manifest: writableManifest() })
+    ready(context)
+    send(context, { newFiles: ['component'] })
+    complete(context)
+    const ack = postedType(context.frame, 'shell/register-ack')?.payload as {
+      acceptedNewFiles: string[]
+      rejected: unknown[]
+    }
+    expect(ack.acceptedNewFiles).toEqual(['component'])
+    expect(ack.rejected).toEqual([])
+    const outcome = context.outcomes[0]
+    expect(outcome).toMatchObject({ kind: 'active' })
+    if (outcome.kind === 'active') {
+      expect(outcome.newFiles.map((template) => template.id)).toEqual(['component'])
+    }
+  })
+
+  it('rejects an undeclared or duplicate template id', () => {
+    const context = start({ manifest: writableManifest() })
+    ready(context)
+    send(context, { newFiles: ['missing', 'component', 'component', 42] })
+    complete(context)
+    const ack = postedType(context.frame, 'shell/register-ack')?.payload as {
+      acceptedNewFiles: string[]
+      rejected: Array<{ index: number; kind?: string; reason: string }>
+    }
+    expect(ack.acceptedNewFiles).toEqual(['component'])
+    expect(ack.rejected).toEqual([
+      { index: 0, kind: 'newFile', reason: 'not-declared' },
+      { index: 3, kind: 'newFile', reason: 'invalid-contribution' },
+    ])
+  })
+
+  it('rejects every template when the manifest lacks workspace:write', () => {
+    const context = start({
+      manifest: manifest({ permissions: ['workspace:read'], newFiles: templates }),
+    })
+    ready(context)
+    send(context, { newFiles: ['component'] })
+    complete(context)
+    const ack = postedType(context.frame, 'shell/register-ack')?.payload as {
+      acceptedNewFiles: string[]
+      rejected: Array<{ index: number; kind?: string; reason: string }>
+    }
+    expect(ack.acceptedNewFiles).toEqual([])
+    expect(ack.rejected).toEqual([{ index: 0, kind: 'newFile', reason: 'permission-denied' }])
+  })
+
+  it('does not activate a template before register-complete', () => {
+    const context = start({ manifest: writableManifest() })
+    ready(context)
+    send(context, { newFiles: ['component'] })
+    expect(context.outcomes).toEqual([])
   })
 })

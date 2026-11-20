@@ -14,7 +14,7 @@ checklist item performed manually against the deployed site.
 | 10k-entry directory listing | 3,000 ms total, 1,000 ms longest task | Expand a directory with 10,000 entries and measure until every row is painted |
 | 1 MiB file open | 1,000 ms | Shell text surface and reference code plugin, from activating the file to the editable surface |
 | 1 MiB file save | 1,000 ms | Shell text surface and reference code plugin, from Save to the shell's success state |
-| Shell bundle (JS) | 159,000 gzip bytes | `npm run budget` / CI `Bundle budget` |
+| Shell bundle (JS) | 176,000 gzip bytes | `npm run budget` / CI `Bundle budget` |
 | Shell bundle (CSS) | 14,000 gzip bytes | `npm run budget` / CI `Bundle budget` |
 
 These are release ceilings, not product SLOs. They are intentionally generous
@@ -116,6 +116,14 @@ The production build adds 4,329 gzip bytes over the view-surfaces measurement:
 169,686 js against the raised 171,000 limit and 13,531 css against 14,000. The
 increase is the command registry, invocation controller, palette/menu/toolbar
 surfaces and notice region.
+
+The `plugin-file-creation` build adds 3,739 gzip bytes over the command
+measurement: 173,477 js against the raised 176,000 limit and 13,794 css against
+14,000. The increase is the manifest template decoder, the create-only provider
+paths, the Save As dialog, the explorer template menu, the new-file request
+controller and the SDK helpers. The budget was raised by 5,000 bytes, leaving
+roughly 1,260 bytes of headroom; no dependency or vendored asset was added, and
+the new-file path performs no content transformation.
 
 ## Bundle budget
 

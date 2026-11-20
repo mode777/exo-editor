@@ -19,6 +19,7 @@ function record(overrides: Partial<PluginHostRecord> = {}): PluginHostRecord {
     panels: [],
     contentViews: [],
     commands: [],
+    newFiles: [],
     ...overrides,
   }
 }
@@ -97,6 +98,7 @@ describe('plugin runtime status row', () => {
             panels: [],
             contentViews: [],
             commands: [],
+            newFiles: [],
           },
         })}
         onReview={onReview}

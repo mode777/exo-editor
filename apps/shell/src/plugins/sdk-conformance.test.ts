@@ -420,7 +420,7 @@ function registerInit(overrides: Partial<RegistrationInit> = {}): RegistrationIn
     permissions: ['workspace:read', 'workspace:write'],
     locale: 'en',
     settings: {},
-    capabilities: { localEvents: true },
+    capabilities: { localEvents: true, newFiles: true },
     ...overrides,
   }
 }

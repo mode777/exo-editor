@@ -874,3 +874,60 @@ describe('plugin host', () => {
     host.dispose()
   })
 })
+
+describe('new-file templates in the host', () => {
+  it('registers templates, exposes them and removes them with the plugin', async () => {
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse(
+        manifestJson({
+          permissions: ['workspace:read', 'workspace:write'],
+          contributes: {
+            newFiles: [
+              {
+                id: 'component',
+                label: 'Component',
+                fileName: 'Component.tsx',
+                content: 'export {}',
+              },
+            ],
+          },
+        }),
+        MANIFEST_URL,
+      ),
+    )
+    const { host, transport, config } = createHost(fetchImpl)
+    config.setEntries(entries(MANIFEST_URL))
+    await waitForRecord(host, MANIFEST_URL, 'awaiting-consent')
+    host.approveConsent('https://plugins.example.com::com.example.monaco')
+    await vi.waitFor(() => {
+      expect(transport.frames.some((frame) => frame.options.url.includes('mode=register'))).toBe(
+        true,
+      )
+    })
+    const frame = transport.frames.find((candidate) => candidate.options.url.includes('register'))
+    if (!frame) throw new Error('Registration frame not found')
+    ready(frame, 'https://plugins.example.com')
+    frame.emit(
+      {
+        exo: 1,
+        type: 'plugin/register',
+        payload: { newFiles: ['component'] },
+      },
+      'https://plugins.example.com',
+    )
+    frame.emit(
+      { exo: 1, type: 'plugin/register-complete', payload: {} },
+      'https://plugins.example.com',
+    )
+    await waitForRecord(host, MANIFEST_URL, 'active')
+
+    const record = host.getSnapshot().records[0]
+    expect(
+      record.newFiles.map((template) => [template.id, template.label, template.fileName]),
+    ).toEqual([['component', 'Component', 'Component.tsx']])
+
+    config.setEntries([])
+    await vi.waitFor(() => expect(host.getSnapshot().records).toEqual([]))
+    host.dispose()
+  })
+})

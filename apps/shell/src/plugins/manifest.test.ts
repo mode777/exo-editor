@@ -7,6 +7,11 @@ import {
   MANIFEST_ID_PATTERN,
   MANIFEST_CONTRIBUTION_ID_PATTERN,
   MANIFEST_MAX_COMMANDS,
+  MANIFEST_MAX_NEW_FILES,
+  MANIFEST_MAX_NEW_FILE_BYTES,
+  MANIFEST_MAX_NEW_FILE_NAME,
+  MANIFEST_MAX_NEW_FILE_TOTAL_BYTES,
+  MANIFEST_NEW_FILE_ENCODINGS,
   MANIFEST_MAX_COMMAND_TITLE,
   MANIFEST_MAX_CONTENT_VIEWS,
   MANIFEST_MAX_EDITORS,
@@ -1100,7 +1105,19 @@ interface SchemaDefs {
       panels: { maxItems: number; items: { $ref: string } }
       contentViews: { maxItems: number; items: { $ref: string } }
       commands: { maxItems: number; items: { $ref: string } }
+      newFiles: { maxItems: number; items: { $ref: string } }
       configuration: { $ref: string }
+    }
+  }
+  newFile: {
+    additionalProperties: boolean
+    required: string[]
+    properties: {
+      id: { $ref: string }
+      label: { minLength: number; maxLength: number }
+      fileName: { minLength: number; maxLength: number; pattern: string }
+      encoding: { enum: string[] }
+      content: { type: string }
     }
   }
   command: {
@@ -1217,6 +1234,14 @@ describe('manifest schema parity', () => {
     expect(defs.command.properties.menus.uniqueItems).toBe(true)
     expect(defs.command.properties.menus.items.enum).toEqual([...MANIFEST_COMMAND_MENUS])
     expect(defs.commandTarget.oneOf).toHaveLength(3)
+    expect(defs.contributes.properties.newFiles.maxItems).toBe(MANIFEST_MAX_NEW_FILES)
+    expect(defs.contributes.properties.newFiles.items.$ref).toBe('#/$defs/newFile')
+    expect(defs.newFile.required).toEqual(['id', 'label', 'fileName', 'content'])
+    expect(defs.newFile.additionalProperties).toBe(false)
+    expect(defs.newFile.properties.id.$ref).toBe('#/$defs/contributionId')
+    expect(defs.newFile.properties.label.maxLength).toBe(MANIFEST_MAX_LABEL)
+    expect(defs.newFile.properties.fileName.maxLength).toBe(MANIFEST_MAX_NEW_FILE_NAME)
+    expect(defs.newFile.properties.encoding.enum).toEqual([...MANIFEST_NEW_FILE_ENCODINGS])
     expect(defs.panel.required).toEqual(['id', 'title', 'location', 'entry'])
     expect(defs.panel.properties.id.$ref).toBe('#/$defs/contributionId')
     expect(defs.panel.properties.title.maxLength).toBe(MANIFEST_MAX_VIEW_TITLE)
@@ -1310,5 +1335,172 @@ describe('manifest schema parity', () => {
         true,
       )
     }
+  })
+})
+
+describe('new-file templates', () => {
+  function withNewFiles(newFiles: unknown[]) {
+    return validate({ contributes: { newFiles } })
+  }
+
+  it('accepts a text template and keeps the decoded bytes and preview text', () => {
+    const result = withNewFiles([
+      {
+        id: 'ts-component',
+        label: 'TypeScript component',
+        fileName: 'Component.tsx',
+        content: 'export const value = 1\n',
+      },
+    ])
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.manifest.newFiles).toHaveLength(1)
+    expect(result.manifest.newFiles[0]).toMatchObject({
+      id: 'ts-component',
+      label: 'TypeScript component',
+      fileName: 'Component.tsx',
+      encoding: 'utf8',
+      text: 'export const value = 1\n',
+    })
+    expect(new TextDecoder().decode(result.manifest.newFiles[0].bytes)).toBe(
+      'export const value = 1\n',
+    )
+  })
+
+  it('decodes a base64 template to exact bytes without preview text', () => {
+    const result = withNewFiles([
+      {
+        id: 'image',
+        label: 'Tiny image',
+        fileName: 'image.bin',
+        encoding: 'base64',
+        content: Buffer.from([0, 1, 2, 255]).toString('base64'),
+      },
+    ])
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect([...result.manifest.newFiles[0].bytes]).toEqual([0, 1, 2, 255])
+    expect(result.manifest.newFiles[0].text).toBeUndefined()
+  })
+
+  it('accepts an empty template array', () => {
+    expect(withNewFiles([]).ok).toBe(true)
+  })
+
+  it('rejects an unknown encoding', () => {
+    const result = withNewFiles([
+      { id: 'a', label: 'A', fileName: 'a.txt', encoding: 'utf16', content: 'a' },
+    ])
+    expect(errorOf(result)).toMatchObject({
+      code: 'invalid-manifest',
+      field: '/contributes/newFiles/0/encoding',
+    })
+  })
+
+  it('rejects invalid base64', () => {
+    for (const content of ['a', '====', 'ab cd', 'aGVsbG8*']) {
+      const result = withNewFiles([
+        { id: 'a', label: 'A', fileName: 'a.bin', encoding: 'base64', content },
+      ])
+      expect(errorOf(result), content).toMatchObject({
+        code: 'invalid-manifest',
+        field: '/contributes/newFiles/0/content',
+      })
+    }
+  })
+
+  it('rejects a template above 64 KiB decoded', () => {
+    const result = withNewFiles([
+      {
+        id: 'big',
+        label: 'Big',
+        fileName: 'big.txt',
+        content: 'a'.repeat(MANIFEST_MAX_NEW_FILE_BYTES + 1),
+      },
+    ])
+    expect(errorOf(result)).toMatchObject({ code: 'invalid-manifest' })
+  })
+
+  it('rejects a total above 128 KiB decoded', () => {
+    const each = 'a'.repeat(50 * 1024)
+    const result = withNewFiles([
+      { id: 'a', label: 'A', fileName: 'a.txt', content: each },
+      { id: 'b', label: 'B', fileName: 'b.txt', content: each },
+      { id: 'c', label: 'C', fileName: 'c.txt', content: each },
+    ])
+    expect(MANIFEST_MAX_NEW_FILE_TOTAL_BYTES).toBe(128 * 1024)
+    expect(errorOf(result)).toMatchObject({
+      code: 'invalid-manifest',
+      field: '/contributes/newFiles',
+    })
+  })
+
+  it('rejects more than 20 templates', () => {
+    const result = withNewFiles(
+      Array.from({ length: MANIFEST_MAX_NEW_FILES + 1 }, (_, index) => ({
+        id: `template-${index}`,
+        label: `Template ${index}`,
+        fileName: `file-${index}.txt`,
+        content: 'a',
+      })),
+    )
+    expect(errorOf(result)).toMatchObject({
+      code: 'invalid-manifest',
+      field: '/contributes/newFiles',
+    })
+  })
+
+  it('rejects invalid file names', () => {
+    const names = [
+      '',
+      '.',
+      '..',
+      'a/b.txt',
+      'a\\b.txt',
+      'a\0b.txt',
+      'a'.repeat(MANIFEST_MAX_NEW_FILE_NAME + 1),
+    ]
+    for (const fileName of names) {
+      const result = withNewFiles([{ id: 'a', label: 'A', fileName, content: 'a' }])
+      expect(errorOf(result), JSON.stringify(fileName)).toMatchObject({
+        code: 'invalid-manifest',
+        field: '/contributes/newFiles/0/fileName',
+      })
+    }
+  })
+
+  it('rejects reserved file names regardless of case', () => {
+    for (const fileName of ['exo.json', 'EXO.JSON', '.exo', '.EXO']) {
+      const result = withNewFiles([{ id: 'a', label: 'A', fileName, content: 'a' }])
+      expect(errorOf(result), fileName).toMatchObject({
+        code: 'invalid-manifest',
+        field: '/contributes/newFiles/0/fileName',
+      })
+    }
+  })
+
+  it('rejects a duplicate template id', () => {
+    const result = withNewFiles([
+      { id: 'same', label: 'A', fileName: 'a.txt', content: 'a' },
+      { id: 'same', label: 'B', fileName: 'b.txt', content: 'b' },
+    ])
+    expect(errorOf(result)).toMatchObject({
+      code: 'invalid-manifest',
+      field: '/contributes/newFiles/1/id',
+    })
+  })
+
+  it('rejects unknown fields', () => {
+    const result = withNewFiles([
+      { id: 'a', label: 'A', fileName: 'a.txt', content: 'a', title: 'nope' },
+    ])
+    expect(errorOf(result)).toMatchObject({
+      code: 'invalid-manifest',
+      field: '/contributes/newFiles/0/title',
+    })
+  })
+
+  it('keeps the declared encodings in sync with the schema constants', () => {
+    expect(MANIFEST_NEW_FILE_ENCODINGS).toEqual(['utf8', 'base64'])
   })
 })

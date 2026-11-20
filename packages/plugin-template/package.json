@@ -11,13 +11,13 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@exo/plugin-sdk": "1.4.0"
+    "@exo/plugin-sdk": "1.7.0"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
     "typescript": "~5.9.3",
     "vite": "^8.3.8",
     "vitest": "^5.1.0",
-    "@exo/plugin-sdk": "1.6.0"
+    "@exo/plugin-sdk": "1.7.0"
   }
 }

@@ -81,6 +81,7 @@ function recordFor(manifest: PluginManifest, identity: string, index: number): P
       registrationOrder: order,
     })),
     commands: [],
+    newFiles: [],
   }
 }
 

@@ -7,6 +7,7 @@ import type { ViewHandle } from '../plugins/view-pool'
 import type { PluginSettingsSnapshot } from '../plugins/settings'
 import type { CommandControllerSnapshot } from '../plugins/commands'
 import type { FilePickerView } from '../plugins/file-picker'
+import type { NewFileView } from '../plugins/new-file'
 import type { WorkspaceRuntime, WorkspaceSnapshot } from './runtime'
 
 const WorkspaceRuntimeContext = createContext<WorkspaceRuntime | null>(null)
@@ -97,5 +98,14 @@ export function useFilePicker(): FilePickerView | null {
     runtime.filePicker.subscribe,
     runtime.filePicker.getSnapshot,
     runtime.filePicker.getSnapshot,
+  )
+}
+
+export function useNewFile(): NewFileView | null {
+  const runtime = useWorkspaceRuntime()
+  return useSyncExternalStore(
+    runtime.newFiles.subscribe,
+    runtime.newFiles.getSnapshot,
+    runtime.newFiles.getSnapshot,
   )
 }

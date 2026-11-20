@@ -18,7 +18,7 @@ enough to ship a plugin.
 
 | Artifact                                            | Version | Packaging                                        |
 | --------------------------------------------------- | ------- | ------------------------------------------------ |
-| `packages/plugin-sdk` (`@exo/plugin-sdk`)           | `1.6.0` | Private workspace package; no runtime dependency |
+| `packages/plugin-sdk` (`@exo/plugin-sdk`)           | `1.7.0` | Private workspace package; no runtime dependency |
 | `packages/plugin-template` (`@exo/plugin-template`) | `0.1.0` | Private workspace package; built static assets   |
 
 - The SDK MAJOR equals the protocol major it speaks. `PROTOCOL_VERSION` and
@@ -27,9 +27,10 @@ enough to ship a plugin.
   additive `requestFiles()` helper, `1.3.0` adds the additive
   `listDirectory()` helper, `1.4.0` adds the additive local-event helpers and
   `1.5.0` adds the view client, panel/content-view registration and the
-  `openFile()`, `openView()` and `requestPanel()` helpers, and `1.6.0` adds
-  command registration, `onCommand()` and the command support bit, all without
-  changing the protocol major.
+  `openFile()`, `openView()` and `requestPanel()` helpers, `1.6.0` adds
+  command registration, `onCommand()` and the command support bit, and `1.7.0`
+  adds `requestNewFile()`, `registerNewFile()` and the creation/template support
+  bits, all without changing the protocol major.
 - The packages are not published in v1 (D12). Consumers in this repository use
   the workspace copy. A future publication adds a built `dist` and does not
   change the message protocol.
@@ -109,14 +110,18 @@ register({ glob, entry, label? })   -> one plugin/register
 registerPanel(id)                   -> one plugin/register with { panels: [id] }
 registerContentView(id)             -> one plugin/register with { contentViews: [id] }
 registerCommand(id)                 -> one plugin/register with { commands: [id] }
+registerNewFile(id)                 -> one plugin/register with { newFiles: [id] }
 complete()                          -> one plugin/register-complete, then shell/register-ack
 ```
 
 - `complete()` resolves with
-  `{ accepted: string[], acceptedPanels: string[], acceptedContentViews: string[], acceptedCommands: string[], rejected: RejectedContribution[] }`.
+  `{ accepted: string[], acceptedPanels: string[], acceptedContentViews: string[], acceptedCommands: string[], acceptedNewFiles: string[], rejected: RejectedContribution[] }`.
   Each rejection carries its index, stable reason, optional `kind` and optional
-  message. An older shell's acknowledgement omits the view and command arrays;
-  the SDK reports them as empty rather than failing the editor registrations.
+  message. An older shell's acknowledgement omits the view, command and template
+  arrays; the SDK reports them as empty rather than failing the editor
+  registrations.
+- `registerNewFile(id)` rejects locally with `unsupported-message` when the
+  registration init omits `capabilities.newFiles`.
 - A second `complete()` rejects locally as `protocol-violation` and sends no
   second message.
 - A registration call after completion rejects locally.
@@ -130,12 +135,13 @@ complete()                          -> one plugin/register-complete, then shell/
 
 ```ts
 editor.file // FileMetadata from shell/init, no content
-editor.capabilities // read, write, requestFiles, filePicker, directoryListing, localEvents,
-                   // openFile, openView, requestPanel, commands
+editor.capabilities // read, write, requestFiles, filePicker, createFile, directoryListing,
+                   // localEvents, openFile, openView, requestPanel, commands
 editor.limits // maxFileSize, maxRequestBytes
 editor.settings // resolved shell settings
 editor.readFile(path, 'utf8' | 'binary')
 editor.requestFiles({ multiple?, directory? })
+editor.requestNewFile({ text | bytes, suggestedName?, directory? })
 editor.listDirectory(path, { cursor? })
 editor.setDirty(dirty)
 editor.requestSave()
@@ -163,6 +169,16 @@ editor.onLocalEvent(topic, listener)
   false, and with `rate-limited` when the client already has one pending picker.
   The shell returns no content, so a selected path is read with `readFile()`.
   Manual path entry remains the fallback on a shell that predates the message.
+- `requestNewFile({ text | bytes, suggestedName?, directory? })` sends one
+  `plugin/request-new-file` with exactly one content field and resolves with
+  `{ path, version }`, or `null` when the user cancels. It rejects locally with
+  `unsupported-message` when the shell omits `capabilities.createFile`, with
+  `permission-denied` when the manifest lacks `workspace:write`, with
+  `too-large` naming the actual size and the 8 MiB limit, and with
+  `rate-limited` when the client already has one pending request. A shell
+  `already-exists` rejects with that code so the plugin can ask for another name.
+  A runtime-created file is not opened automatically; call `openFile()` if that
+  is appropriate.
 - `listDirectory(path, { cursor? })` sends one `plugin/request-list` with a fresh
   id and resolves with `{ entries, nextCursor? }` from the matching
   `shell/list-result`. It rejects locally with `unsupported-message` when the
@@ -199,8 +215,8 @@ editor.onLocalEvent(topic, listener)
 ## 7.1 View client
 
 `ViewClient` is only available on a view-mode connection. It shares the read,
-listing, picker, event, navigation and disposal API with `EditorClient` and
-exposes no save or dirty methods.
+new-file, listing, picker, event, navigation and disposal API with `EditorClient`
+and exposes no save or dirty methods.
 
 ```ts
 view.view // ViewInitData from shell/init: kind, id, title, instanceId, location?, payload?, openedBy?
@@ -209,6 +225,7 @@ view.limits // maxFileSize, maxRequestBytes
 view.settings // resolved shell settings
 view.readFile(path, 'utf8' | 'binary')
 view.requestFiles({ multiple?, directory? })
+view.requestNewFile({ text | bytes, suggestedName?, directory? })
 view.listDirectory(path, { cursor? })
 view.openFile(path)
 view.openView({ pluginId?, viewId, instanceKey?, payload? })
@@ -329,6 +346,10 @@ handler({ command, args? }) -> void | { ok: true } | { ok: false, message? }
 - Command registration and `onCommand()` are an additive minor (`1.6.0`). A shell
   that predates them omits `capabilities.commands`; the SDK treats absence as
   false and never fabricates a command result.
+- New-file creation and template registration are an additive minor (`1.7.0`). A
+  shell that predates them omits `capabilities.createFile` and
+  `capabilities.newFiles`; the SDK treats absence as false and rejects
+  `requestNewFile()`/`registerNewFile()` locally with `unsupported-message`.
 - A deprecated SDK export remains functional for the rest of the current major,
   carries an `@deprecated` note with its replacement and is removed only at the
   next major.

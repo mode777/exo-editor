@@ -198,6 +198,7 @@ settings view fails with `conflict` rather than overwriting an external edit.
 | `contributes.panels` | array | no | Maximum 8 across both locations. Each entry: `id` (required, `^[a-z0-9][a-z0-9.-]{0,63}$`, unique among panels), `title` (required, 1-80 chars), `icon` (optional Codicon name, 1-40 chars, `^[a-z0-9-]+$`), `location` (`"primary"` or `"secondary"`), and `entry` (required, relative HTML page inside the plugin root). See section 3.2. |
 | `contributes.contentViews` | array | no | Maximum 16. Each entry: `id` (required, same id rule and unique among content views), `title` (required, 1-80 chars), and `entry` (required, relative HTML page inside the plugin root). A content view opens as a read-only tab. See section 3.2. |
 | `contributes.commands` | array | no | Maximum 32. Each entry: `id` (required, same id rule and unique among commands), `title` (required, 1-40 chars), optional `category` (1-40 chars), a `target` (`"activeEditor"`, `{ "kind": "panel", "id" }` or `{ "kind": "contentView", "id" }`), and optional `menus` (subset of `commandPalette`, `explorer/context`, `editor/title`; default `["commandPalette"]`). See section 3.3. |
+| `contributes.newFiles` | array | no | Maximum 20. Each entry: `id` (required, same id rule and unique among templates), `label` (required, 1-40 chars), `fileName` (required, one path segment, 1-128 chars, not `exo.json` or `.exo`), optional `encoding` (`utf8` or `base64`, default `utf8`), and `content` (required, at most 64 KiB after decoding; at most 128 KiB total decoded content). See section 3.4. |
 | `contributes.configuration` | object | no | Optional workspace settings declaration. `configuration.properties` is an object of at most 50 named settings, each with `type` (`boolean`, `string` or `number`), a required matching `default`, an optional `enum`, an optional `description`, and an optional `scope` that must be `workspace`. See section 3.1. |
 
 Unknown manifest fields are rejected at every level, like unknown `exo.json`
@@ -321,12 +322,13 @@ entry, on the manifest origin, with no query, fragment or `..` segment.
 - The shell names the plugin in the activity-bar title, secondary picker and
   content-view chrome, so a newly added surface cannot impersonate shell chrome.
 
-Panels, content views and commands are user-invoked surfaces inside the
-already-approved root. They grant no autonomous data access and are **excluded
-from the consent fingerprint**; the first-grant dialog lists them and a later
-addition does not re-prompt. A manifest that adds panels or content views should
-declare `engines.exo` at or above the shell that supports them (0.3.0), and one
-that adds commands at or above 0.4.0, so an older shell reports
+Panels, content views, commands and new-file templates are user-invoked
+surfaces inside the already-approved root. They grant no autonomous data access
+and are **excluded from the consent fingerprint**; the first-grant dialog lists
+them and a later addition does not re-prompt. A manifest that adds panels or
+content views should declare `engines.exo` at or above the shell that supports
+them (0.3.0), one that adds commands at or above 0.4.0, and one that adds
+new-file templates at or above 0.5.0, so an older shell reports
 `incompatible-engine` rather than rejecting the unknown contribution.
 
 ### 3.3 Commands
@@ -384,6 +386,49 @@ target. A command's target decides where the shell delivers it:
   target frame's existing permissions are the ceiling.
 - Every surface names the contributing plugin. The palette id is shell-owned and
   synthetic, so a plugin command cannot shadow a shell command id.
+
+### 3.4 New-file templates
+
+A template is fixed manifest data that the shell can write to a new file the
+user names. It is not generated at create time and is never executed:
+
+```json
+{
+  "contributes": {
+    "newFiles": [
+      {
+        "id": "component",
+        "label": "TypeScript component",
+        "fileName": "Component.tsx",
+        "content": "export function Component() {}\n"
+      },
+      {
+        "id": "pixel",
+        "label": "One-pixel PNG",
+        "fileName": "pixel.png",
+        "encoding": "base64",
+        "content": "iVBORw0KGgo="
+      }
+    ]
+  }
+}
+```
+
+- `content` is UTF-8 text by default. With `"encoding": "base64"` it must be
+  strict base64 (no whitespace, valid padding) and is decoded to bytes at
+  manifest validation. The shell holds the decoded bytes; it never re-fetches or
+  evaluates template syntax.
+- `fileName` is one path segment. It is a default in an editable field, never a
+  commit: the created path comes from the shell-owned dialog.
+- A template requires `workspace:write`; a manifest may declare one without the
+  permission, but every registration is rejected with `permission-denied`.
+- The controller registers a subset by id through `plugin/register.newFiles`
+  after `plugin/register-complete`; an undeclared id is `not-declared`. The
+  first-grant prompt lists each label and default name; adding, removing or
+  changing a template does not change the fingerprint.
+- The explorer New File menu offers Empty File plus each active template grouped
+  by plugin name, and the palette has one entry per template with the plugin name
+  as its category. A read-only workspace offers neither.
 
 ### Glob rules
 
@@ -529,9 +574,10 @@ fingerprint = "v1:" + hex(sha256(JSON.stringify({
 ```
 
 `name`, `description`, `version`, `icon`, `publisher`, individual page paths,
-`contributes.configuration`, `contributes.panels`, `contributes.contentViews`
-and `contributes.commands` are excluded: they are display metadata, user-edited
-shell state or user-invoked surfaces inside the already-approved root. The `rendering` flag is
+`contributes.configuration`, `contributes.panels`, `contributes.contentViews`,
+`contributes.commands` and `contributes.newFiles` are excluded: they are display
+metadata, user-edited shell state or user-invoked surfaces inside the
+already-approved root. The `rendering` flag is
 included only when it is `"frame"`, so existing hidden manifests keep their stored
 consent and a hidden-to-frame change re-prompts. Changing the origin, the approved
 root, a permission or a declared glob changes the fingerprint and re-prompts.
@@ -539,8 +585,9 @@ Adding, removing or renaming a page inside the root does not, because the user
 approved the directory tree (D14). The input list is exhaustive: a new manifest
 field that changes what the plugin can do autonomously must be added to the
 fingerprint in the same change, or consent would silently cover behaviour the
-user never saw. Panels, content views and commands only change what the user can
-invoke, so they are a deliberate exclusion, recorded in the security review.
+user never saw. Panels, content views, commands and new-file templates only
+change what the user can invoke or confirm, so they are a deliberate exclusion,
+recorded in the security review.
 `workspace:list` is a separate permission for this reason: a plugin that
 previously declared only `workspace:read` gains a different sorted permissions
 input when it adds listing, so it re-prompts, while a read-only plugin keeps its

@@ -156,17 +156,19 @@ interface ShellInit {
     openedBy?: { pluginId: string; pluginName: string; origin: string }
   }
   /**
-   * Registration init carries `{ localEvents }`. Editor and view init carry the
-   * permission bits plus the shell support bits: `filePicker`,
-   * `directoryListing`, `localEvents`, `openFile`, `openView`, `requestPanel` and
-   * `commands` are absent on older shells and a plugin must treat absence as
-   * false.
+   * Registration init carries `{ localEvents, newFiles }`. Editor and view init
+   * carry the permission bits plus the shell support bits: `filePicker`,
+   * `createFile`, `directoryListing`, `localEvents`, `openFile`, `openView`,
+   * `requestPanel` and `commands` are absent on older shells and a plugin must
+   * treat absence as false.
    */
   capabilities?: {
     read?: boolean
     write?: boolean
     requestFiles?: boolean
     filePicker?: boolean
+    createFile?: boolean
+    newFiles?: boolean
     directoryListing?: boolean
     localEvents?: boolean
     openFile?: boolean
@@ -203,8 +205,8 @@ reinterpret a frame that starts in one mode as the other.
 | Phase | Allowed plugin messages |
 | --- | --- |
 | `register` | `plugin/ready`, `plugin/register`, `plugin/register-complete` |
-| `editor` | `plugin/ready`, `plugin/request-file`, `plugin/request-files`, `plugin/request-list`, `plugin/dirty`, `plugin/request-save`, `plugin/save-content`, `plugin/subscribe`, `plugin/unsubscribe`, `plugin/publish`, `plugin/open-file`, `plugin/open-view`, `plugin/request-panel`, `plugin/command-result`, `plugin/dispose-ack` |
-| `view` | `plugin/ready`, `plugin/request-file`, `plugin/request-files`, `plugin/request-list`, `plugin/subscribe`, `plugin/unsubscribe`, `plugin/publish`, `plugin/open-file`, `plugin/open-view`, `plugin/request-panel`, `plugin/command-result`, `plugin/dispose-ack` |
+| `editor` | `plugin/ready`, `plugin/request-file`, `plugin/request-files`, `plugin/request-new-file`, `plugin/request-list`, `plugin/dirty`, `plugin/request-save`, `plugin/save-content`, `plugin/subscribe`, `plugin/unsubscribe`, `plugin/publish`, `plugin/open-file`, `plugin/open-view`, `plugin/request-panel`, `plugin/command-result`, `plugin/dispose-ack` |
+| `view` | `plugin/ready`, `plugin/request-file`, `plugin/request-files`, `plugin/request-new-file`, `plugin/request-list`, `plugin/subscribe`, `plugin/unsubscribe`, `plugin/publish`, `plugin/open-file`, `plugin/open-view`, `plugin/request-panel`, `plugin/command-result`, `plugin/dispose-ack` |
 
 - `plugin/ready` is accepted once per frame. A second `ready`, a
   `plugin/register-complete` before `ready`, or a registration message after
@@ -243,18 +245,19 @@ frame with `protocol-violation`.
 ```text
 plugin/register          { fileEditors?: FileEditorContribution[],
                            panels?: string[], contentViews?: string[],
-                           commands?: string[] }
+                           commands?: string[], newFiles?: string[] }
 plugin/register-complete {}
 shell/register-ack      { accepted: string[],
                           acceptedPanels: string[],
                           acceptedContentViews: string[],
                           acceptedCommands: string[],
+                          acceptedNewFiles: string[],
                           rejected: RejectedContribution[] }
 
 FileEditorContribution = { glob: string; entry: string; label?: string }
 RejectedContribution   = { index: number,
                            reason: RegistrationRejection,
-                           kind?: 'fileEditor' | 'panel' | 'contentView' | 'command',
+                           kind?: 'fileEditor' | 'panel' | 'contentView' | 'command' | 'newFile',
                            message?: string }
 RegistrationRejection  = 'not-declared' | 'permission-denied' | 'invalid-glob'
                        | 'invalid-contribution' | 'target-not-registered'
@@ -291,16 +294,21 @@ RegistrationRejection  = 'not-declared' | 'permission-denied' | 'invalid-glob'
   `contributes.panels`, and likewise for content views. Only registered ids
   appear in the host snapshot, the activity bar, the picker or the palette.
 - `shell/register-ack` is additive: `accepted` keeps its glob meaning,
-  `acceptedPanels`, `acceptedContentViews` and `acceptedCommands` carry the view
-  and command ids, and a `rejected` entry names its `kind` when it is not an
-  editor. An older SDK ignores the extra fields; a newer SDK defaults their
-  absence to empty arrays.
+  `acceptedPanels`, `acceptedContentViews`, `acceptedCommands` and
+  `acceptedNewFiles` carry the view, command and template ids, and a `rejected`
+  entry names its `kind` when it is not an editor. An older SDK ignores the extra
+  fields; a newer SDK defaults their absence to empty arrays.
 - `commands` is an array of declared command ids. The shell preserves arrival
   order and deduplicates repeated ids. An undeclared id is rejected with
   `not-declared`. At `plugin/register-complete` a command whose panel or
   content-view target was not registered in the same session is rejected with
   `target-not-registered`; the order of the panel and command registrations does
   not matter. A rejected command appears in no surface.
+- `newFiles` is an array of declared new-file template ids. The shell preserves
+  arrival order and deduplicates repeated ids. An undeclared id is rejected with
+  `not-declared`; a registration from a plugin without `workspace:write` is
+  rejected with `permission-denied`. A declared but unregistered template is not
+  offered.
 - Registration order is the order in which the shell accepted the contributions,
   and the plugin's declaration position in `exo.json` is the outer selection
   order. Equal-priority selection therefore never depends on network or handshake
@@ -440,6 +448,46 @@ DirectoryEntry = { path: WorkspacePath, kind: 'file' | 'directory', size?: numbe
   truncated.
 - Listing is not a watcher and grants no write. A hidden handler may list if it
   holds the permission; no visible surface or user gesture is required.
+
+### 5.2.3 Generated new-file request
+
+```text
+plugin/request-new-file  { text: string } | { bytes: ArrayBuffer }
+                         suggestedName?: string
+                         directory?: WorkspacePath
+shell/new-file-result    { path: WorkspacePath, version: string }
+                         | { cancelled: true }
+```
+
+- `plugin/request-new-file` is an editor-phase and view-phase, correlated
+  request. It requires `workspace:write`, a writable session,
+  `capabilities.createFile`, and an active, visible, focused frame. The shell
+  replies `permission-denied` and opens no dialog for a missing permission, a
+  read-only workspace or a hidden/inactive/unfocused frame.
+- The request carries exactly one of `text` or `bytes`. Both, neither or an
+  unknown field is a protocol violation. `text` is UTF-8 encoded; `bytes` are
+  written unchanged. Neither is decoded, evaluated or transformed.
+- `suggestedName` is a one-segment hint. `directory` is a start hint, not a
+  grant. The shell validates both locally and silently falls back to an empty
+  name or its normal start directory when either is invalid, reserved or
+  missing.
+- The shell opens one shell-owned Save As dialog naming the plugin and showing
+  the directory, editable name, content size and a bounded text preview (or a
+  binary label). The final path is chosen by the user.
+- The write is create-only. An existing target is `already-exists`, is never
+  truncated and keeps the dialog open; a directory target is `not-a-file`; a
+  reserved path is `permission-denied`. On success the shell replies with the
+  workspace-absolute path and the new version and does not open a tab.
+- A user cancellation replies `{ cancelled: true }`. Frame disposal, tab close,
+  plugin removal and workspace switch close the dialog, write nothing and send
+  no reply; a late result is dropped.
+- At most one dialog is open per shell and one request is pending per frame; an
+  additional request is `rate-limited` without queueing. A frame may send at most
+  ten requests in a rolling second.
+- Text or bytes above 8 MiB are `too-large` with a message naming the actual
+  size and the limit, and open no dialog.
+- The shell logs the plugin id, template or request id, target path and error
+  code, never the content.
 
 ### 5.3 Dirty state and save
 
@@ -640,6 +688,7 @@ interface ShellError {
     | 'not-found'
     | 'not-a-file'
     | 'not-a-directory'
+    | 'already-exists'
     | 'too-large'
     | 'conflict'
     | 'rate-limited'
@@ -677,6 +726,9 @@ are cleared on workspace switch.
 | Navigation and panel intents | 10 per rolling second per frame |
 | Pending file pickers per frame | 1 |
 | Open file pickers per shell | 1 |
+| Generated new-file payload | 8 MiB |
+| New-file requests per rolling second per frame | 10 |
+| Pending new-file dialogs per shell | 1 |
 | Paths per file selection | 32 |
 | Entries per listing page | 1,000 |
 | In-flight listing requests per frame | 4 |
@@ -710,11 +762,12 @@ for repeated violations, tears down the frame.
   A shell that predates an additive notification ignores it; the plugin must keep
   a working fallback (for `plugin/request-save`, the shell Save action).
 - The `view` mode, the `view` init block, the navigation/panel intents, the
-  command messages and the extra registration fields are additive within protocol
-  major `1`. An older shell rejects a manifest that declares
-  `contributes.panels`, `contributes.contentViews` or `contributes.commands`
-  unless `engines.exo` excludes that shell, so the plugin fails closed with
-  `incompatible-engine` rather than a partial surface.
+  command messages, the new-file messages and the extra registration fields are
+  additive within protocol major `1`. An older shell rejects a manifest that
+  declares `contributes.panels`, `contributes.contentViews`,
+  `contributes.commands` or `contributes.newFiles` unless `engines.exo` excludes
+  that shell, so the plugin fails closed with `incompatible-engine` rather than a
+  partial surface.
 - The SDK exposes the protocol version as a constant so plugins do not hard-code
   it. The SDK major tracks the protocol major; its compatibility and deprecation
   policy is in [`plugin-sdk.md`](./plugin-sdk.md#9-compatibility-and-deprecation-policy).

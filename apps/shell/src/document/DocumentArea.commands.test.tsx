@@ -41,6 +41,7 @@ function record(identity: string, name: string, commands: RegisteredCommand[]): 
     panels: [],
     contentViews: [],
     commands,
+    newFiles: [],
     manifest: {
       schemaVersion: 1,
       manifestUrl: 'https://plugins.example.com/test/exo-manifest.json',
@@ -57,6 +58,7 @@ function record(identity: string, name: string, commands: RegisteredCommand[]): 
       panels: [],
       contentViews: [],
       commands,
+      newFiles: [],
     },
   }
 }

@@ -32,6 +32,7 @@ function manifest(overrides: Partial<PluginManifest> = {}): PluginManifest {
     panels: [],
     contentViews: [],
     commands: [],
+    newFiles: [],
     ...overrides,
   }
 }

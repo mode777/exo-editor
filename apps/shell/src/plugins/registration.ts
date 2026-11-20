@@ -1,10 +1,12 @@
 import { compileGlob } from './glob'
 import {
   hasWorkspaceRead,
+  hasWorkspaceWrite,
   resolvePluginEntry,
   type ManifestCommand,
   type ManifestContentView,
   type ManifestFileEditor,
+  type ManifestNewFile,
   type ManifestPanel,
   type PluginManifest,
 } from './manifest'
@@ -70,6 +72,11 @@ export interface RegisteredCommand extends ManifestCommand {
   registrationOrder: number
 }
 
+export interface RegisteredNewFile extends ManifestNewFile {
+  /** Arrival order within this plugin, starting at zero. */
+  registrationOrder: number
+}
+
 export type RegistrationRejectionReason =
   | 'not-declared'
   | 'permission-denied'
@@ -80,7 +87,7 @@ export type RegistrationRejectionReason =
 export interface RejectedContribution {
   index: number
   reason: RegistrationRejectionReason
-  kind?: 'fileEditor' | 'panel' | 'contentView' | 'command'
+  kind?: 'fileEditor' | 'panel' | 'contentView' | 'command' | 'newFile'
   message?: string
 }
 
@@ -89,6 +96,7 @@ export interface RegistrationAck {
   acceptedPanels: string[]
   acceptedContentViews: string[]
   acceptedCommands: string[]
+  acceptedNewFiles: string[]
   rejected: RejectedContribution[]
 }
 
@@ -99,6 +107,7 @@ export type RegistrationOutcome =
       panels: RegisteredPanel[]
       contentViews: RegisteredContentView[]
       commands: RegisteredCommand[]
+      newFiles: RegisteredNewFile[]
       ack: RegistrationAck
     }
   | { kind: 'failed'; code: RegistrationErrorCode; phase: RegistrationPhase; message?: string }
@@ -142,6 +151,10 @@ function manifestCommandFor(manifest: PluginManifest, id: string): ManifestComma
   return manifest.commands.find((command) => command.id === id)
 }
 
+function manifestNewFileFor(manifest: PluginManifest, id: string): ManifestNewFile | undefined {
+  return manifest.newFiles.find((template) => template.id === id)
+}
+
 /**
  * One controller frame's registration lifetime. The outcome is delivered once;
  * the frame is removed after the acknowledgement delay. All state changes are
@@ -177,6 +190,7 @@ export class RegistrationSession {
     string,
     { command: ManifestCommand; index: number; registrationOrder: number }
   >()
+  private readonly pendingNewFiles = new Map<string, RegisteredNewFile>()
   private readonly rejected: RejectedContribution[] = []
 
   constructor(options: RegistrationSessionOptions) {
@@ -232,6 +246,7 @@ export class RegistrationSession {
     this.pendingPanels.clear()
     this.pendingContentViews.clear()
     this.pendingCommands.clear()
+    this.pendingNewFiles.clear()
     this.frame?.close()
   }
 
@@ -263,6 +278,7 @@ export class RegistrationSession {
     this.pendingPanels.clear()
     this.pendingContentViews.clear()
     this.pendingCommands.clear()
+    this.pendingNewFiles.clear()
     this.frame?.close()
     this.options.onOutcome({ kind: 'failed', code, phase, message })
   }
@@ -381,7 +397,7 @@ export class RegistrationSession {
       permissions: this.options.manifest.permissions,
       locale: this.options.locale,
       settings: this.options.settings ?? {},
-      capabilities: { localEvents: true },
+      capabilities: { localEvents: true, newFiles: true },
     })
     this.registrationTimer = this.setTimeoutImpl(() => {
       this.fail('timeout', 'register')
@@ -494,6 +510,35 @@ export class RegistrationSession {
         this.registrationOrder += 1
       }
     }
+    if (payload.newFiles !== undefined) {
+      if (!Array.isArray(payload.newFiles)) {
+        this.violation(envelope)
+        return
+      }
+      for (const raw of payload.newFiles) {
+        const index = this.contributionIndex
+        this.contributionIndex += 1
+        if (typeof raw !== 'string') {
+          this.rejected.push({ index, kind: 'newFile', reason: 'invalid-contribution' })
+          continue
+        }
+        const declared = manifestNewFileFor(this.options.manifest, raw)
+        if (!declared) {
+          this.rejected.push({ index, kind: 'newFile', reason: 'not-declared' })
+          continue
+        }
+        if (!hasWorkspaceWrite(this.options.manifest.permissions)) {
+          this.rejected.push({ index, kind: 'newFile', reason: 'permission-denied' })
+          continue
+        }
+        if (this.pendingNewFiles.has(raw)) continue
+        this.pendingNewFiles.set(raw, {
+          ...declared,
+          registrationOrder: this.registrationOrder,
+        })
+        this.registrationOrder += 1
+      }
+    }
   }
 
   private validateContribution(
@@ -568,6 +613,7 @@ export class RegistrationSession {
     const editors = [...this.pending.values()]
     const panels = [...this.pendingPanels.values()]
     const contentViews = [...this.pendingContentViews.values()]
+    const newFiles = [...this.pendingNewFiles.values()]
     const commands: RegisteredCommand[] = []
     for (const entry of this.pendingCommands.values()) {
       const target = entry.command.target
@@ -597,6 +643,7 @@ export class RegistrationSession {
       acceptedPanels: panels.map((panel) => panel.id),
       acceptedContentViews: contentViews.map((view) => view.id),
       acceptedCommands: commands.map((command) => command.id),
+      acceptedNewFiles: newFiles.map((template) => template.id),
       rejected: this.rejected,
     }
     this.phase = 'complete'
@@ -605,6 +652,14 @@ export class RegistrationSession {
     this.closeTimer = this.setTimeoutImpl(() => {
       this.close()
     }, ACK_CLOSE_DELAY_MS)
-    this.options.onOutcome({ kind: 'active', editors, panels, contentViews, commands, ack })
+    this.options.onOutcome({
+      kind: 'active',
+      editors,
+      panels,
+      contentViews,
+      commands,
+      newFiles,
+      ack,
+    })
   }
 }

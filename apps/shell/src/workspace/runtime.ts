@@ -30,6 +30,7 @@ import type {
 } from '../plugins/frame-session'
 import { shellCodeFor } from '../plugins/frame-session'
 import { FilePickerController } from '../plugins/file-picker'
+import { NewFileController } from '../plugins/new-file'
 import type { FrameTransport } from '../plugins/frame'
 import { PluginSettingsStore, type PluginSettingsStorage } from '../plugins/settings'
 import { PluginCommandController, type CommandTargetSession } from '../plugins/commands'
@@ -142,6 +143,7 @@ export class WorkspaceRuntime {
   /** The one event bus for the current workspace; shared by handler pools. */
   readonly events: EventBus
   readonly filePicker: FilePickerController
+  readonly newFiles: NewFileController
   readonly pluginSettings: PluginSettingsStore
   readonly commands: PluginCommandController
 
@@ -181,6 +183,13 @@ export class WorkspaceRuntime {
     })
     this.pluginHost = options.pluginHost ?? new PluginHost()
     this.filePicker = new FilePickerController()
+    this.newFiles = new NewFileController({
+      onCreated: (path) => {
+        this.openDocument(path)
+      },
+      onLog: (event) =>
+        this.pluginHost.logHandler(event.identity, event.phase, event.code, event.message),
+    })
     this.events =
       options.handlerPool?.events ??
       new EventBus({
@@ -194,6 +203,10 @@ export class WorkspaceRuntime {
         onHandlerClosed: (path) => this.documents.handleHandlerClosed(path),
         onSaveRequested: (path) => this.documents.saveFromPlugin(path),
         onRequestFiles: (request) => this.filePicker.request(request),
+        onRequestNewFile: (request) =>
+          this.filePicker.getSnapshot() !== null
+            ? Promise.resolve({ ok: false, code: 'rate-limited' })
+            : this.newFiles.request(request),
         isPickerOpen: () => this.filePicker.getSnapshot() !== null,
         onOpenFile: (request, source) => this.openFileIntent(request, source),
         onOpenView: (request, source) => this.openViewIntent(request, source),
@@ -205,6 +218,7 @@ export class WorkspaceRuntime {
         ...(options.viewTransport === undefined ? {} : { transport: options.viewTransport }),
         events: this.events,
         onRequestFiles: (request) => this.filePicker.request(request),
+        onRequestNewFile: (request) => this.newFiles.request(request),
         onOpenFile: (request, source) => this.openFileIntent(request, source),
         onOpenView: (request, source) => this.openViewIntent(request, source),
         onRequestPanel: (request, source) => this.requestPanelIntent(request, source),
@@ -220,6 +234,9 @@ export class WorkspaceRuntime {
     this.pluginHost.setHandlerLifecycle(this.handlers)
     this.pluginHost.setViewLifecycle({
       closeFor: (identity) => this.closeViewsFor(identity),
+    })
+    this.pluginHost.setNewFileLifecycle?.({
+      closeFor: (identity) => this.newFiles.closeFor(identity, 'plugin-removed'),
     })
     this.commands = new PluginCommandController({
       host: this.pluginHost,
@@ -874,6 +891,7 @@ export class WorkspaceRuntime {
   }
 
   private async deactivate(reason: 'switch' | 'close' = 'switch'): Promise<void> {
+    this.newFiles.reset()
     this.filePicker.reset()
     this.commands.reset()
     this.handlers.publishWorkspaceClosed(reason)

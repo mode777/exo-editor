@@ -5,6 +5,7 @@ import {
   ExoProtocolError,
   MAX_IN_FLIGHT_REQUESTS,
   MAX_LOCAL_EVENT_BYTES,
+  MAX_NEW_FILE_BYTES,
   MAX_VIEW_PAYLOAD_BYTES,
   isEventTopic,
   isLocalEventTopic,
@@ -21,6 +22,8 @@ import {
   type ListDirectoryOptions,
   type LocalEvent,
   type LocalEventTopic,
+  type NewFileOptions,
+  type NewFileResult,
   type OpenViewOptions,
   type PanelAction,
   type PanelResult,
@@ -66,6 +69,14 @@ function parseFileSelection(payload: unknown): string[] | null {
   if (!isPlainObject(payload) || !Array.isArray(payload.paths)) return null
   if (payload.paths.some((path) => typeof path !== 'string')) return null
   return payload.paths as string[]
+}
+
+function parseNewFileResult(payload: unknown): NewFileResult | null | undefined {
+  if (!isPlainObject(payload)) return undefined
+  if (payload.cancelled === true) return Object.keys(payload).length === 1 ? null : undefined
+  if (typeof payload.path !== 'string' || typeof payload.version !== 'string') return undefined
+  if (Object.keys(payload).some((key) => key !== 'path' && key !== 'version')) return undefined
+  return { path: payload.path, version: payload.version }
 }
 
 function parseDirectoryPage(payload: unknown): DirectoryPage | null {
@@ -151,6 +162,7 @@ export class FrameClient {
   protected isClosed = false
   protected disposed = false
   private pendingPickerId: string | null = null
+  private pendingNewFileId: string | null = null
 
   constructor(gate: MessageGate, init: ShellInit) {
     this.gate = gate
@@ -162,6 +174,9 @@ export class FrameClient {
     )
     gate.on('shell/files-selected', (envelope) =>
       this.handleFileSelection(envelope.replyTo, envelope.payload),
+    )
+    gate.on('shell/new-file-result', (envelope) =>
+      this.handleNewFileResult(envelope.replyTo, envelope.payload),
     )
     gate.on('shell/list-result', (envelope) =>
       this.handleListing(envelope.replyTo, envelope.payload),
@@ -257,6 +272,100 @@ export class FrameClient {
       ...(options.directory === undefined ? {} : { directory: options.directory }),
     }).finally(() => {
       if (this.pendingPickerId === id) this.pendingPickerId = null
+    })
+  }
+
+  /**
+   * Ask the shell to create a new file from generated text or bytes. Resolves
+   * with the path and version, or `null` when the user cancels.
+   */
+  requestNewFile(options: NewFileOptions): Promise<NewFileResult | null> {
+    if (!this.capabilities.createFile) {
+      return Promise.reject(
+        new ExoProtocolError(
+          'unsupported-message',
+          'This shell does not support new-file creation.',
+        ),
+      )
+    }
+    if (!this.init.permissions.includes('workspace:write')) {
+      return Promise.reject(
+        new ExoProtocolError(
+          'permission-denied',
+          'The plugin does not have workspace:write permission for new-file creation.',
+        ),
+      )
+    }
+    if (this.pendingNewFileId !== null) {
+      return Promise.reject(
+        new ExoProtocolError('rate-limited', 'A new-file request is already pending.'),
+      )
+    }
+    const hasText = typeof options.text === 'string'
+    const hasBytes = options.bytes instanceof ArrayBuffer || ArrayBuffer.isView(options.bytes)
+    if (hasText === hasBytes) {
+      return Promise.reject(
+        new ExoProtocolError(
+          'protocol-violation',
+          'A new-file request needs exactly one of text or bytes.',
+        ),
+      )
+    }
+    if (
+      options.suggestedName !== undefined &&
+      (typeof options.suggestedName !== 'string' || options.suggestedName.length > 128)
+    ) {
+      return Promise.reject(
+        new ExoProtocolError(
+          'protocol-violation',
+          'A suggested name must be at most 128 characters.',
+        ),
+      )
+    }
+    if (options.directory !== undefined && typeof options.directory !== 'string') {
+      return Promise.reject(
+        new ExoProtocolError('protocol-violation', 'A directory hint must be a string.'),
+      )
+    }
+
+    let payload: { text: string } | { bytes: ArrayBuffer }
+    let size: number
+    if (hasText) {
+      const text = options.text as string
+      payload = { text }
+      size = new TextEncoder().encode(text).byteLength
+    } else {
+      const raw = options.bytes
+      let bytes: Uint8Array
+      if (raw instanceof ArrayBuffer) {
+        bytes = new Uint8Array(raw.slice(0))
+      } else {
+        const view = raw as ArrayBufferView
+        bytes = new Uint8Array(view.byteLength)
+        bytes.set(new Uint8Array(view.buffer, view.byteOffset, view.byteLength))
+      }
+      const buffer = new ArrayBuffer(bytes.byteLength)
+      new Uint8Array(buffer).set(bytes)
+      payload = { bytes: buffer }
+      size = bytes.byteLength
+    }
+    if (size > MAX_NEW_FILE_BYTES) {
+      return Promise.reject(
+        new ExoProtocolError(
+          'too-large',
+          `Generated files are limited to ${MAX_NEW_FILE_BYTES} bytes; this request is ${size} bytes.`,
+        ),
+      )
+    }
+
+    const id = this.nextId()
+    this.pendingNewFileId = id
+    return this.request<NewFileResult | null>(id, 'plugin/request-new-file', {
+      ...payload,
+      ...(options.suggestedName === undefined ? {} : { suggestedName: options.suggestedName }),
+      ...(options.directory === undefined ? {} : { directory: options.directory }),
+    }).finally(() => {
+      if (this.pendingNewFileId === id) this.pendingNewFileId = null
     })
   }
 
@@ -590,6 +699,18 @@ export class FrameClient {
       return
     }
     this.settle(replyTo, undefined, paths)
+  }
+
+  private handleNewFileResult(replyTo: string | undefined, payload: unknown): void {
+    const result = parseNewFileResult(payload)
+    if (result === undefined) {
+      this.settle(
+        replyTo,
+        new ExoProtocolError('protocol-violation', 'The shell sent an invalid new-file result.'),
+      )
+      return
+    }
+    this.settle(replyTo, undefined, result)
   }
 
   private handleListing(replyTo: string | undefined, payload: unknown): void {

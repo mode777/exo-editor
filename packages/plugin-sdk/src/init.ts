@@ -30,6 +30,7 @@ const SHELL_ERROR_CODES: ShellErrorCode[] = [
   'not-found',
   'not-a-file',
   'not-a-directory',
+  'already-exists',
   'too-large',
   'conflict',
   'rate-limited',
@@ -112,6 +113,10 @@ function capabilitiesAt(value: Record<string, unknown>, path: string): EditorCap
       capabilities.filePicker === undefined
         ? false
         : booleanAt(capabilities, 'filePicker', `${path}.capabilities`),
+    createFile:
+      capabilities.createFile === undefined
+        ? false
+        : booleanAt(capabilities, 'createFile', `${path}.capabilities`),
     directoryListing:
       capabilities.directoryListing === undefined
         ? false
@@ -174,13 +179,17 @@ function registrationCapabilitiesAt(
   value: Record<string, unknown>,
   path: string,
 ): RegistrationCapabilities {
-  if (value.capabilities === undefined) return { localEvents: false }
+  if (value.capabilities === undefined) return { localEvents: false, newFiles: false }
   const capabilities = objectAt(value, 'capabilities', path)
   return {
     localEvents:
       capabilities.localEvents === undefined
         ? false
         : booleanAt(capabilities, 'localEvents', `${path}.capabilities`),
+    newFiles:
+      capabilities.newFiles === undefined
+        ? false
+        : booleanAt(capabilities, 'newFiles', `${path}.capabilities`),
   }
 }
 

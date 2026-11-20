@@ -4,6 +4,7 @@ import { useWorkbenchStore } from 'vscode-workbench'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from './App'
 import { FilePickerDialog } from './document/FilePickerDialog'
+import { NewFileDialog } from './document/NewFileDialog'
 import { ClosePromptDialog } from './components/ClosePromptDialog'
 import { ConsentDialog, type ConsentRequestView } from './plugins/ConsentDialog'
 import type { PluginManifest } from './plugins/manifest'
@@ -97,6 +98,7 @@ function manifest(): PluginManifest {
     panels: [],
     contentViews: [],
     commands: [],
+    newFiles: [],
   }
 }
 
@@ -270,6 +272,32 @@ describe('Exo-owned surface accessibility', () => {
       />,
     )
     await vi.waitFor(() => expect(container.querySelector('[data-picker-row]')).not.toBeNull())
+    await expectNoViolations(container.querySelector('[role="dialog"]'))
+  })
+
+  it('new-file dialog has no WCAG A/AA violations', async () => {
+    const { runtime } = await mountWorkspace({ '/a.txt': 'one', '/dir/b.txt': 'two' })
+    const session = runtime.getSession()
+    if (!session) throw new Error('No workspace session')
+    const container = await renderNode(
+      <NewFileDialog
+        request={{
+          kind: 'request',
+          identity: 'https://plugins.example.com::com.example.code',
+          pluginId: 'com.example.code',
+          pluginName: 'Code Plugin',
+          directory: '/',
+          name: 'notes.md',
+          size: 12,
+          preview: '# Notes\nhello',
+          binary: false,
+          session,
+        }}
+        onCancel={() => undefined}
+        onSubmit={() => undefined}
+      />,
+    )
+    await vi.waitFor(() => expect(container.querySelector('input')).not.toBeNull())
     await expectNoViolations(container.querySelector('[role="dialog"]'))
   })
 

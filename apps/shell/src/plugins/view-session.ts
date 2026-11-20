@@ -1,6 +1,7 @@
 import type { WorkspaceSession } from '../workspace/contract'
 import type { FrameTransport } from './frame'
 import type { FilePickerOpenRequest, FilePickerOutcome } from './file-picker'
+import type { NewFileOutcome, NewFileRequest } from './new-file'
 import type { EventBus } from './events'
 import type { SettingValues } from './settings'
 import {
@@ -55,6 +56,7 @@ export interface ViewSessionOptions {
   clearTimeoutImpl?: typeof clearTimeout
   onActive?: () => void
   onRequestFiles?: (request: FilePickerOpenRequest) => Promise<FilePickerOutcome>
+  onRequestNewFile?: (request: NewFileRequest) => Promise<NewFileOutcome>
   onFailure: (failure: SessionFailure) => void
   onLog?: (event: SessionLogEvent) => void
   onOpenFile?: (request: OpenFileIntent) => Promise<IntentOutcome>
@@ -92,6 +94,7 @@ export class ViewSession extends FrameSession {
       clearTimeoutImpl: options.clearTimeoutImpl,
       onActive: options.onActive,
       onRequestFiles: options.onRequestFiles,
+      onRequestNewFile: options.onRequestNewFile,
       onFailure: (failure) => options.onFailure(failure),
       onLog: options.onLog,
       onOpenFile: options.onOpenFile,

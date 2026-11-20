@@ -1447,3 +1447,171 @@ describe('resolveHandlerReadPath', () => {
     expect(() => resolveHandlerReadPath('/editor.ts', '')).toThrow()
   })
 })
+
+describe('new-file requests', () => {
+  function requestNewFile(context: Started, id: string, payload: Record<string, unknown> = {}) {
+    context.frame.emit({ exo: 1, type: 'plugin/request-new-file', id, payload }, PLUGIN_ORIGIN)
+  }
+
+  it('advertises createFile only when the shell provides the handler', async () => {
+    const without = await start()
+    ready(without)
+    expect(postedType(without.frame, 'shell/init')?.payload).toMatchObject({
+      capabilities: { createFile: false },
+    })
+
+    const withHandler = await start({ onRequestNewFile: async () => ({ ok: false, silent: true }) })
+    ready(withHandler)
+    expect(postedType(withHandler.frame, 'shell/init')?.payload).toMatchObject({
+      capabilities: { createFile: true },
+    })
+  })
+
+  it('sends text and replies with the created path and version', async () => {
+    const calls: unknown[] = []
+    const context = await start({
+      onRequestNewFile: async (request) => {
+        calls.push(request)
+        return { ok: true, path: '/notes/written.txt', version: 'm7' }
+      },
+    })
+    ready(context)
+    requestNewFile(context, 'new-1', {
+      text: 'hello',
+      suggestedName: 'written.txt',
+      directory: '/notes',
+    })
+    await vi.waitFor(() => {
+      expect(postedType(context.frame, 'shell/new-file-result')).toBeTruthy()
+    })
+
+    expect(calls).toHaveLength(1)
+    expect(calls[0]).toMatchObject({
+      kind: 'request',
+      pluginId: 'com.example.code',
+      suggestedName: 'written.txt',
+      directory: '/notes',
+      fallbackDirectory: '/src',
+      content: { text: 'hello' },
+    })
+    expect((calls[0] as { content: { bytes: Uint8Array } }).content.bytes).toEqual(
+      new TextEncoder().encode('hello'),
+    )
+    expect(postedType(context.frame, 'shell/new-file-result')).toMatchObject({
+      replyTo: 'new-1',
+      payload: { path: '/notes/written.txt', version: 'm7' },
+    })
+  })
+
+  it('passes binary bytes unchanged and reports cancellation', async () => {
+    const calls: Array<{ content: { bytes: Uint8Array; text?: string } }> = []
+    const context = await start({
+      onRequestNewFile: async (request) => {
+        calls.push(request as { content: { bytes: Uint8Array; text?: string } })
+        return { ok: false, cancelled: true }
+      },
+    })
+    ready(context)
+    const bytes = new Uint8Array([0, 128, 255])
+    requestNewFile(context, 'new-2', { bytes: bytes.buffer })
+    await vi.waitFor(() => {
+      expect(postedType(context.frame, 'shell/new-file-result')).toBeTruthy()
+    })
+
+    expect(Array.from(calls[0].content.bytes)).toEqual([0, 128, 255])
+    expect(calls[0].content.text).toBeUndefined()
+    expect(postedType(context.frame, 'shell/new-file-result')).toMatchObject({
+      replyTo: 'new-2',
+      payload: { cancelled: true },
+    })
+  })
+
+  it('rejects both content fields as a protocol violation', async () => {
+    const handler = vi.fn(async () => ({ ok: false as const, silent: true as const }))
+    const context = await start({ onRequestNewFile: handler })
+    ready(context)
+    requestNewFile(context, 'new-3', { text: 'a', bytes: new ArrayBuffer(1) })
+    expect(handler).not.toHaveBeenCalled()
+    expect(postedType(context.frame, 'shell/error')).toMatchObject({
+      replyTo: 'new-3',
+      payload: { code: 'protocol-violation' },
+    })
+  })
+
+  it('rejects content above 8 MiB with the actual size and limit', async () => {
+    const handler = vi.fn(async () => ({ ok: false as const, silent: true as const }))
+    const context = await start({ onRequestNewFile: handler })
+    ready(context)
+    requestNewFile(context, 'new-4', { bytes: new Uint8Array(8 * 1024 * 1024 + 1).buffer })
+    expect(handler).not.toHaveBeenCalled()
+    const error = postedType(context.frame, 'shell/error')
+    expect(error).toMatchObject({ replyTo: 'new-4', payload: { code: 'too-large' } })
+    expect((error?.payload as { message?: string }).message).toContain('8388608')
+  })
+
+  it('denies a frame without workspace:write or without focus', async () => {
+    const handler = vi.fn(async () => ({ ok: true as const, path: '/x.txt', version: 'm1' }))
+    const readOnly = await start({
+      onRequestNewFile: handler,
+      candidate: candidate({ permissions: ['workspace:read'] }),
+    })
+    ready(readOnly)
+    requestNewFile(readOnly, 'new-5', { text: 'x' })
+    expect(handler).not.toHaveBeenCalled()
+    expect(postedType(readOnly.frame, 'shell/error')).toMatchObject({
+      replyTo: 'new-5',
+      payload: { code: 'permission-denied' },
+    })
+
+    const hidden = await start({ onRequestNewFile: handler, isVisible: () => false })
+    ready(hidden)
+    requestNewFile(hidden, 'new-6', { text: 'x' })
+    expect(handler).not.toHaveBeenCalled()
+    expect(postedType(hidden.frame, 'shell/error')).toMatchObject({
+      replyTo: 'new-6',
+      payload: { code: 'permission-denied' },
+    })
+  })
+
+  it('reports a write collision as already-exists', async () => {
+    const context = await start({
+      onRequestNewFile: async () => ({
+        ok: false,
+        code: 'already-exists',
+        message: '/notes.txt already exists.',
+      }),
+    })
+    ready(context)
+    requestNewFile(context, 'new-7', { text: 'x', suggestedName: 'notes.txt' })
+    await vi.waitFor(() => {
+      expect(postedType(context.frame, 'shell/error')).toBeTruthy()
+    })
+    expect(postedType(context.frame, 'shell/error')).toMatchObject({
+      replyTo: 'new-7',
+      payload: { code: 'already-exists' },
+    })
+  })
+
+  it('drops the reply when the frame is disposed with a dialog pending', async () => {
+    let resolveRequest: ((outcome: { ok: true; path: string; version: string }) => void) | null =
+      null
+    const context = await start({
+      onRequestNewFile: () =>
+        new Promise((resolve) => {
+          resolveRequest = resolve
+        }),
+    })
+    ready(context)
+    requestNewFile(context, 'new-8', { text: 'x' })
+    await context.handler.dispose('closed')
+    const resolve = resolveRequest as
+      ((outcome: { ok: true; path: string; version: string }) => void) | null
+    resolve?.({ ok: true, path: '/x.txt', version: 'm1' })
+    await Promise.resolve()
+    expect(
+      context.frame.posted.find(
+        (entry) => (entry.message as { type?: string }).type === 'shell/new-file-result',
+      ),
+    ).toBeUndefined()
+  })
+})

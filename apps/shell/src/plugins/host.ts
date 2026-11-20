@@ -9,6 +9,7 @@ import {
   type RegisteredCommand,
   type RegisteredContentView,
   type RegisteredEditor,
+  type RegisteredNewFile,
   type RegisteredPanel,
 } from './registration'
 import { EditorRegistry, type EditorCandidate } from './registry'
@@ -38,6 +39,7 @@ export interface PluginHostRecord {
   panels: RegisteredPanel[]
   contentViews: RegisteredContentView[]
   commands: RegisteredCommand[]
+  newFiles: RegisteredNewFile[]
   error?: {
     code: PluginHostErrorCode
     phase: PluginHostFailurePhase
@@ -91,11 +93,19 @@ export interface ViewLifecycle {
   ): void
 }
 
+export interface NewFileLifecycle {
+  closeFor(
+    identity: string,
+    reason: 'closed' | 'workspace-switch' | 'plugin-removed' | 'error',
+  ): void
+}
+
 export interface PluginHostOptions {
   fetchImpl?: typeof fetch
   transport?: FrameTransport
   handlerLifecycle?: HandlerLifecycle
   viewLifecycle?: ViewLifecycle
+  newFileLifecycle?: NewFileLifecycle
   consentStore?: ConsentStore
   consentStorage?: ConsentStorage | null
   digest?: Digest
@@ -155,6 +165,10 @@ function cloneManifest(manifest: PluginManifest): PluginManifest {
       ...(command.target === 'activeEditor' ? {} : { target: { ...command.target } }),
       menus: [...command.menus],
     })),
+    newFiles: manifest.newFiles.map((template) => ({
+      ...template,
+      bytes: new Uint8Array(template.bytes),
+    })),
     configuration: manifest.configuration
       ? {
           properties: Object.fromEntries(
@@ -183,6 +197,10 @@ function cloneRecord(record: PluginHostRecord): PluginHostRecord {
       ...(command.target === 'activeEditor' ? {} : { target: { ...command.target } }),
       menus: [...command.menus],
     })),
+    newFiles: record.newFiles.map((template) => ({
+      ...template,
+      bytes: new Uint8Array(template.bytes),
+    })),
     error: record.error ? { ...record.error } : undefined,
   }
 }
@@ -206,6 +224,7 @@ export class PluginHost {
   private readonly createSessionId: (() => string) | undefined
   private handlerLifecycleValue: HandlerLifecycle | undefined
   private viewLifecycleValue: ViewLifecycle | undefined
+  private newFileLifecycleValue: NewFileLifecycle | undefined
   private readonly setTimeoutImpl: typeof setTimeout | undefined
   private readonly clearTimeoutImpl: typeof clearTimeout | undefined
   private readonly fetchLimit: number
@@ -255,6 +274,7 @@ export class PluginHost {
     this.createSessionId = options.createSessionId
     this.handlerLifecycleValue = options.handlerLifecycle
     this.viewLifecycleValue = options.viewLifecycle
+    this.newFileLifecycleValue = options.newFileLifecycle
     this.setTimeoutImpl = options.setTimeoutImpl
     this.clearTimeoutImpl = options.clearTimeoutImpl
     this.fetchLimit = options.fetchConcurrency ?? 4
@@ -367,6 +387,7 @@ export class PluginHost {
     record.panels = []
     record.contentViews = []
     record.commands = []
+    record.newFiles = []
     record.error = undefined
     this.consentRequest = null
     this.log('consent', record, 'denied')
@@ -386,6 +407,7 @@ export class PluginHost {
     record.panels = []
     record.contentViews = []
     record.commands = []
+    record.newFiles = []
     record.error = undefined
     this.denied.delete(identity)
     if (this.consentRequest?.identity === identity) this.consentRequest = null
@@ -465,6 +487,7 @@ export class PluginHost {
             panels: [],
             contentViews: [],
             commands: [],
+            newFiles: [],
           })
           continue
         }
@@ -480,6 +503,7 @@ export class PluginHost {
         record.panels = []
         record.contentViews = []
         record.commands = []
+        record.newFiles = []
         record.error = undefined
         continue
       }
@@ -495,6 +519,7 @@ export class PluginHost {
           panels: [],
           contentViews: [],
           commands: [],
+          newFiles: [],
         }
         this.records.set(entry.manifest, record)
         this.enqueueManifest(record)
@@ -513,6 +538,7 @@ export class PluginHost {
         record.panels = []
         record.contentViews = []
         record.commands = []
+        record.newFiles = []
         record.error = undefined
         this.enqueueManifest(record)
       } else if (record.identity && record.phase === 'active') {
@@ -783,6 +809,7 @@ export class PluginHost {
       record.panels = outcome.panels
       record.contentViews = outcome.contentViews
       record.commands = outcome.commands
+      record.newFiles = outcome.newFiles
       record.error = undefined
       record.consent = 'granted'
       this.registry.add(
@@ -802,7 +829,7 @@ export class PluginHost {
         'register',
         record,
         'active',
-        `${outcome.editors.length} editor(s), ${outcome.panels.length} panel(s), ${outcome.contentViews.length} content view(s), ${outcome.commands.length} command(s)`,
+        `${outcome.editors.length} editor(s), ${outcome.panels.length} panel(s), ${outcome.contentViews.length} content view(s), ${outcome.commands.length} command(s), ${outcome.newFiles.length} new-file template(s)`,
       )
     } else {
       record.phase = 'failed'
@@ -810,6 +837,7 @@ export class PluginHost {
       record.panels = []
       record.contentViews = []
       record.commands = []
+      record.newFiles = []
       record.error = {
         code: outcome.code,
         phase: outcome.phase,
@@ -859,6 +887,7 @@ export class PluginHost {
     }
     this.handlerLifecycleValue?.closeFor(identity, 'plugin-removed')
     this.viewLifecycleValue?.closeFor(identity, 'plugin-removed')
+    this.newFileLifecycleValue?.closeFor(identity, 'plugin-removed')
     this.registry.remove(identity)
     this.commands.remove(identity)
     this.registrationQueue = this.registrationQueue.filter((entry) => entry !== record)
@@ -904,6 +933,10 @@ export class PluginHost {
 
   setViewLifecycle(lifecycle: ViewLifecycle | undefined): void {
     this.viewLifecycleValue = lifecycle
+  }
+
+  setNewFileLifecycle(lifecycle: NewFileLifecycle | undefined): void {
+    this.newFileLifecycleValue = lifecycle
   }
 
   logView(identity: string, phase: string, code?: string, message?: string): void {

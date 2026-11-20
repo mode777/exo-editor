@@ -110,6 +110,28 @@ does not define its format. Listing is one level at a time: list a returned
 directory with another call. Keep exact-path reads and the picker as the
 fallback on an older shell.
 
+To create a file from generated content, declare `workspace:write`:
+
+```ts
+if (editor.capabilities.createFile) {
+  const created = await editor.requestNewFile({
+    text: '# Report\n',
+    suggestedName: 'report.md',
+    directory: '/reports',
+  })
+  if (created) {
+    // created.path and created.version; the shell did not open a tab.
+  }
+}
+```
+
+`requestNewFile` accepts exactly one of `text` or `bytes` and resolves `null`
+when the user cancels. It preflights `capabilities.createFile`, the permission
+and the 8 MiB cap with `unsupported-message`, `permission-denied` and
+`too-large`; `already-exists` is the shell's create-only collision and the plugin
+may ask again. A view client has the same helper. Manifest templates are
+registered separately with `registration.registerNewFile(id)`.
+
 Rules the SDK enforces for you:
 
 - `shell/init` must echo the fragment's session and mode before any payload is
