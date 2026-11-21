@@ -29,9 +29,11 @@ Verification is always against the deployed URL, never a local dev server.
 
 Post-release updates are additive within protocol major `1`: the workspace file
 picker and directory listing (SDK `1.2.0`/`1.3.0`), plugin-local events
-(`1.4.0`), and plugin panels, content views and navigation intents
-(`1.5.0`, shell `0.3.0`). Panels mount lazily and content views open as
-read-only tabs; both are user-invoked and excluded from the consent fingerprint.
+(`1.4.0`), plugin panels, content views and navigation intents (`1.5.0`, shell
+`0.3.0`), plugin commands in shell-owned surfaces (`1.6.0`, shell `0.4.0`), and
+plugin new-file creation with manifest templates (`1.7.0`, shell `0.5.0`).
+Panels mount lazily and content views open as read-only tabs; both are
+user-invoked and excluded from the consent fingerprint.
 
 ## How it fits together
 
