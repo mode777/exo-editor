@@ -14,9 +14,10 @@ opt-in visible handler surface and its child-path deployment. A post-layer-9
 change (`plugin-initiated-save`, archived as
 `2026-11-16-plugin-initiated-save`) adds the id-less `plugin/request-save` intent
 and Ctrl/Cmd+S in the reference editor. The post-layer-10 change
-`plugin-file-picker` adds the user-mediated workspace picker, the
-`capabilities.filePicker` support bit and SDK `1.2.0`; its deployed verification
-is recorded in the change design. The post-layer-10 change
+`plugin-file-picker` (archived as `2026-11-21-plugin-file-picker`) adds the
+user-mediated workspace picker, the `capabilities.filePicker` support bit and
+SDK `1.2.0`; its deployed verification is recorded in the archived change
+design. The post-layer-10 change
 `plugin-workspace-listing` adds permissioned one-level directory listing, the
 `capabilities.directoryListing` support bit and SDK `1.3.0`; its deployed
 verification is also recorded in the change design. The post-layer-10 change
