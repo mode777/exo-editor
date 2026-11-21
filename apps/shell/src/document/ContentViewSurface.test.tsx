@@ -116,7 +116,7 @@ async function openContent(runtime: WorkspaceRuntime): Promise<ContentViewTabInf
 }
 
 describe('content view surface', () => {
-  it('renders shell chrome and attaches the frame to its placeholder', async () => {
+  it('renders the view body and attaches the frame to its placeholder', async () => {
     const transport = new FakeFrameTransport()
     const runtime = new WorkspaceRuntime({
       providerFactory: () => new MemoryWorkspaceProvider({ now: () => 1, initialFiles: {} }),
@@ -143,8 +143,7 @@ describe('content view surface', () => {
       ),
     )
 
-    expect(container.textContent).toContain('Tutorial')
-    expect(container.textContent).toContain('Other Plugin')
+    expect(container.querySelector('.exo-content-view-header')).toBeNull()
     const placeholder = container.querySelector('.exo-view-placeholder')
     expect(placeholder).not.toBeNull()
     expect(placeholder?.getAttribute('aria-label')).toBe('Tutorial — Other Plugin')

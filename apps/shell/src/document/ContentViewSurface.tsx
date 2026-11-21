@@ -1,12 +1,11 @@
 import { useCallback, useRef } from 'react'
-import { useWorkbenchStore } from 'vscode-workbench'
 import { usePluginHost, useViewPoolSnapshot, useWorkspaceRuntime } from '../workspace/context'
 import type { ContentViewTabInfo } from '../workbench/tabs'
 
 /**
- * The shell-owned chrome and placeholder for one content-view tab. The iframe
- * is positioned by the view pool over the placeholder; tabs, title, plugin name
- * and error/close controls stay outside it.
+ * The shell-owned body for one content-view tab. The iframe is positioned by
+ * the view pool over the placeholder; the tab strip carries the title, plugin
+ * name and close control, so the surface adds no second header.
  */
 export function ContentViewSurface({ content }: { content: ContentViewTabInfo }) {
   const runtime = useWorkspaceRuntime()
@@ -26,29 +25,9 @@ export function ContentViewSurface({ content }: { content: ContentViewTabInfo })
     [runtime],
   )
 
-  const close = () => {
-    useWorkbenchStore.getState().closeTab(content.key)
-  }
-
   const missing = !record || !view
   return (
     <div className="exo-view-surface exo-content-view">
-      <header className="exo-content-view-header">
-        <div>
-          <strong>{content.title}</strong>
-          <span className="exo-content-view-plugin">{content.pluginName}</span>
-        </div>
-        <div className="exo-document-actions">
-          {handle?.phase === 'failed' && (
-            <button type="button" onClick={() => runtime.views.retry(content.key)}>
-              Retry
-            </button>
-          )}
-          <button type="button" onClick={close}>
-            Close
-          </button>
-        </div>
-      </header>
       {missing ? (
         <div className="exo-view-missing" role="status">
           This content view is no longer available.
@@ -57,7 +36,10 @@ export function ContentViewSurface({ content }: { content: ContentViewTabInfo })
         <>
           {handle?.phase === 'failed' && (
             <div className="exo-view-error" role="alert">
-              {handle.error?.message ?? 'The content view could not start.'}
+              <span>{handle.error?.message ?? 'The content view could not start.'}</span>
+              <button type="button" onClick={() => runtime.views.retry(content.key)}>
+                Retry
+              </button>
             </div>
           )}
           <div

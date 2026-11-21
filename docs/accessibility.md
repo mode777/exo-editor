@@ -55,9 +55,9 @@ npm test --workspace @exo/shell -- --run \
   label, folder navigation, reserved-folder filtering and the collision state.
 - `src/workbench/SecondaryViewPicker.test.tsx` covers the secondary-view picker's
   list, initial focus, Arrow Up/Down movement, Escape close and an axe scan.
-- `src/document/ContentViewSurface.test.tsx` covers the content-view chrome,
-  plugin name, placeholder accessible name and an axe scan of the shell-owned
-  nodes.
+- `src/document/ContentViewSurface.test.tsx` covers the content-view body, the
+  absence of a second header or breadcrumb row, the placeholder accessible name
+  and an axe scan of the shell-owned nodes.
 - `src/document/DocumentArea.commands.test.tsx` covers the plugin action row:
   the matching plugin's commands only, an accessible name that includes the
   plugin, and an axe scan. `src/explorer/ExplorerView.commands.test.tsx` covers

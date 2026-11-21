@@ -972,6 +972,11 @@ The shell SHALL open a content view as a read-only tab in the document area, SHA
 - **WHEN** a content-view tab is active
 - **THEN** Save is not offered, the tab has no dirty indicator and the close guard does not treat it as a document
 
+#### Scenario: No second header row
+
+- **WHEN** a content-view tab is active
+- **THEN** the document area shows neither a breadcrumb row nor a content-view header, and the tab strip carries the title, plugin name and close control
+
 #### Scenario: Content tabs are not files
 
 - **WHEN** the shell computes the active document path or the quick-open file list

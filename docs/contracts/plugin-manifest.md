@@ -302,8 +302,9 @@ entry, on the manifest origin, with no query, fragment or `..` segment.
   item and a left-side-bar view. A `secondary` panel adds a right-side-bar view
   reached through the shell's "Select View" picker and palette entries.
 - A **content view** opens as a read-only tab in the document area. It has no
-  file path, dirty state, Save action or close prompt. One frame belongs to one
-  open tab instance.
+  file path, dirty state, Save action, close prompt or separate header row; the
+  tab carries the view title, plugin name and close control. One frame belongs
+  to one open tab instance.
 - Up to 8 panels and 16 content views may be declared. The controller registers
   a subset by id; an undeclared id is rejected with `not-declared`, a duplicate
   collapses into one entry, and an id becomes active only after

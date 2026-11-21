@@ -1233,24 +1233,9 @@
   background: var(--vscode-editor-background);
 }
 
-.exo-content-view-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 6px 10px;
-  border-bottom: 1px solid var(--vscode-widget-border);
-  color: var(--vscode-foreground);
-  font-size: 12px;
-}
-
-.exo-content-view-header .exo-document-actions {
-  margin-top: 0;
-}
-
-.exo-content-view-plugin {
-  margin-left: 8px;
-  color: var(--vscode-descriptionForeground);
+/* The tab strip names the view and the plugin; a content view adds no header row. */
+.editor-area:has(.exo-content-view) .editor-breadcrumbs {
+  display: none;
 }
 
 .exo-view-error {
