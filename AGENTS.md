@@ -43,9 +43,10 @@ The post-layer-10 change `plugin-file-creation` (archived as
 Save As dialog, `plugin/request-new-file` / `shell/new-file-result`, the
 create-only `WriteOptions.createOnly` path and SDK `1.7.0`; its deployed
 verification is recorded in the archived change design and `ROADMAP.md`.
-The post-layer-10 change `plugin-theming` adds the optional
-`@exo/plugin-sdk/theme` helper, `@exo/plugin-sdk/theme.css` and SDK `1.8.0`, plus
-the styling contract, author-guide page and skill step; shell `0.7.0`.
+The post-layer-10 change `plugin-theming` (archived as
+`2026-11-22-plugin-theming`) adds the optional `@exo/plugin-sdk/theme` helper,
+`@exo/plugin-sdk/theme.css` and SDK `1.8.0`, plus the styling contract,
+author-guide page and skill step; shell `0.7.0`.
 The parallel Stratofold provider track
 (P1-P3) is archived and verified; it does not gate the numbered layers. The
 contracts are ratified, and the shell app (`apps/shell`) builds, tests and

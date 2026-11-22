@@ -897,7 +897,14 @@ high-contrast, SDK `1.8.0` and shell `0.7.0`. It also adds the styling contract,
 the author-guide styling page and a styling step in the `create-exo-plugin`
 skill, and moves the reference code plugin to the SDK tokens and helper. No
 protocol message, manifest field, permission or consent fingerprint input
-changes. Verification and archive follow the deploy.
+changes. Verified against deployed commit `056e946` on 2026-11-22 with
+`chrome-headless-shell` 131: the code-plugin frame started at `data-theme=dark`
+with `--exo-bg: #1f1f1f` and Monaco `vs-dark`, and toggling the theme changed it
+to `data-theme=light`, `--exo-bg: #fff`, a white body background and Monaco `vs`
+without reopening the file; the page recorded zero errors and the guide,
+contract and raw skill URLs returned 200. The CI `verify` job and Pages deploy
+passed; the bundle measured 174,159/176,000 js and 13,785/14,000 css gzip bytes.
+The change is archived as `2026-11-22-plugin-theming`.
 
 ---
 

@@ -167,7 +167,19 @@ the option.
 
 ## Deployed verification
 
-Recorded after the change is deployed: the reference code plugin follows the
-initial theme and a live toggle, the token sheet resolves in both themes, and the
-guide/skill links resolve from the deployed repository. Until then, the deployed
-verification task stays open.
+Verified on 2026-11-22 against deployed commit `056e946` (asset
+`index-B-xycg0O.js`) at `https://mode777.github.io/exo-editor/` with
+`chrome-headless-shell` 131.0.6778.264 at 1280x800. The workspace was seeded in
+OPFS and declared the deployed code-plugin manifest.
+
+- The initial code-plugin frame carried `data-theme="dark"`,
+  `color-scheme: dark`, `--exo-bg: #1f1f1f`, `--exo-fg: #ccc`, a
+  `rgb(31, 31, 31)` body background and Monaco `vs-dark`.
+- Running **Toggle Theme** changed the frame to `data-theme="light"`,
+  `color-scheme: light`, `--exo-bg: #fff`, `--exo-fg: #3b3b3b`, a
+  `rgb(255, 255, 255)` body background and Monaco `vs`, without reopening the
+  file.
+- The page recorded zero page errors. The styling guide, styling contract and
+  raw skill URLs returned HTTP 200 from the deployed commit.
+- High contrast is covered by the helper/CSS unit tests and the token contrast
+  test; the current settings surface only exposes dark and light.

@@ -36,7 +36,7 @@
 
 - [x] 6.1 Run the full local gate from `AGENTS.md`: lint, format check, typecheck, unit tests, shell build, budget, CSP, custom elements, no-SDK, no-Monaco, template build/copy, code build/copy and secret check.
 - [x] 6.2 Run `openspec validate --all` and `openspec validate plugin-theming --strict` plus the repository guide, changelog and composition quality tests; verify the new spec and both deltas validate.
-- [ ] 6.3 Deploy the change and verify on the deployed URL that the reference code plugin follows the initial light/dark theme and a live toggle, and that the styling guide and skill links resolve; record the deployed commit and date in the design.
+- [x] 6.3 Deploy the change and verify on the deployed URL that the reference code plugin follows the initial light/dark theme and a live toggle, and that the styling guide and skill links resolve; record the deployed commit and date in the design.
 
 ## Workflow follow-up
 
