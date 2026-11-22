@@ -228,6 +228,27 @@ subscriptions, events, results, errors }` into `#observation` and the title.
   `openedBy` fields in `#observation` distinguish a panel open, a shell palette
   open and a cross-plugin open.
 
+`fixture-tutorial` declares `companionPanel: "fixture-inspector"`. Opening the
+content view from the shell palette or from `view-primary.html` reveals the
+secondary **Fixture Inspector** panel. Opening the view again focuses the same
+instance and reveals the panel again. Opening it twice from the shell palette
+creates two instances; closing one keeps the inspector until the last tab
+closes. A manual hide of the inspector stays hidden until the content view is
+opened or focused again, and selecting another secondary panel does not make a
+later content-view close dismiss that panel.
+
+Manual companion checks:
+
+1. Open **Fixture Tutorial** from the shell palette. The right side bar shows
+   **Fixture Inspector** and the content tab renders.
+2. Hide the inspector with its close control. It stays hidden while the content
+   tab remains active; re-open or refocus the content view and it returns.
+3. Open **Fixture Tutorial** twice from the palette, then close one tab. The
+   inspector remains visible while the other tab is open; close the second tab
+   and it hides.
+4. Select another secondary view, then close the content tab. The other panel
+   stays visible and the right side bar does not close.
+
 The other fixture manifest declares `other-tutorial` and uses
 `other-plugin.html` as its controller, so the cross-plugin open has a real target
 identity. A same-origin copy runs with `allow-scripts` only; `storage` in the

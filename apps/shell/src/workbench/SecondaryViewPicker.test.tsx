@@ -75,6 +75,16 @@ describe('secondary view picker', () => {
     expect(onChoose).toHaveBeenCalledWith('inspector')
   })
 
+  it('selects a companion panel through the ordinary callback', async () => {
+    const id = 'plugin:https%3A%2F%2Fplugins.example.com%3A%3Acom.example.viewer:asset-params'
+    const { onChoose } = await render({
+      views: [{ id, title: 'Parameters', pluginName: 'Viewer' }],
+    })
+    const option = container?.querySelector<HTMLButtonElement>('.exo-view-choice')
+    option?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(onChoose).toHaveBeenCalledWith(id)
+  })
+
   it('has no Exo-owned axe violations', async () => {
     await render()
     const results = await runAxe(container as Element)

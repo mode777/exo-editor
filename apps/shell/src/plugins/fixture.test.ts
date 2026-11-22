@@ -38,6 +38,8 @@ describe('deployed plugin fixture', () => {
       'fixture-tutorial',
       'fixture-generator',
     ])
+    expect(result.manifest.contentViews[0]?.companionPanel).toBe('fixture-inspector')
+    expect(result.manifest.contentViews[1]?.companionPanel).toBeUndefined()
     expect(result.manifest.newFiles.map((template) => template.id)).toEqual([
       'fixture.text',
       'fixture.binary',

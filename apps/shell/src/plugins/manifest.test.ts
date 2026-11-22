@@ -609,7 +609,14 @@ describe('manifest validation', () => {
           },
           { id: 'inspector', title: 'Inspector', location: 'secondary', entry: 'other.html' },
         ],
-        contentViews: [{ id: 'tutorial', title: 'Tutorial', entry: 'views/tutorial.html' }],
+        contentViews: [
+          {
+            id: 'tutorial',
+            title: 'Tutorial',
+            entry: 'views/tutorial.html',
+            companionPanel: 'inspector',
+          },
+        ],
       },
     })
     expect(result.ok).toBe(true)
@@ -637,6 +644,7 @@ describe('manifest validation', () => {
         title: 'Tutorial',
         entry: 'views/tutorial.html',
         entryUrl: 'https://plugins.example.com/monaco/views/tutorial.html',
+        companionPanel: 'inspector',
       },
     ])
   })
@@ -721,6 +729,135 @@ describe('manifest validation', () => {
     expect(errorOf(validate({ contributes: { contentViews: views } })).field).toBe(
       '/contributes/contentViews',
     )
+  })
+
+  it('validates content-view companion panels', () => {
+    const panels = [
+      { id: 'asset-params', title: 'Parameters', location: 'secondary', entry: 'params.html' },
+      { id: 'outline', title: 'Outline', location: 'primary', entry: 'outline.html' },
+    ]
+    const shared = validate({
+      contributes: {
+        panels,
+        contentViews: [
+          {
+            id: 'asset-preview',
+            title: 'Asset Preview',
+            entry: 'preview.html',
+            companionPanel: 'asset-params',
+          },
+          {
+            id: 'asset-inspector',
+            title: 'Asset Inspector',
+            entry: 'inspector.html',
+            companionPanel: 'asset-params',
+          },
+        ],
+      },
+    })
+    expect(shared.ok).toBe(true)
+    if (shared.ok) {
+      expect(shared.manifest.contentViews.map((view) => view.companionPanel)).toEqual([
+        'asset-params',
+        'asset-params',
+      ])
+    }
+
+    const withoutCompanion = validate({
+      contributes: {
+        panels,
+        contentViews: [{ id: 'plain', title: 'Plain', entry: 'plain.html' }],
+      },
+    })
+    expect(withoutCompanion.ok).toBe(true)
+    if (withoutCompanion.ok) {
+      expect(withoutCompanion.manifest.contentViews[0]?.companionPanel).toBeUndefined()
+    }
+
+    const cases: Array<[Record<string, unknown>, string, string | undefined]> = [
+      [
+        {
+          id: 'asset-preview',
+          title: 'Asset Preview',
+          entry: 'preview.html',
+          companionPanel: 'missing',
+        },
+        '/contributes/contentViews/0/companionPanel',
+        'A companionPanel must name a panel declared in the same manifest.',
+      ],
+      [
+        {
+          id: 'asset-preview',
+          title: 'Asset Preview',
+          entry: 'preview.html',
+          companionPanel: 'outline',
+        },
+        '/contributes/contentViews/0/companionPanel',
+        'A companionPanel must name a secondary panel.',
+      ],
+      [
+        {
+          id: 'asset-preview',
+          title: 'Asset Preview',
+          entry: 'preview.html',
+          companionPanel: 'Asset-Params',
+        },
+        '/contributes/contentViews/0/companionPanel',
+        undefined,
+      ],
+      [
+        {
+          id: 'asset-preview',
+          title: 'Asset Preview',
+          entry: 'preview.html',
+          companionPanel: 42,
+        },
+        '/contributes/contentViews/0/companionPanel',
+        undefined,
+      ],
+    ]
+    for (const [view, field, message] of cases) {
+      expect(errorOf(validate({ contributes: { panels, contentViews: [view] } }))).toMatchObject({
+        code: 'invalid-manifest',
+        field,
+        ...(message === undefined ? {} : { message }),
+      })
+    }
+  })
+
+  it('accepts the author-guide companion example', () => {
+    const result = validate({
+      contributes: {
+        panels: [
+          {
+            id: 'outline',
+            title: 'Outline',
+            icon: 'list-tree',
+            location: 'primary',
+            entry: 'views/outline.html',
+          },
+          {
+            id: 'asset-params',
+            title: 'Parameters',
+            icon: 'settings',
+            location: 'secondary',
+            entry: 'views/parameters.html',
+          },
+        ],
+        contentViews: [
+          {
+            id: 'tutorial',
+            title: 'Tutorial',
+            entry: 'views/tutorial.html',
+            companionPanel: 'asset-params',
+          },
+        ],
+      },
+    })
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.manifest.contentViews[0]?.companionPanel).toBe('asset-params')
+    }
   })
 
   it('uses a supported final manifest URL', () => {
@@ -1150,6 +1287,7 @@ interface SchemaDefs {
       id: { $ref: string }
       title: { minLength: number; maxLength: number }
       entry: { $ref: string }
+      companionPanel: { $ref: string }
     }
   }
   contributionId: { minLength: number; maxLength: number; pattern: string }
@@ -1249,6 +1387,7 @@ describe('manifest schema parity', () => {
     expect(defs.panel.properties.icon.pattern).toBe('^[a-z0-9-]+$')
     expect(defs.contentView.required).toEqual(['id', 'title', 'entry'])
     expect(defs.contentView.properties.id.$ref).toBe('#/$defs/contributionId')
+    expect(defs.contentView.properties.companionPanel.$ref).toBe('#/$defs/contributionId')
     expect(defs.contributionId.pattern).toBe(MANIFEST_CONTRIBUTION_ID_PATTERN)
     expect(defs.configuration.additionalProperties).toBe(false)
     expect(defs.configuration.required).toEqual(['properties'])

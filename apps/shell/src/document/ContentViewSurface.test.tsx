@@ -9,12 +9,13 @@ import { MemoryHandleStore } from '../workspace/providers/folder/handle-store'
 import { FakeFrameTransport } from '../plugins/frame-test-support'
 import type { PluginHost, PluginHostRecord } from '../plugins/host'
 import { validateManifest, type PluginManifest } from '../plugins/manifest'
-import type { RegisteredContentView } from '../plugins/registration'
+import type { RegisteredContentView, RegisteredPanel } from '../plugins/registration'
 import {
   clearWorkspaceTabs,
   configurePresetStore,
   type ContentViewTabInfo,
 } from '../workbench/tabs'
+import { pluginViewId } from '../workbench/plugin-views'
 import { DocumentArea } from './DocumentArea'
 import { describeAxeViolations, runAxe } from '../test-a11y'
 
@@ -23,7 +24,7 @@ const IDENTITY = `${ORIGIN}::com.example.other`
 
 configurePresetStore()
 
-function manifest(): PluginManifest {
+function manifest(companionPanel?: string): PluginManifest {
   const result = validateManifest(
     {
       schemaVersion: 1,
@@ -36,7 +37,26 @@ function manifest(): PluginManifest {
       permissions: ['workspace:read'],
       contributes: {
         fileEditors: [],
-        contentViews: [{ id: 'tutorial', title: 'Tutorial', entry: 'views/tutorial.html' }],
+        ...(companionPanel === undefined
+          ? {}
+          : {
+              panels: [
+                {
+                  id: companionPanel,
+                  title: 'Inspector',
+                  location: 'secondary',
+                  entry: 'views/inspector.html',
+                },
+              ],
+            }),
+        contentViews: [
+          {
+            id: 'tutorial',
+            title: 'Tutorial',
+            entry: 'views/tutorial.html',
+            ...(companionPanel === undefined ? {} : { companionPanel }),
+          },
+        ],
       },
     },
     `${ORIGIN}/other/exo-manifest.json`,
@@ -46,8 +66,8 @@ function manifest(): PluginManifest {
   return result.manifest
 }
 
-function record(): PluginHostRecord {
-  const value = manifest()
+function record(companionPanel?: string): PluginHostRecord {
+  const value = manifest(companionPanel)
   return {
     manifestUrl: value.manifestUrl,
     entryIndex: 0,
@@ -58,7 +78,10 @@ function record(): PluginHostRecord {
     fingerprint: 'v1:test',
     consent: 'granted',
     registrations: [],
-    panels: [],
+    panels: value.panels.map<RegisteredPanel>((panel, order) => ({
+      ...panel,
+      registrationOrder: order,
+    })),
     contentViews: value.contentViews.map<RegisteredContentView>((view, order) => ({
       ...view,
       registrationOrder: order,
@@ -151,6 +174,43 @@ describe('content view surface', () => {
     expect(info.key).toBe(tab.id)
     const results = await runAxe(container)
     expect(describeAxeViolations(results)).toEqual([])
+    runtime.dispose()
+  })
+
+  it('reveals the companion when the content tab becomes active', async () => {
+    const transport = new FakeFrameTransport()
+    const runtime = new WorkspaceRuntime({
+      providerFactory: () => new MemoryWorkspaceProvider({ now: () => 1, initialFiles: {} }),
+      supportsFolder: () => true,
+      handleStore: new MemoryHandleStore(),
+      eventTarget: new EventTarget(),
+      now: () => 1,
+      pluginHost: host(record('inspector')),
+      viewTransport: transport,
+    })
+    await runtime.openFolder()
+    useWorkbenchStore.setState({ secondarySideBarVisible: false, activeSecondaryView: 'chat' })
+    await openContent(runtime)
+    const companion = pluginViewId(IDENTITY, 'inspector')
+    useWorkbenchStore.getState().toggleSecondarySideBar(companion)
+    expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(false)
+
+    const tab = useWorkbenchStore.getState().tabs[0]
+    if (!tab) throw new Error('No tab')
+    container = document.createElement('div')
+    document.body.appendChild(container)
+    root = createRoot(container)
+    await act(async () =>
+      root?.render(
+        <WorkspaceRuntimeProvider runtime={runtime}>
+          <DocumentArea tab={tab} />
+        </WorkspaceRuntimeProvider>,
+      ),
+    )
+
+    expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(true)
+    expect(useWorkbenchStore.getState().activeSecondaryView).toBe(companion)
+    expect(transport.frames).toHaveLength(1)
     runtime.dispose()
   })
 

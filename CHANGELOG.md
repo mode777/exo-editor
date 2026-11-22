@@ -3,6 +3,43 @@
 All notable changes to Exo Editor are recorded here. The version axes and the
 release process are in [`docs/releases.md`](./docs/releases.md).
 
+## [0.6.0] - 2026-11-22
+
+Additive post-release update: declarative content-view companion panels.
+
+### Added
+
+- Optional `contributes.contentViews[].companionPanel` naming a panel declared
+  in the same manifest with `location: "secondary"`. An unknown id, a primary
+  panel or an invalid id fails manifest validation, and the association is
+  preserved on the registered content view and host snapshot.
+- Shell-owned reveal and hide behavior: opening or focusing a content view shows
+  its companion in the secondary side bar; closing the last open instance that
+  shares it hides the panel. A manually hidden panel stays hidden until the next
+  open or focus, a user-selected other secondary view is left alone, and an
+  unregistered companion is skipped without blocking the content view.
+- Companion visibility is derived from the open view records in every teardown
+  path (`closeContent`, `closeFor`, `disposeAll`, plugin removal and workspace
+  switch); there is no refcount, heartbeat, polling or new plugin lifecycle
+  event. `plugin/request-panel` keeps its existing semantics.
+- Shell `0.6.0`. No new permission, consent fingerprint input, protocol message,
+  SDK API or manifest schema version is added.
+
+### Compatibility
+
+- Shell: `0.6.0`
+- Protocol: `1`
+- Manifest schema: `1`
+- SDK: `1.7.0`
+
+### Breaking
+
+- None. The field is optional within manifest schema `1`, the protocol and SDK
+  are unchanged, and existing plugins behave as before. A plugin that adopts
+  `companionPanel` must declare an `engines.exo` range that includes `0.6.0`;
+  an older shell rejects the unknown field and reports `incompatible-engine`
+  before mounting a partial surface.
+
 ## [0.5.0] - 2026-11-20
 
 Additive post-release update: plugin new-file creation and manifest templates.

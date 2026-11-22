@@ -171,7 +171,12 @@ settings view fails with `conflict` rather than overwriting an external edit.
       }
     ],
     "contentViews": [
-      { "id": "tutorial", "title": "Tutorial", "entry": "views/tutorial.html" }
+      {
+        "id": "tutorial",
+        "title": "Tutorial",
+        "entry": "views/tutorial.html",
+        "companionPanel": "inspector"
+      }
     ]
   }
 }
@@ -196,7 +201,7 @@ settings view fails with `conflict` rather than overwriting an external edit.
 | `permissions` | array | yes | Subset of `workspace:read`, `workspace:write`, `workspace:list`, `events:subscribe`. No duplicates. `workspace:write` and `workspace:list` require `workspace:read`. A `contributes.fileEditors` entry requires `workspace:read` or `workspace:write`; registrations from a plugin without either are rejected with `permission-denied`. `workspace:list` additionally allows one directory level per `plugin/request-list` and re-prompts an already-approved reader when added. |
 | `contributes.fileEditors` | array | no | Maximum 20. Each entry: `glob` (required), `entry` (required, relative HTML URL for the per-document iframe, inside the plugin root), `label` (required, 1-40 chars), `priority` (integer -100..100, default 0), `rendering` (`"hidden"` or `"frame"`, default `"hidden"`). Every editor entry uses the entry-resolution rules in section 4 and requires `workspace:read` or `workspace:write`. |
 | `contributes.panels` | array | no | Maximum 8 across both locations. Each entry: `id` (required, `^[a-z0-9][a-z0-9.-]{0,63}$`, unique among panels), `title` (required, 1-80 chars), `icon` (optional Codicon name, 1-40 chars, `^[a-z0-9-]+$`), `location` (`"primary"` or `"secondary"`), and `entry` (required, relative HTML page inside the plugin root). See section 3.2. |
-| `contributes.contentViews` | array | no | Maximum 16. Each entry: `id` (required, same id rule and unique among content views), `title` (required, 1-80 chars), and `entry` (required, relative HTML page inside the plugin root). A content view opens as a read-only tab. See section 3.2. |
+| `contributes.contentViews` | array | no | Maximum 16. Each entry: `id` (required, same id rule and unique among content views), `title` (required, 1-80 chars), `entry` (required, relative HTML page inside the plugin root) and optional `companionPanel` (same id rule, naming a `secondary` panel declared in the same manifest). A content view opens as a read-only tab and may reveal its companion. See section 3.2. |
 | `contributes.commands` | array | no | Maximum 32. Each entry: `id` (required, same id rule and unique among commands), `title` (required, 1-40 chars), optional `category` (1-40 chars), a `target` (`"activeEditor"`, `{ "kind": "panel", "id" }` or `{ "kind": "contentView", "id" }`), and optional `menus` (subset of `commandPalette`, `explorer/context`, `editor/title`; default `["commandPalette"]`). See section 3.3. |
 | `contributes.newFiles` | array | no | Maximum 20. Each entry: `id` (required, same id rule and unique among templates), `label` (required, 1-40 chars), `fileName` (required, one path segment, 1-128 chars, not `exo.json` or `.exo`), optional `encoding` (`utf8` or `base64`, default `utf8`), and `content` (required, at most 64 KiB after decoding; at most 128 KiB total decoded content). See section 3.4. |
 | `contributes.configuration` | object | no | Optional workspace settings declaration. `configuration.properties` is an object of at most 50 named settings, each with `type` (`boolean`, `string` or `number`), a required matching `default`, an optional `enum`, an optional `description`, and an optional `scope` that must be `workspace`. See section 3.1. |
@@ -289,10 +294,22 @@ entry, on the manifest origin, with no query, fragment or `..` segment.
         "icon": "list-tree",
         "location": "primary",
         "entry": "views/outline.html"
+      },
+      {
+        "id": "asset-params",
+        "title": "Parameters",
+        "icon": "settings",
+        "location": "secondary",
+        "entry": "views/parameters.html"
       }
     ],
     "contentViews": [
-      { "id": "tutorial", "title": "Tutorial", "entry": "views/tutorial.html" }
+      {
+        "id": "tutorial",
+        "title": "Tutorial",
+        "entry": "views/tutorial.html",
+        "companionPanel": "asset-params"
+      }
     ]
   }
 }
@@ -305,6 +322,15 @@ entry, on the manifest origin, with no query, fragment or `..` segment.
   file path, dirty state, Save action, close prompt or separate header row; the
   tab carries the view title, plugin name and close control. One frame belongs
   to one open tab instance.
+- A content view MAY declare one `companionPanel`. It MUST name a panel declared
+  in the same manifest with `location: "secondary"`; an unknown id, a primary
+  panel or an invalid id fails validation. The shell reveals that panel when the
+  content view opens or is focused, keeps it open while any content view with the
+  same companion remains open, and hides it after the last such view closes.
+  Multiple content views may share one companion. A manually hidden panel stays
+  hidden until the next content-view open or focus, and a manual picker choice is
+  ordinary panel behavior. No new message, permission or lifecycle event is
+  involved; `plugin/request-panel` is unchanged.
 - Up to 8 panels and 16 content views may be declared. The controller registers
   a subset by id; an undeclared id is rejected with `not-declared`, a duplicate
   collapses into one entry, and an id becomes active only after
@@ -328,9 +354,10 @@ surfaces inside the already-approved root. They grant no autonomous data access
 and are **excluded from the consent fingerprint**; the first-grant dialog lists
 them and a later addition does not re-prompt. A manifest that adds panels or
 content views should declare `engines.exo` at or above the shell that supports
-them (0.3.0), one that adds commands at or above 0.4.0, and one that adds
-new-file templates at or above 0.5.0, so an older shell reports
-`incompatible-engine` rather than rejecting the unknown contribution.
+them (0.3.0), one that adds commands at or above 0.4.0, one that adds
+new-file templates at or above 0.5.0, and one that adds `companionPanel` at or
+above 0.6.0, so an older shell reports `incompatible-engine` rather than
+rejecting the unknown contribution.
 
 ### 3.3 Commands
 

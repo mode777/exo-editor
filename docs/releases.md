@@ -10,7 +10,7 @@ replace the contracts; the normative version rules are in
 
 | Axis | Current | Where it lives | Meaning |
 | --- | --- | --- | --- |
-| Shell SemVer | `0.5.0` | `apps/shell/package.json`, `SHELL_VERSION`, advertised in `shell/init` | The deployed shell release; independent of the protocol major |
+| Shell SemVer | `0.6.0` | `apps/shell/package.json`, `SHELL_VERSION`, advertised in `shell/init` | The deployed shell release; independent of the protocol major |
 | Protocol major | `1` | Envelope `exo: 1`, `PROTOCOL_VERSION`, handshake | The wire compatibility axis; the shell accepts exactly one major per release |
 | Manifest schema | `1` | `manifest.schemaVersion` / `exo.json` `schemaVersion` | The manifest shape; a new version needs a validator and a consent re-prompt |
 | SDK SemVer | `1.7.0` | `packages/plugin-sdk/package.json` | The client package; its MAJOR equals the protocol major it speaks |
@@ -24,11 +24,12 @@ SDK version answers "which client API is this".
 ## Current release
 
 The first public release is shell `0.1.0`, protocol `1`, manifest schema `1`,
-SDK `1.1.0`, dated 2026-11-16. The current shell is `0.5.0`, protocol `1`,
-manifest schema `1` and SDK `1.7.0`, dated 2026-11-20; `0.5.0` adds plugin
-new-file creation and manifest templates. Shell `0.2.0` added plugin-local
-events, `0.3.0` added panels and content views, and `0.4.0` added plugin
-commands. The current SDK minor is `1.7.0`; `1.2.0` added the file-picker
+SDK `1.1.0`, dated 2026-11-16. The current shell is `0.6.0`, protocol `1`,
+manifest schema `1` and SDK `1.7.0`, dated 2026-11-22; `0.6.0` adds declarative
+content-view companion panels. Shell `0.5.0` added plugin new-file creation and
+manifest templates, `0.4.0` added plugin commands, and `0.2.0` added plugin-local
+events; `0.3.0` added panels and content views. The current SDK minor is `1.7.0`;
+`1.2.0` added the file-picker
 helper, `1.3.0` added directory listing, `1.4.0` added local events, `1.5.0`
 added the view client and navigation helpers, `1.6.0` added command
 registration and `1.7.0` added new-file creation and templates, all without

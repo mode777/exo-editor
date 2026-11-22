@@ -42,7 +42,8 @@
       {
         "id": "fixture-tutorial",
         "title": "Fixture Tutorial",
-        "entry": "view-content.html"
+        "entry": "view-content.html",
+        "companionPanel": "fixture-inspector"
       },
       {
         "id": "fixture-generator",

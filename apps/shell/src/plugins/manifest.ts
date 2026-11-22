@@ -153,6 +153,8 @@ export interface ManifestContentView {
   entry: string
   /** Resolved absolute page URL. */
   entryUrl: string
+  /** Secondary panel declared in the same manifest and revealed with this view. */
+  companionPanel?: string
 }
 
 export interface ManifestSetting {
@@ -576,6 +578,7 @@ function parseContentViews(
   manifestUrl: string,
   manifestOrigin: string,
   pluginRoot: string,
+  panels: ManifestPanel[],
 ): ManifestContentView[] | ManifestIssue {
   if (!Array.isArray(value) || value.length > MANIFEST_MAX_CONTENT_VIEWS) {
     return issue('invalid-manifest', { field: '/contributes/contentViews' })
@@ -586,7 +589,7 @@ function parseContentViews(
     const raw = value[index]
     const base = pointer('contributes', 'contentViews', index)
     if (!isPlainObject(raw)) return issue('invalid-manifest', { field: base })
-    const unknown = unknownKeys(raw, ['id', 'title', 'entry'], base)
+    const unknown = unknownKeys(raw, ['id', 'title', 'entry', 'companionPanel'], base)
     if (unknown) return unknown
     if (typeof raw.id !== 'string' || !CONTRIBUTION_ID.test(raw.id)) {
       return issue('invalid-manifest', { field: `${base}/id` })
@@ -600,6 +603,26 @@ function parseContentViews(
     ids.add(raw.id)
     if (!isStringInRange(raw.title, 1, MANIFEST_MAX_VIEW_TITLE)) {
       return issue('invalid-manifest', { field: `${base}/title` })
+    }
+    let companionPanel: string | undefined
+    if (hasOwn(raw, 'companionPanel')) {
+      if (typeof raw.companionPanel !== 'string' || !CONTRIBUTION_ID.test(raw.companionPanel)) {
+        return issue('invalid-manifest', { field: `${base}/companionPanel` })
+      }
+      const panel = panels.find((entry) => entry.id === raw.companionPanel)
+      if (!panel) {
+        return issue('invalid-manifest', {
+          field: `${base}/companionPanel`,
+          message: 'A companionPanel must name a panel declared in the same manifest.',
+        })
+      }
+      if (panel.location !== 'secondary') {
+        return issue('invalid-manifest', {
+          field: `${base}/companionPanel`,
+          message: 'A companionPanel must name a secondary panel.',
+        })
+      }
+      companionPanel = panel.id
     }
     if (!hasOwn(raw, 'entry')) {
       return issue('invalid-manifest', { field: `${base}/entry` })
@@ -616,6 +639,7 @@ function parseContentViews(
       title: raw.title,
       entry: raw.entry as string,
       entryUrl: entry.url,
+      ...(companionPanel === undefined ? {} : { companionPanel }),
     })
   }
   return views
@@ -1080,6 +1104,7 @@ export function validateManifest(
         manifestUrl.href,
         manifestUrl.origin,
         controller.pluginRoot,
+        panels,
       )
       if (!Array.isArray(parsed)) return { ok: false, error: parsed }
       contentViews = parsed

@@ -19,7 +19,7 @@ import { isReservedPath, normalizePath } from './paths'
 import { PluginConfigStore } from '../plugins/store'
 import { PluginHost } from '../plugins/host'
 import { HandlerPool } from '../plugins/handlers'
-import { ViewPool } from '../plugins/view-pool'
+import { ViewPool, type CompanionPanelChange } from '../plugins/view-pool'
 import type {
   IntentOutcome,
   IntentSource,
@@ -228,6 +228,7 @@ export class WorkspaceRuntime {
         onOpenFile: (request, source) => this.openFileIntent(request, source),
         onOpenView: (request, source) => this.openViewIntent(request, source),
         onRequestPanel: (request, source) => this.requestPanelIntent(request, source),
+        onCompanionPanel: (change) => this.applyCompanionChange(change),
       })
     this.pluginSettings = new PluginSettingsStore({
       storage: options.pluginSettingsStorage,
@@ -524,6 +525,29 @@ export class WorkspaceRuntime {
     else store.showSecondaryView(viewId)
   }
 
+  /**
+   * Apply a content-view companion change through the ordinary secondary-panel
+   * path. A show is skipped unless the panel is registered and secondary; a
+   * hide only closes the region when the companion is the active, visible view,
+   * so a manual hide or another selected panel is respected.
+   */
+  private applyCompanionChange(change: CompanionPanelChange): void {
+    const panelViewId = pluginViewId(change.identity, change.panelId)
+    if (change.action === 'show') {
+      const record = this.pluginHost
+        .getSnapshot()
+        .records.find((entry) => entry.identity === change.identity && entry.phase === 'active')
+      const panel = record?.panels.find((entry) => entry.id === change.panelId)
+      if (!panel || panel.location !== 'secondary') return
+      this.showPanel(panelViewId, 'secondary')
+      return
+    }
+    const store = useWorkbenchStore.getState()
+    if (store.secondarySideBarVisible && store.activeSecondaryView === panelViewId) {
+      store.toggleSecondarySideBar(panelViewId)
+    }
+  }
+
   /** Open a content view from the shell palette or a "Show View" entry. */
   openContentView(identity: string, viewId: string): void {
     this.contentInstance += 1
@@ -540,7 +564,12 @@ export class WorkspaceRuntime {
     const plugin = viewPluginInfo(record)
     const opened = this.views.openContent({
       plugin,
-      view: { id: view.id, title: view.title, entryUrl: view.entryUrl },
+      view: {
+        id: view.id,
+        title: view.title,
+        entryUrl: view.entryUrl,
+        ...(view.companionPanel === undefined ? {} : { companionPanel: view.companionPanel }),
+      },
       instanceKey,
     })
     if (!opened.ok) return false
@@ -638,7 +667,12 @@ export class WorkspaceRuntime {
     const instanceKey = request.instanceKey ?? `auto-${this.contentInstance}`
     const opened = this.views.openContent({
       plugin,
-      view: { id: view.id, title: view.title, entryUrl: view.entryUrl },
+      view: {
+        id: view.id,
+        title: view.title,
+        entryUrl: view.entryUrl,
+        ...(view.companionPanel === undefined ? {} : { companionPanel: view.companionPanel }),
+      },
       instanceKey,
       ...(request.payload === undefined ? {} : { payload: request.payload }),
       openedBy: {

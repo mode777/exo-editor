@@ -350,8 +350,21 @@ describe('plugin host', () => {
                 location: 'primary',
                 entry: 'views/outline.html',
               },
+              {
+                id: 'inspector',
+                title: 'Inspector',
+                location: 'secondary',
+                entry: 'views/inspector.html',
+              },
             ],
-            contentViews: [{ id: 'tutorial', title: 'Tutorial', entry: 'views/tutorial.html' }],
+            contentViews: [
+              {
+                id: 'tutorial',
+                title: 'Tutorial',
+                entry: 'views/tutorial.html',
+                companionPanel: 'inspector',
+              },
+            ],
           },
         }),
         MANIFEST_URL,
@@ -371,7 +384,7 @@ describe('plugin host', () => {
       {
         exo: 1,
         type: 'plugin/register',
-        payload: { panels: ['outline'], contentViews: ['tutorial'] },
+        payload: { panels: ['outline', 'inspector'], contentViews: ['tutorial'] },
       },
       'https://plugins.example.com',
     )
@@ -380,6 +393,7 @@ describe('plugin host', () => {
       'https://plugins.example.com',
     )
     await waitForRecord(host, MANIFEST_URL, 'active')
+    expect(transport.frames).toHaveLength(1)
     const record = host.getSnapshot().records[0]
     expect(record?.panels).toEqual([
       {
@@ -391,6 +405,14 @@ describe('plugin host', () => {
         entryUrl: 'https://plugins.example.com/monaco/views/outline.html',
         registrationOrder: 0,
       },
+      {
+        id: 'inspector',
+        title: 'Inspector',
+        location: 'secondary',
+        entry: 'views/inspector.html',
+        entryUrl: 'https://plugins.example.com/monaco/views/inspector.html',
+        registrationOrder: 1,
+      },
     ])
     expect(record?.contentViews).toEqual([
       {
@@ -398,7 +420,8 @@ describe('plugin host', () => {
         title: 'Tutorial',
         entry: 'views/tutorial.html',
         entryUrl: 'https://plugins.example.com/monaco/views/tutorial.html',
-        registrationOrder: 1,
+        companionPanel: 'inspector',
+        registrationOrder: 2,
       },
     ])
 

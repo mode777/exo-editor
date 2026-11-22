@@ -104,10 +104,22 @@ content-view tabs:
       "icon": "list-tree",
       "location": "primary",
       "entry": "views/outline.html"
+    },
+    {
+      "id": "asset-params",
+      "title": "Parameters",
+      "icon": "settings",
+      "location": "secondary",
+      "entry": "views/parameters.html"
     }
   ],
   "contentViews": [
-    { "id": "tutorial", "title": "Tutorial", "entry": "views/tutorial.html" }
+    {
+      "id": "tutorial",
+      "title": "Tutorial",
+      "entry": "views/tutorial.html",
+      "companionPanel": "asset-params"
+    }
   ]
 }
 ```
@@ -119,10 +131,20 @@ content views. The controller registers a subset by id with
 `registerPanel(id)` / `registerContentView(id)`. Panels mount on first reveal and
 stay hidden without disposal; content frames are created when their tab opens.
 
+A content view can declare one optional `companionPanel`. It must name a
+`secondary` panel declared in the same manifest. The shell reveals it when the
+content view opens or is focused, keeps it open while another open content view
+shares it, and hides it after the last such view closes. If the panel is not
+registered, the content view still opens. The shell owns this lifecycle; you do
+not send a message, poll or add a heartbeat. A hide by the user stays until the
+next content-view open or focus, and `plugin/request-panel` keeps its existing
+behavior.
+
 Panels and content views are excluded from the consent fingerprint because they
 are user-invoked. A manifest that adds them should set `engines.exo` to a range
 that includes `0.3.0`, so older shells fail closed instead of rejecting the
-unknown field. See the [manifest contract](../contracts/plugin-manifest.md#32-panels-and-content-views).
+unknown field. A manifest that uses `companionPanel` must include `0.6.0`. See
+the [manifest contract](../contracts/plugin-manifest.md#32-panels-and-content-views).
 
 ## Commands
 

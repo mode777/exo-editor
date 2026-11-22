@@ -7,6 +7,7 @@ import { EventBus } from './events'
 import {
   MAX_CONTENT_VIEW_TABS,
   ViewPool,
+  type CompanionPanelChange,
   type PanelViewInput,
   type ViewPluginInfo,
 } from './view-pool'
@@ -72,7 +73,12 @@ function placeholder(): HTMLDivElement {
 
 let sessionCounter = 0
 
-async function createPool(overrides: { events?: EventBus } = {}) {
+async function createPool(
+  overrides: {
+    events?: EventBus
+    onCompanionPanel?: (change: CompanionPanelChange) => void
+  } = {},
+) {
   const transport = new FakeFrameTransport()
   const workspace = await makeWorkspace()
   const logs: Array<{ phase: string; code?: string }> = []
@@ -87,6 +93,9 @@ async function createPool(overrides: { events?: EventBus } = {}) {
     onOpenFile: async () => ({ ok: true }),
     onOpenView: async () => ({ ok: true }),
     onRequestPanel: async () => ({ ok: true, open: true }),
+    ...(overrides.onCompanionPanel === undefined
+      ? {}
+      : { onCompanionPanel: overrides.onCompanionPanel }),
   })
   pool.attach({
     session: workspace,
@@ -180,6 +189,94 @@ describe('view pool', () => {
     frame.emit({ exo: 1, type: 'plugin/dispose-ack' }, PLUGIN_ORIGIN)
     expect(frame.closed).toBe(true)
     expect(pool.contentSession(key)).toBeUndefined()
+  })
+
+  it('reveals a companion on open and focus and hides it after the last instance', async () => {
+    const changes: CompanionPanelChange[] = []
+    const { pool, transport } = await createPool({
+      onCompanionPanel: (change) => changes.push(change),
+    })
+    const view = {
+      id: 'asset-preview',
+      title: 'Asset Preview',
+      entryUrl: `${PLUGIN_ORIGIN}/viewer/views/preview.html`,
+      companionPanel: 'asset-params',
+    }
+    const input = { plugin: plugin(), view, instanceKey: 'first' }
+    const first = pool.openContent(input)
+    if (!first.ok) throw new Error('First content view did not open')
+    expect(changes).toEqual([{ action: 'show', identity: IDENTITY, panelId: 'asset-params' }])
+    expect(pool.contentSession(first.key)?.view).toMatchObject({ kind: 'content' })
+
+    const repeated = pool.openContent(input)
+    expect(repeated).toMatchObject({ ok: true, existing: true })
+    pool.revealCompanion(first.key)
+    expect(changes).toHaveLength(3)
+
+    const second = pool.openContent({ ...input, instanceKey: 'second' })
+    if (!second.ok) throw new Error('Second content view did not open')
+    expect(transport.frames).toHaveLength(2)
+
+    pool.closeContent(first.key)
+    expect(changes.at(-1)?.action).toBe('show')
+    expect(changes.filter((change) => change.action === 'hide')).toEqual([])
+
+    pool.closeContent(second.key)
+    expect(changes.at(-1)).toEqual({
+      action: 'hide',
+      identity: IDENTITY,
+      panelId: 'asset-params',
+    })
+  })
+
+  it('hides companions through closeFor, disposeAll and detach', async () => {
+    const changes: CompanionPanelChange[] = []
+    const { pool } = await createPool({
+      onCompanionPanel: (change) => changes.push(change),
+    })
+    const open = (instanceKey: string) =>
+      pool.openContent({
+        plugin: plugin(),
+        view: {
+          id: 'asset-preview',
+          title: 'Asset Preview',
+          entryUrl: `${PLUGIN_ORIGIN}/viewer/views/preview.html`,
+          companionPanel: 'asset-params',
+        },
+        instanceKey,
+      })
+
+    expect(open('close-for').ok).toBe(true)
+    pool.closeFor(IDENTITY, 'plugin-removed')
+    expect(changes.at(-1)?.action).toBe('hide')
+
+    expect(open('dispose-all').ok).toBe(true)
+    await pool.disposeAll('workspace-switch')
+    expect(changes.at(-1)?.action).toBe('hide')
+
+    expect(open('detach').ok).toBe(true)
+    await pool.detach()
+    expect(changes.at(-1)?.action).toBe('hide')
+    expect(changes.filter((change) => change.action === 'hide')).toHaveLength(3)
+  })
+
+  it('does not emit companion changes for a content view without one', async () => {
+    const changes: CompanionPanelChange[] = []
+    const { pool } = await createPool({
+      onCompanionPanel: (change) => changes.push(change),
+    })
+    const opened = pool.openContent({
+      plugin: plugin(),
+      view: {
+        id: 'tutorial',
+        title: 'Tutorial',
+        entryUrl: `${PLUGIN_ORIGIN}/viewer/views/tutorial.html`,
+      },
+      instanceKey: 'plain',
+    })
+    if (!opened.ok) throw new Error('Content view did not open')
+    pool.closeContent(opened.key)
+    expect(changes).toEqual([])
   })
 
   it('caps content-view tabs per plugin', async () => {

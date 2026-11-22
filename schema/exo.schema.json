@@ -118,7 +118,8 @@
           "minLength": 1,
           "maxLength": 80
         },
-        "entry": { "$ref": "#/$defs/relativePage" }
+        "entry": { "$ref": "#/$defs/relativePage" },
+        "companionPanel": { "$ref": "#/$defs/contributionId" }
       }
     },
     "commandTarget": {

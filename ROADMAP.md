@@ -871,6 +871,18 @@ opened no dialog. The local gate passed with 894 shell tests, 95 SDK tests and
 4 template tests; the measured bundle was 173,554/176,000 js and
 13,794/14,000 css gzip bytes.
 
+**Follow-up (2026-11-22):** the post-layer-10 change
+`content-view-companion-panel` adds optional
+`contributes.contentViews[].companionPanel`, validated against a secondary panel
+in the same manifest and preserved on the registered view. The shell reveals the
+companion when a content view opens or is focused, keeps it while any open
+instance shares it, and hides it after the last instance closes; visibility is
+derived from open view records across tab close, plugin removal and workspace
+switch. The field adds no permission, consent fingerprint input, protocol
+message or SDK API; shell `0.6.0`, manifest schema `1`, protocol `1` and SDK
+`1.7.0`. Implementation and local verification are complete; the deployed
+commit, fixture checks and bundle result are recorded after the Pages deploy.
+
 ---
 
 ## Deferred beyond v1

@@ -82,6 +82,14 @@ the deployed URL below, not a local dev server or local build.
     template and confirm the dialog shows a byte size and no preview. Invoke a
     content view that asks the shell to create a file; it gets the path and
     version, the shell does not open a tab, and Escape cancels without a write.
+16. **Check a content-view companion.** With the fixture active, open Fixture
+    Tutorial from the palette. The right side bar reveals Fixture Inspector and
+    the read-only tab renders. Hide the inspector: it stays hidden while the tab
+    remains active. Refocus the tab and it returns. Open Fixture Tutorial twice
+    from the palette, then close one tab: the inspector stays while the other tab
+    is open, and hides when the last tab closes. Select another secondary view
+    before closing the last tab: that other panel stays visible. No plugin
+    heartbeat, polling or extra lifecycle message is involved.
 
 ## Screenshots
 

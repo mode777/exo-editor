@@ -8,7 +8,7 @@ import type { PluginHost, PluginHostRecord, ViewLifecycle } from '../plugins/hos
 import { validateManifest, type PluginManifest } from '../plugins/manifest'
 import type { RegisteredContentView, RegisteredPanel } from '../plugins/registration'
 import { pluginViewId } from '../workbench/plugin-views'
-import { clearWorkspaceTabs, configurePresetStore } from '../workbench/tabs'
+import { clearWorkspaceTabs, configurePresetStore, contentViewOf } from '../workbench/tabs'
 
 const ORIGIN_A = 'https://plugins.example.com'
 const ORIGIN_B = 'https://other.example.com'
@@ -17,7 +17,12 @@ const IDENTITY_B = `${ORIGIN_B}::com.example.other`
 
 configurePresetStore()
 
-function manifestFor(origin: string, id: string, kind: 'panel' | 'content'): PluginManifest {
+function manifestFor(
+  origin: string,
+  id: string,
+  kind: 'panel' | 'content',
+  companionPanel?: string,
+): PluginManifest {
   const result = validateManifest(
     {
       schemaVersion: 1,
@@ -50,7 +55,28 @@ function manifestFor(origin: string, id: string, kind: 'panel' | 'content'): Plu
             }
           : {}),
         ...(kind === 'content'
-          ? { contentViews: [{ id: 'tutorial', title: 'Tutorial', entry: 'views/tutorial.html' }] }
+          ? {
+              ...(companionPanel === undefined
+                ? {}
+                : {
+                    panels: [
+                      {
+                        id: companionPanel,
+                        title: 'Inspector',
+                        location: 'secondary',
+                        entry: 'views/inspector.html',
+                      },
+                    ],
+                  }),
+              contentViews: [
+                {
+                  id: 'tutorial',
+                  title: 'Tutorial',
+                  entry: 'views/tutorial.html',
+                  ...(companionPanel === undefined ? {} : { companionPanel }),
+                },
+              ],
+            }
           : {}),
       },
     },
@@ -212,11 +238,12 @@ describe('runtime view intents', () => {
       0,
     )
     const contentRecord = recordFor(
-      manifestFor(ORIGIN_B, 'com.example.other', 'content'),
+      manifestFor(ORIGIN_B, 'com.example.other', 'content', 'inspector'),
       IDENTITY_B,
       1,
     )
     const { runtime, transport } = await createRuntime([panelRecord, contentRecord])
+    useWorkbenchStore.setState({ secondarySideBarVisible: false, activeSecondaryView: 'chat' })
     runtime.views.attachPanelSurface(panelInput(panelRecord), placeholder())
     const panelFrame = transport.frames[0]
     if (!panelFrame) throw new Error('Frame not found')
@@ -250,7 +277,11 @@ describe('runtime view intents', () => {
         .getState()
         .tabs.some((tab) => (tab as { contentView?: unknown }).contentView),
     ).toBe(true)
+    expect(useWorkbenchStore.getState().activeSecondaryView).toBe(
+      pluginViewId(IDENTITY_B, 'inspector'),
+    )
 
+    useWorkbenchStore.setState({ secondarySideBarVisible: false })
     send(panelFrame, ORIGIN_A, 'plugin/open-view', 'view-2', {
       pluginId: 'com.example.other',
       viewId: 'tutorial',
@@ -258,6 +289,139 @@ describe('runtime view intents', () => {
     })
     await flush()
     expect(transport.frames).toHaveLength(2)
+    expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(true)
+    expect(useWorkbenchStore.getState().activeSecondaryView).toBe(
+      pluginViewId(IDENTITY_B, 'inspector'),
+    )
+    runtime.dispose()
+  })
+
+  it('reveals a companion when a content view opens and hides it when the tab closes', async () => {
+    const contentRecord = recordFor(
+      manifestFor(ORIGIN_B, 'com.example.other', 'content', 'inspector'),
+      IDENTITY_B,
+      0,
+    )
+    const { runtime } = await createRuntime([contentRecord])
+    useWorkbenchStore.setState({ secondarySideBarVisible: false, activeSecondaryView: 'chat' })
+    const companion = pluginViewId(IDENTITY_B, 'inspector')
+
+    runtime.openContentView(IDENTITY_B, 'tutorial')
+    expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(true)
+    expect(useWorkbenchStore.getState().activeSecondaryView).toBe(companion)
+
+    const tab = useWorkbenchStore
+      .getState()
+      .tabs.find((entry) => (entry as { contentView?: unknown }).contentView)
+    if (!tab) throw new Error('Content tab not found')
+    runtime.closeTabs([tab])
+    expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(false)
+    runtime.dispose()
+  })
+
+  it('keeps a shared companion open until the last content view closes', async () => {
+    const contentRecord = recordFor(
+      manifestFor(ORIGIN_B, 'com.example.other', 'content', 'inspector'),
+      IDENTITY_B,
+      0,
+    )
+    const { runtime } = await createRuntime([contentRecord])
+    useWorkbenchStore.setState({ secondarySideBarVisible: false, activeSecondaryView: 'chat' })
+
+    runtime.openContentView(IDENTITY_B, 'tutorial')
+    runtime.openContentView(IDENTITY_B, 'tutorial')
+    const tabs = useWorkbenchStore
+      .getState()
+      .tabs.filter((entry) => (entry as { contentView?: unknown }).contentView)
+    expect(tabs).toHaveLength(2)
+    expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(true)
+
+    runtime.closeTabs([tabs[0] as (typeof tabs)[number]])
+    expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(true)
+    runtime.closeTabs([tabs[1] as (typeof tabs)[number]])
+    expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(false)
+    runtime.dispose()
+  })
+
+  it('opens a content view normally when its companion is not registered', async () => {
+    const contentRecord = recordFor(
+      manifestFor(ORIGIN_B, 'com.example.other', 'content', 'inspector'),
+      IDENTITY_B,
+      0,
+    )
+    contentRecord.panels = []
+    const { runtime } = await createRuntime([contentRecord])
+    useWorkbenchStore.setState({ secondarySideBarVisible: false, activeSecondaryView: 'chat' })
+
+    runtime.openContentView(IDENTITY_B, 'tutorial')
+    expect(useWorkbenchStore.getState().tabs).toHaveLength(1)
+    expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(false)
+    expect(useWorkbenchStore.getState().activeSecondaryView).toBe('chat')
+    runtime.dispose()
+  })
+
+  it('respects a manual companion hide until the view is focused again', async () => {
+    const contentRecord = recordFor(
+      manifestFor(ORIGIN_B, 'com.example.other', 'content', 'inspector'),
+      IDENTITY_B,
+      0,
+    )
+    const { runtime } = await createRuntime([contentRecord])
+    useWorkbenchStore.setState({ secondarySideBarVisible: false, activeSecondaryView: 'chat' })
+    const companion = pluginViewId(IDENTITY_B, 'inspector')
+
+    runtime.openContentView(IDENTITY_B, 'tutorial')
+    useWorkbenchStore.getState().toggleSecondarySideBar(companion)
+    expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(false)
+    runtime.refreshExplorer()
+    expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(false)
+
+    const tab = useWorkbenchStore.getState().tabs.find((entry) => contentViewOf(entry))
+    const content = tab ? contentViewOf(tab) : undefined
+    if (!tab || !content) throw new Error('Content tab not found')
+    runtime.views.revealCompanion(content.key)
+    expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(true)
+    expect(useWorkbenchStore.getState().activeSecondaryView).toBe(companion)
+
+    runtime.closeTabs([tab])
+    expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(false)
+    runtime.dispose()
+  })
+
+  it('leaves a manually selected other panel open when the content view closes', async () => {
+    const contentRecord = recordFor(
+      manifestFor(ORIGIN_B, 'com.example.other', 'content', 'inspector'),
+      IDENTITY_B,
+      0,
+    )
+    const { runtime } = await createRuntime([contentRecord])
+    useWorkbenchStore.setState({ secondarySideBarVisible: false, activeSecondaryView: 'chat' })
+
+    runtime.openContentView(IDENTITY_B, 'tutorial')
+    useWorkbenchStore.getState().showSecondaryView('other-panel')
+    const tab = useWorkbenchStore
+      .getState()
+      .tabs.find((entry) => (entry as { contentView?: unknown }).contentView)
+    if (!tab) throw new Error('Content tab not found')
+    runtime.closeTabs([tab])
+    expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(true)
+    expect(useWorkbenchStore.getState().activeSecondaryView).toBe('other-panel')
+    runtime.dispose()
+  })
+
+  it('hides an orphaned companion on workspace switch', async () => {
+    const contentRecord = recordFor(
+      manifestFor(ORIGIN_B, 'com.example.other', 'content', 'inspector'),
+      IDENTITY_B,
+      0,
+    )
+    const { runtime } = await createRuntime([contentRecord])
+    useWorkbenchStore.setState({ secondarySideBarVisible: false, activeSecondaryView: 'chat' })
+
+    runtime.openContentView(IDENTITY_B, 'tutorial')
+    expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(true)
+    await runtime.disconnect()
+    expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(false)
     runtime.dispose()
   })
 
@@ -316,12 +480,14 @@ describe('runtime view intents', () => {
   it('removes content tabs and frames when the host releases the plugin', async () => {
     const record = recordFor(manifestFor(ORIGIN_A, 'com.example.viewer', 'panel'), IDENTITY_A, 0)
     const contentRecord = recordFor(
-      manifestFor(ORIGIN_B, 'com.example.other', 'content'),
+      manifestFor(ORIGIN_B, 'com.example.other', 'content', 'inspector'),
       IDENTITY_B,
       1,
     )
     const { runtime, transport, stub } = await createRuntime([record, contentRecord])
+    useWorkbenchStore.setState({ secondarySideBarVisible: false, activeSecondaryView: 'chat' })
     runtime.openContentView(IDENTITY_B, 'tutorial')
+    expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(true)
     const frame = transport.frames[0]
     if (!frame) throw new Error('Frame not found')
     expect(
@@ -331,6 +497,7 @@ describe('runtime view intents', () => {
     ).toBe(true)
 
     stub.lifecycle.value?.closeFor(IDENTITY_B, 'plugin-removed')
+    expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(false)
     expect(
       useWorkbenchStore
         .getState()

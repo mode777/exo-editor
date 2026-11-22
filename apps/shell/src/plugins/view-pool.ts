@@ -46,10 +46,18 @@ export interface ContentViewInput {
     id: string
     title: string
     entryUrl: string
+    /** Secondary panel declared with the view, revealed while it is open. */
+    companionPanel?: string
   }
   instanceKey: string
   payload?: unknown
   openedBy?: ViewOpenedBy
+}
+
+export interface CompanionPanelChange {
+  action: 'show' | 'hide'
+  identity: string
+  panelId: string
 }
 
 export type ViewHandleKind = 'panel' | 'content'
@@ -102,6 +110,8 @@ export interface ViewPoolOptions {
   onOpenFile?: (request: OpenFileIntent, source: IntentSource) => Promise<IntentOutcome>
   onOpenView?: (request: OpenViewIntent, source: IntentSource) => Promise<IntentOutcome>
   onRequestPanel?: (request: PanelIntent, source: IntentSource) => Promise<PanelIntentOutcome>
+  /** Shell-internal notification for a content view's declared companion panel. */
+  onCompanionPanel?: (change: CompanionPanelChange) => void
 }
 
 interface ViewRecord {
@@ -125,6 +135,12 @@ function panelKey(identity: string, panelId: string): string {
 
 export function contentViewKey(identity: string, viewId: string, instanceKey: string): string {
   return `content:${identity}:${viewId}:${instanceKey}`
+}
+
+function companionPanelOf(record: ViewRecord): string | undefined {
+  if (record.handle.kind !== 'content') return undefined
+  const input = record.input
+  return 'view' in input ? input.view.companionPanel : undefined
 }
 
 /**
@@ -154,6 +170,7 @@ export class ViewPool {
     ((request: OpenViewIntent, source: IntentSource) => Promise<IntentOutcome>) | undefined
   private readonly onRequestPanel:
     ((request: PanelIntent, source: IntentSource) => Promise<PanelIntentOutcome>) | undefined
+  private readonly onCompanionPanel: ((change: CompanionPanelChange) => void) | undefined
 
   private readonly records = new Map<string, ViewRecord>()
   private attachOptions: ViewPoolAttachOptions | null = null
@@ -185,6 +202,7 @@ export class ViewPool {
     this.onOpenFile = options.onOpenFile
     this.onOpenView = options.onOpenView
     this.onRequestPanel = options.onRequestPanel
+    this.onCompanionPanel = options.onCompanionPanel
     if (typeof window !== 'undefined') {
       window.addEventListener('resize', this.handleViewportResize)
     }
@@ -205,10 +223,12 @@ export class ViewPool {
 
   async detach(): Promise<void> {
     const sessions = [...this.records.values()]
+    const companions = this.companionsOf(sessions)
     for (const key of [...this.records.keys()]) this.dropSurface(key)
     this.records.clear()
     this.attachOptions = null
     this.publish()
+    this.hideOrphanedCompanions(companions)
     await Promise.all(sessions.map((record) => record.session?.dispose('workspace-switch')))
   }
 
@@ -281,7 +301,9 @@ export class ViewPool {
       return { ok: false, code: 'internal', message: 'No workspace is attached.' }
     }
     const key = contentViewKey(input.plugin.identity, input.view.id, input.instanceKey)
-    if (this.records.has(key)) {
+    const existing = this.records.get(key)
+    if (existing) {
+      this.showCompanion(existing)
       return { ok: true, key, existing: true }
     }
     if (this.contentCount(input.plugin.identity) >= MAX_CONTENT_VIEW_TABS) {
@@ -314,6 +336,7 @@ export class ViewPool {
     }
     this.records.set(key, record)
     this.publish()
+    this.showCompanion(record)
     this.mount(record, {
       kind: 'content',
       id: input.view.id,
@@ -324,6 +347,12 @@ export class ViewPool {
       openedBy: input.openedBy,
     })
     return { ok: true, key, existing: false }
+  }
+
+  /** Reveal the companion of an already-open content view, e.g. on tab focus. */
+  revealCompanion(key: string): void {
+    const record = this.records.get(key)
+    if (record) this.showCompanion(record)
   }
 
   attachContentSurface(key: string, element: HTMLElement | null): void {
@@ -345,6 +374,8 @@ export class ViewPool {
   ): void {
     const record = this.records.get(key)
     if (!record) return
+    const companion = companionPanelOf(record)
+    const identity = record.handle.identity
     this.dropSurface(key)
     this.records.delete(key)
     record.handle.phase = 'closed'
@@ -356,6 +387,7 @@ export class ViewPool {
     )
     void record.session?.dispose(reason)
     this.publish()
+    if (companion) this.hideCompanionIfOrphaned(identity, companion)
   }
 
   /** Recreate a failed panel or content frame with its original input. */
@@ -376,6 +408,9 @@ export class ViewPool {
     identity: string,
     reason: 'closed' | 'workspace-switch' | 'plugin-removed' | 'error',
   ): void {
+    const companions = this.companionsOf(
+      [...this.records.values()].filter((record) => record.handle.identity === identity),
+    )
     for (const [key, record] of [...this.records]) {
       if (record.handle.identity !== identity) continue
       this.dropSurface(key)
@@ -384,15 +419,18 @@ export class ViewPool {
       void record.session?.dispose(reason)
     }
     this.publish()
+    this.hideOrphanedCompanions(companions)
   }
 
   async disposeAll(
     reason: 'closed' | 'workspace-switch' | 'plugin-removed' | 'error',
   ): Promise<void> {
     const sessions = [...this.records.values()]
+    const companions = this.companionsOf(sessions)
     for (const key of [...this.records.keys()]) this.dropSurface(key)
     this.records.clear()
     this.publish()
+    this.hideOrphanedCompanions(companions)
     await Promise.all(sessions.map((record) => record.session?.dispose(reason)))
   }
 
@@ -454,6 +492,46 @@ export class ViewPool {
     }
     for (const key of [...this.records.keys()]) this.dropSurface(key)
     if (this.ownsTransport) this.transport.dispose?.()
+  }
+
+  private showCompanion(record: ViewRecord): void {
+    const panelId = companionPanelOf(record)
+    if (!panelId) return
+    this.onCompanionPanel?.({
+      action: 'show',
+      identity: record.handle.identity,
+      panelId,
+    })
+  }
+
+  private companionsOf(
+    records: Iterable<ViewRecord>,
+  ): Array<{ identity: string; panelId: string }> {
+    const companions: Array<{ identity: string; panelId: string }> = []
+    const seen = new Set<string>()
+    for (const record of records) {
+      const panelId = companionPanelOf(record)
+      if (!panelId) continue
+      const identity = record.handle.identity
+      const key = `${identity}\u0000${panelId}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      companions.push({ identity, panelId })
+    }
+    return companions
+  }
+
+  private hideOrphanedCompanions(companions: Array<{ identity: string; panelId: string }>): void {
+    for (const { identity, panelId } of companions) {
+      this.hideCompanionIfOrphaned(identity, panelId)
+    }
+  }
+
+  private hideCompanionIfOrphaned(identity: string, panelId: string): void {
+    for (const record of this.records.values()) {
+      if (record.handle.identity === identity && companionPanelOf(record) === panelId) return
+    }
+    this.onCompanionPanel?.({ action: 'hide', identity, panelId })
   }
 
   private ensurePanel(input: PanelViewInput): ViewRecord | null {
