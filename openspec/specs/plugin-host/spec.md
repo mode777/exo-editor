@@ -238,7 +238,7 @@ The plugin host SHALL NOT request workspace content, create a plugin-facing work
 
 ### Requirement: Panel and content-view registration
 
-The host SHALL record registered panel and content-view ids only after `plugin/register-complete`, SHALL expose them in the workspace-scoped snapshot with their resolved entry and placement, and SHALL remove them when the plugin stops.
+The host SHALL record registered panel and content-view ids only after `plugin/register-complete`, SHALL expose them in the workspace-scoped snapshot with their resolved entry, placement and, for a content view, its optional declared companion panel, and SHALL remove them when the plugin stops.
 
 #### Scenario: Registration activates on completion
 
@@ -260,10 +260,15 @@ The host SHALL record registered panel and content-view ids only after `plugin/r
 - **WHEN** a plugin with a primary panel and a content view is active
 - **THEN** the host snapshot names the panel, its primary location and entry, and the content view, its title and entry, without page content
 
+#### Scenario: Snapshot preserves a companion association
+
+- **WHEN** a registered content view declares a valid `companionPanel`
+- **THEN** the host snapshot preserves that panel id on the content-view entry and does not add the panel frame or page content
+
 #### Scenario: Stop removes view surfaces
 
 - **WHEN** a plugin is disabled, removed or revoked
-- **THEN** none of its panel or content-view entries remain in the snapshot
+- **THEN** none of its panel or content-view entries remain in the snapshot and no companion association survives
 
 #### Scenario: Duplicate registration is idempotent
 
