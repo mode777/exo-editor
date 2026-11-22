@@ -26,7 +26,7 @@
 - [x] 4.1 Bump `apps/shell/package.json` and `SHELL_VERSION` to `0.6.0`, add the `CHANGELOG.md` entry naming shell `0.6.0`, manifest schema `1`, protocol `1` and SDK `1.7.0`, and update `docs/releases.md`. Verify `version.test.ts`, `quality/changelog.test.ts` and the SDK conformance test pass with no SDK version change.
 - [x] 4.2 Update `ROADMAP.md` and `docs/walkthrough.md` with the post-release change status and the fixture acceptance path; record no roadmap layer or contract drift and verify `openspec validate --all`.
 - [x] 4.3 Run the full local gate from `AGENTS.md`: lint, format check, typecheck, unit tests, build, bundle budget, CSP, custom elements, no-SDK, no-Monaco, template/code builds, deploy copies, secrets and `openspec validate --all`; verify every command exits zero.
-- [ ] 4.4 Push `main`, wait for the CI `verify` job and Pages deploy, then verify on `https://mode777.github.io/exo-editor/` that the fixture content view reveals `fixture-inspector`, refocus reveals it, a manual hide stays until refocus, a shared instance keeps it open, the last close hides it, and an unregistered companion still opens the content view. Record the deployed commit and date.
+- [x] 4.4 Push `main`, wait for the CI `verify` job and Pages deploy, then verify on `https://mode777.github.io/exo-editor/` that the fixture content view reveals `fixture-inspector`, refocus reveals it, a manual hide stays until refocus, a shared instance keeps it open, the last close hides it, and an unregistered companion still opens the content view. Record the deployed commit and date.
 
 ## Workflow follow-up
 

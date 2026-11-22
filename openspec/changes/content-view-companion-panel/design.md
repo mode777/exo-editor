@@ -214,6 +214,21 @@ changes because the association adds no autonomous access.
    record change is involved. A plugin that declared the field on a `0.6.0`
    shell must still declare the matching `engines.exo` range if rolled back.
 
+## Deployed Verification
+
+Verified on 2026-11-22 against `https://mode777.github.io/exo-editor/` at deployed
+commit `fbbce58` with `chrome-headless-shell` 131.0.6778.264, using an OPFS
+workspace and a `showDirectoryPicker` stub. The deployed fixture content view
+revealed **Fixture Inspector** on open; a manual side-bar close stayed hidden
+until switching to a file tab and back to the content tab; opening a second
+instance kept the companion visible after closing the first and hid it after the
+last close; selecting **Fixture Inspector 2** and then closing the content view
+left that user-selected panel visible. A separate localhost plugin that declared
+`companionPanel` on an unregistered secondary panel opened its content view with
+no side bar and no companion error. The browser console recorded no errors. The
+CI `verify` job and Pages deploy passed; the shell bundle measured
+174,159/176,000 js and 13,785/14,000 css gzip bytes.
+
 ## Open Questions
 
 None.

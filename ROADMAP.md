@@ -880,8 +880,15 @@ instance shares it, and hides it after the last instance closes; visibility is
 derived from open view records across tab close, plugin removal and workspace
 switch. The field adds no permission, consent fingerprint input, protocol
 message or SDK API; shell `0.6.0`, manifest schema `1`, protocol `1` and SDK
-`1.7.0`. Implementation and local verification are complete; the deployed
-commit, fixture checks and bundle result are recorded after the Pages deploy.
+`1.7.0`. Verified against deployed commit `fbbce58` on 2026-11-22 with
+`chrome-headless-shell` 131: the fixture content view revealed
+**Fixture Inspector** on open; a manual close stayed hidden until the tab was
+refocused; a second instance kept the companion open after the first close and
+the last close hid it; selecting **Fixture Inspector 2** left that panel visible
+when the content view closed; and a localhost plugin with an unregistered
+companion opened its content view with no side bar or error. The CI `verify` job
+and Pages deploy passed; the bundle measured 174,159/176,000 js and
+13,785/14,000 css gzip bytes.
 
 ---
 
