@@ -1,5 +1,7 @@
 import type { FileChangedPayload, SaveResult } from '@exo/plugin-sdk'
 import { connectBrowserPlugin } from '@exo/plugin-sdk/browser'
+import { followTheme } from '@exo/plugin-sdk/theme'
+import '@exo/plugin-sdk/theme.css'
 import * as monaco from 'monaco-editor'
 import EditorWorker from 'monaco-editor/editor/editor.worker.js?worker&inline'
 import JsonWorker from 'monaco-editor/language/json/json.worker.js?worker&inline'
@@ -186,16 +188,12 @@ async function main(): Promise<void> {
     model.dispose()
   })
 
-  const permissions = client.initialization.permissions
-  if (permissions.includes('events:subscribe')) {
-    try {
-      await client.subscribe('theme/changed')
-      client.onEvent('theme/changed', (event) => {
-        monaco.editor.setTheme(monacoThemeFor(event.payload.theme))
-      })
-    } catch (error) {
-      setNotice(`Theme updates are unavailable: ${String(error)}`)
-    }
+  try {
+    await followTheme(client, {
+      onTheme: (theme) => monaco.editor.setTheme(monacoThemeFor(theme)),
+    })
+  } catch (error) {
+    setNotice(`Theme updates are unavailable: ${String(error)}`)
   }
 
   renderStatus(currentPath, language, dirty, formatBytes(client.file.size))

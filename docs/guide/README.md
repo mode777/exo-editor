@@ -55,7 +55,7 @@ free of hand-written envelopes and `postMessage` calls. The SDK is private to
 this repository in v1; see the compatibility section of
 [`docs/contracts/plugin-sdk.md`](../contracts/plugin-sdk.md).
 
-## The four pieces
+## The pieces
 
 1. [Manifest](./manifest.md): `exo-manifest.json` declares your identity,
    permissions, controller entry and file-editor globs. `exo.json` in the
@@ -63,9 +63,11 @@ this repository in v1; see the compatibility section of
 2. [Protocol](./protocol.md): the handshake, registration, file handler, save
    and dispose flow. Read this if you are debugging or not using the SDK.
 3. [SDK](./sdk.md): the typed client for the controller and editor pages.
-4. [Hosting](./hosting.md): HTTPS, CORS, same-origin versus cross-origin framing
+4. [Styling](./styling.md): the optional theme helper and token sheet that keep
+   the plugin page consistent in dark, light and high-contrast.
+5. [Hosting](./hosting.md): HTTPS, CORS, same-origin versus cross-origin framing
    and the plugin root rule.
-5. [Consent](./consent.md): what the user sees and when the shell asks again.
+6. [Consent](./consent.md): what the user sees and when the shell asks again.
 
 ## Check your plugin
 
@@ -74,6 +76,8 @@ this repository in v1; see the compatibility section of
 - The controller registers only declared globs and completes.
 - The editor reads on request, keeps content out of `shell/init`, reports dirty
   honestly and answers saves.
+- The plugin page follows the shell theme with the SDK helper and tokens, or an
+  equivalent `data-theme` implementation; both dark and light are checked.
 - The plugin never reads `exo.json`, `/.exo/**`, a `FileSystemHandle` or the
   parent DOM.
 - [Testing and troubleshooting](./testing.md) covers the local and deployed

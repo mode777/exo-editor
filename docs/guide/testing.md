@@ -52,28 +52,31 @@ plus the shell text surface. The recorded acceptance path is
 - Dirty state reaches the tab, Save writes exact text or bytes, a conflict
   leaves the buffer and disk intact.
 - An external change is visible and does not silently replace a dirty buffer.
+- The visible plugin page follows the shell theme: toggling dark/light updates
+  the background, text, inputs, focus ring, selection and scrollbars without
+  reopening the file, and the editor library's own theme maps `high-contrast`.
 - Closing the tab disposes the frame; a late save does not recreate the file.
 - Disabling the plugin falls back to the shell text surface.
 - A same-origin plugin has no storage and a cross-origin plugin keeps its own.
 
 ## Troubleshooting
 
-| Symptom | Likely cause | Fix |
-| --- | --- | --- |
-| `cors` during manifest fetch | Missing `Access-Control-Allow-Origin` | Serve the header from the manifest origin; check the exact origin and no redirect |
-| `unsupported-origin` | Entry page is outside the manifest origin | Serve the page from the manifest origin |
-| `unsupported-version` | Protocol major mismatch | Use the SDK's `PROTOCOL_VERSION`; do not hard-code a different major |
-| `incompatible-engine` | `engines.exo` excludes the shell | Widen the range to the contract's shipped form |
-| `permission-denied` on a read | Missing `workspace:read`/`workspace:write`, or a reserved path | Fix the manifest; never request `exo.json` or `/.exo/**` |
-| `not-found` / `not-a-file` | Wrong path or a directory | Resolve relative to the open file or use an absolute workspace path |
-| `too-large` | File or payload exceeds the advertised limit | Ask for a smaller file/range or show a no-editor state |
-| `timeout` in the plugin log | Controller never sent `ready`, or registration never completed | Check the SDK boot path and the frame's console |
-| `unsupported-message` on a picker | Shell predates `plugin/request-files` or omits `filePicker` | Hide the picker action and fall back to manual path entry |
-| `unsupported-message` on a listing | Shell predates `plugin/request-list` or omits `directoryListing` | Fall back to exact-path reads and the picker |
-| `permission-denied` on a listing | Manifest lacks `workspace:list`, or the path is reserved | Add `workspace:read` and `workspace:list`; never list `/.exo` or `/exo.json` |
-| `not-a-directory` / `not-found` on a listing | Path is a file, missing, or the cursor expired | List a directory, and re-list without a cursor after `not-found` |
-| `protocol-violation` | Unknown message, wrong session, wrong mode or content outside save | Remove hand-written protocol code; use the SDK |
-| Manifest rejected with no frame | Unknown field or invalid page | Validate against the schema and the contract's field table |
+| Symptom                                      | Likely cause                                                       | Fix                                                                               |
+| -------------------------------------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------------------- |
+| `cors` during manifest fetch                 | Missing `Access-Control-Allow-Origin`                              | Serve the header from the manifest origin; check the exact origin and no redirect |
+| `unsupported-origin`                         | Entry page is outside the manifest origin                          | Serve the page from the manifest origin                                           |
+| `unsupported-version`                        | Protocol major mismatch                                            | Use the SDK's `PROTOCOL_VERSION`; do not hard-code a different major              |
+| `incompatible-engine`                        | `engines.exo` excludes the shell                                   | Widen the range to the contract's shipped form                                    |
+| `permission-denied` on a read                | Missing `workspace:read`/`workspace:write`, or a reserved path     | Fix the manifest; never request `exo.json` or `/.exo/**`                          |
+| `not-found` / `not-a-file`                   | Wrong path or a directory                                          | Resolve relative to the open file or use an absolute workspace path               |
+| `too-large`                                  | File or payload exceeds the advertised limit                       | Ask for a smaller file/range or show a no-editor state                            |
+| `timeout` in the plugin log                  | Controller never sent `ready`, or registration never completed     | Check the SDK boot path and the frame's console                                   |
+| `unsupported-message` on a picker            | Shell predates `plugin/request-files` or omits `filePicker`        | Hide the picker action and fall back to manual path entry                         |
+| `unsupported-message` on a listing           | Shell predates `plugin/request-list` or omits `directoryListing`   | Fall back to exact-path reads and the picker                                      |
+| `permission-denied` on a listing             | Manifest lacks `workspace:list`, or the path is reserved           | Add `workspace:read` and `workspace:list`; never list `/.exo` or `/exo.json`      |
+| `not-a-directory` / `not-found` on a listing | Path is a file, missing, or the cursor expired                     | List a directory, and re-list without a cursor after `not-found`                  |
+| `protocol-violation`                         | Unknown message, wrong session, wrong mode or content outside save | Remove hand-written protocol code; use the SDK                                    |
+| Manifest rejected with no frame              | Unknown field or invalid page                                      | Validate against the schema and the contract's field table                        |
 
 The complete code vocabulary is in
 [`docs/contracts/plugin-protocol.md`](../contracts/plugin-protocol.md#6-errors)
@@ -86,6 +89,9 @@ and [`docs/contracts/plugin-manifest.md`](../contracts/plugin-manifest.md).
 - [ ] The controller registers only declared contributions and completes.
 - [ ] The editor handles read, dirty, save, conflict, external change, dispose
       and a rejected read with an actionable state.
+- [ ] The visible page follows the shell theme in dark and light (and maps high
+      contrast when the editor library supports it) with readable contrast and a
+      visible focus ring.
 - [ ] The plugin does not touch storage in same-origin mode.
 - [ ] The plugin has no `postMessage`, envelope or handshake code outside the
       SDK.

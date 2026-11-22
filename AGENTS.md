@@ -43,6 +43,9 @@ The post-layer-10 change `plugin-file-creation` (archived as
 Save As dialog, `plugin/request-new-file` / `shell/new-file-result`, the
 create-only `WriteOptions.createOnly` path and SDK `1.7.0`; its deployed
 verification is recorded in the archived change design and `ROADMAP.md`.
+The post-layer-10 change `plugin-theming` adds the optional
+`@exo/plugin-sdk/theme` helper, `@exo/plugin-sdk/theme.css` and SDK `1.8.0`, plus
+the styling contract, author-guide page and skill step; shell `0.7.0`.
 The parallel Stratofold provider track
 (P1-P3) is archived and verified; it does not gate the numbered layers. The
 contracts are ratified, and the shell app (`apps/shell`) builds, tests and
@@ -52,21 +55,22 @@ exist yet.
 
 ## Read this first
 
-| Document | Why |
-| --- | --- |
-| [`docs/vision.md`](./docs/vision.md) | Product intent, principles, non-goals |
-| [`docs/architecture.md`](./docs/architecture.md) | Runtime model, lifecycle, trust boundaries, decisions D1-D19 |
-| [`docs/contracts/`](./docs/contracts/) | Normative contracts; ratified by `define-core-contracts` and mirrored in `openspec/specs/` |
-| [`docs/contracts/plugin-sdk.md`](./docs/contracts/plugin-sdk.md) | Typed plugin client, origin rules, compatibility policy and template |
-| [`docs/guide/`](./docs/guide/README.md) | Author handoff: quickstart, manifest, protocol, SDK, hosting, consent, testing |
-| [`docs/security-review.md`](./docs/security-review.md) | Trust-boundary control map, mutation evidence, findings |
-| [`docs/accessibility.md`](./docs/accessibility.md) | A11y scope, automated checks, manual script, upstream exceptions |
-| [`docs/browser-support.md`](./docs/browser-support.md) | Supported, unsupported and unverified browser/provider combinations |
-| [`docs/performance.md`](./docs/performance.md) | Runtime budgets, reference environment and measurements |
-| [`docs/walkthrough.md`](./docs/walkthrough.md) | Recorded acceptance path for the release |
-| [`docs/releases.md`](./docs/releases.md) | Version axes, release checklist, deprecation and breaking changes |
-| [`docs/providers/stratofold.md`](./docs/providers/stratofold.md) | Remote-provider track, upstream status and npm blocker |
-| [`ROADMAP.md`](./ROADMAP.md) | Layer order, one OpenSpec change per layer, exit criteria |
+| Document                                                                 | Why                                                                                        |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
+| [`docs/vision.md`](./docs/vision.md)                                     | Product intent, principles, non-goals                                                      |
+| [`docs/architecture.md`](./docs/architecture.md)                         | Runtime model, lifecycle, trust boundaries, decisions D1-D19                               |
+| [`docs/contracts/`](./docs/contracts/)                                   | Normative contracts; ratified by `define-core-contracts` and mirrored in `openspec/specs/` |
+| [`docs/contracts/plugin-sdk.md`](./docs/contracts/plugin-sdk.md)         | Typed plugin client, origin rules, compatibility policy and template                       |
+| [`docs/contracts/plugin-styling.md`](./docs/contracts/plugin-styling.md) | Optional theme helper, token sheet and the three palettes                                  |
+| [`docs/guide/`](./docs/guide/README.md)                                  | Author handoff: quickstart, manifest, protocol, SDK, styling, hosting, consent, testing    |
+| [`docs/security-review.md`](./docs/security-review.md)                   | Trust-boundary control map, mutation evidence, findings                                    |
+| [`docs/accessibility.md`](./docs/accessibility.md)                       | A11y scope, automated checks, manual script, upstream exceptions                           |
+| [`docs/browser-support.md`](./docs/browser-support.md)                   | Supported, unsupported and unverified browser/provider combinations                        |
+| [`docs/performance.md`](./docs/performance.md)                           | Runtime budgets, reference environment and measurements                                    |
+| [`docs/walkthrough.md`](./docs/walkthrough.md)                           | Recorded acceptance path for the release                                                   |
+| [`docs/releases.md`](./docs/releases.md)                                 | Version axes, release checklist, deprecation and breaking changes                          |
+| [`docs/providers/stratofold.md`](./docs/providers/stratofold.md)         | Remote-provider track, upstream status and npm blocker                                     |
+| [`ROADMAP.md`](./ROADMAP.md)                                             | Layer order, one OpenSpec change per layer, exit criteria                                  |
 
 ## Hard invariants
 
@@ -166,23 +170,23 @@ Install once from the repository root:
 npm install        # npm ci in CI
 ```
 
-| Check | Command |
-| --- | --- |
-| Lint | `npm run lint` |
-| Format | `npm run format:check` (write with `npm run format`) |
-| Typecheck | `npm run typecheck` |
-| Unit tests | `npm test` |
-| Build | `npm run build` |
-| Bundle budget | `npm run budget` |
-| Deployed CSP check | `npm run check:dist-csp` (after a build) |
-| Custom elements check | `npm run check:dist-elements` (after a build) |
-| SDK absent from shell bundle | `npm run check:dist-no-sdk` (after a build) |
-| Monaco absent from shell bundle | `npm run check:dist-no-monaco` (after a build) |
+| Check                               | Command                                                                |
+| ----------------------------------- | ---------------------------------------------------------------------- |
+| Lint                                | `npm run lint`                                                         |
+| Format                              | `npm run format:check` (write with `npm run format`)                   |
+| Typecheck                           | `npm run typecheck`                                                    |
+| Unit tests                          | `npm test`                                                             |
+| Build                               | `npm run build`                                                        |
+| Bundle budget                       | `npm run budget`                                                       |
+| Deployed CSP check                  | `npm run check:dist-csp` (after a build)                               |
+| Custom elements check               | `npm run check:dist-elements` (after a build)                          |
+| SDK absent from shell bundle        | `npm run check:dist-no-sdk` (after a build)                            |
+| Monaco absent from shell bundle     | `npm run check:dist-no-monaco` (after a build)                         |
 | No credentials in deployed artifact | `npm run check:dist-secrets` (after the shell build and plugin copies) |
-| Template build | `npm run build:template` |
-| Template deploy copy | `npm run deploy:copy-template` (after the shell build and dist checks) |
-| Code plugin build | `npm run build:code` |
-| Code plugin deploy copy | `npm run deploy:copy-code` (after the shell build and dist checks) |
+| Template build                      | `npm run build:template`                                               |
+| Template deploy copy                | `npm run deploy:copy-template` (after the shell build and dist checks) |
+| Code plugin build                   | `npm run build:code`                                                   |
+| Code plugin deploy copy             | `npm run deploy:copy-code` (after the shell build and dist checks)     |
 
 Dev server: `npm run dev` serves `http://localhost:5173/exo-editor/`. It is a
 development aid, not a verification target.

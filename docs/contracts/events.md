@@ -99,12 +99,12 @@ interface ShellEvent<T> {
 
 ## 4. Topic catalog (v1)
 
-| Topic | Payload | When |
-| --- | --- | --- |
-| `theme/changed` | `{ theme: 'dark' \| 'light' \| 'high-contrast' }` | The user changes the shell theme |
-| `workspace/file-changed` | `{ path, kind: 'created' \| 'changed' \| 'deleted' \| 'renamed', version? }` | A file in the workspace changes, including saves from other tabs |
-| `workspace/closed` | `{ reason: 'switch' \| 'close' }` | The workspace is being released; the last event a frame receives |
-| `config/changed` | `{ pluginId, values: Record<string, unknown> }` | A plugin's contributed settings change; only that plugin's subscribed handler and view frames receive it |
+| Topic                    | Payload                                                                      | When                                                                                                     |
+| ------------------------ | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `theme/changed`          | `{ theme: 'dark' \| 'light' \| 'high-contrast' }`                            | The user changes the shell theme                                                                         |
+| `workspace/file-changed` | `{ path, kind: 'created' \| 'changed' \| 'deleted' \| 'renamed', version? }` | A file in the workspace changes, including saves from other tabs                                         |
+| `workspace/closed`       | `{ reason: 'switch' \| 'close' }`                                            | The workspace is being released; the last event a frame receives                                         |
+| `config/changed`         | `{ pluginId, values: Record<string, unknown> }`                              | A plugin's contributed settings change; only that plugin's subscribed handler and view frames receive it |
 
 Topic names are `<namespace>/<event>`, lowercase, `[a-z0-9-]` segments, maximum
 64 characters. New topics are added by changing this contract and the OpenSpec
@@ -165,14 +165,14 @@ without subscribing. `config/changed` is then incremental.
 
 ## 6. Limits and failure
 
-| Limit | Value |
-| --- | --- |
-| Topics per frame | 32 across shell and local namespaces |
-| Queued events per topic per frame | 1000 |
-| Event payload | 1 MiB (shell and local) |
-| Shell publish rate per topic | 100 events/s (coalesced topics may burst) |
-| Local publish rate per identity and topic | 100 events/s |
-| Local publish rate per frame | 200 events/s across all local topics |
+| Limit                                     | Value                                     |
+| ----------------------------------------- | ----------------------------------------- |
+| Topics per frame                          | 32 across shell and local namespaces      |
+| Queued events per topic per frame         | 1000                                      |
+| Event payload                             | 1 MiB (shell and local)                   |
+| Shell publish rate per topic              | 100 events/s (coalesced topics may burst) |
+| Local publish rate per identity and topic | 100 events/s                              |
+| Local publish rate per frame              | 200 events/s across all local topics      |
 
 - On queue overflow the shell drops the oldest events and sends one
   `shell/error` with `rate-limited` and the topic name. It does not tear down the
@@ -211,7 +211,9 @@ without subscribing. `config/changed` is then incremental.
    document's identity for no v1 benefit.
 2. `theme/changed` carries the theme name only. Resolved CSS custom properties
    would create a second token contract and couple plugins to the shell's
-   palette. A token set can be proposed later as its own contract.
+   palette. The optional SDK token sheet in
+   [`plugin-styling.md`](./plugin-styling.md) is a plugin-local palette, not a
+   protocol payload; `theme/changed` still carries only the name.
 3. A plugin with no matching open document has no handler frame and therefore no
    subscription unless it has registered and revealed a panel, which is retained
    as its event hub. Background frames remain out of scope until a later layer

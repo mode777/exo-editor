@@ -3,6 +3,42 @@
 All notable changes to Exo Editor are recorded here. The version axes and the
 release process are in [`docs/releases.md`](./docs/releases.md).
 
+## [0.7.0] - 2026-11-22
+
+Additive post-release update: plugin styling and the SDK theme surface.
+
+### Added
+
+- `@exo/plugin-sdk/theme` with `applyTheme(theme, options?)` and
+  `followTheme(client, options?)`. The helper writes the shell theme name to
+  `data-theme`, applies `shell/init.theme`, follows `theme/changed` when the
+  manifest has `events:subscribe`, and returns a listener cleanup.
+- `@exo/plugin-sdk/theme.css`, an optional semantic token sheet with complete
+  dark, light and high-contrast palettes, `color-scheme` for native controls and
+  a `prefers-color-scheme` fallback for the interval before the handshake.
+- `docs/contracts/plugin-styling.md`, the author-guide styling page, and a
+  styling step in the `create-exo-plugin` skill covering both themes, high
+  contrast, editor-library theme mapping, contrast, focus and reduced motion.
+- The reference code plugin now imports the SDK token sheet and uses
+  `followTheme` for its initial and live theme, while Monaco keeps its own
+  `vs`/`vs-dark`/`hc-black` mapping.
+- Shell `0.7.0` records the deployed documentation and SDK addition; the shell
+  runtime surface is unchanged.
+
+### Compatibility
+
+- Shell: `0.7.0`
+- Protocol: `1`
+- Manifest schema: `1`
+- SDK: `1.8.0`
+
+### Breaking
+
+- None. The theme helper, stylesheet and guide are additive within protocol
+  major `1` and manifest schema `1`. No permission, message, manifest field or
+  consent fingerprint input is added. A plugin that does not import the theme
+  surface keeps its current appearance and behavior.
+
 ## [0.6.0] - 2026-11-22
 
 Additive post-release update: declarative content-view companion panels.

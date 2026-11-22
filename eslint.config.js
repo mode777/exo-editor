@@ -31,7 +31,11 @@ export default tseslint.config(
     // The SDK core must stay usable outside a browser. Only the explicit
     // browser adapter may read these globals.
     files: ['packages/plugin-sdk/src/**/*.ts'],
-    ignores: ['packages/plugin-sdk/src/browser.ts', 'packages/plugin-sdk/src/**/*.test.ts'],
+    ignores: [
+      'packages/plugin-sdk/src/browser.ts',
+      'packages/plugin-sdk/src/theme.ts',
+      'packages/plugin-sdk/src/**/*.test.ts',
+    ],
     rules: {
       'no-restricted-globals': ['error', 'window', 'document', 'location', 'parent'],
     },
@@ -51,7 +55,8 @@ export default tseslint.config(
           patterns: [
             {
               // Only the published kit's public entry points may be imported.
-              regex: '^vscode-workbench/(?!react$|core$|elements/[\\w-]+$|styles/[\\w-]+\\.css$).+$',
+              regex:
+                '^vscode-workbench/(?!react$|core$|elements/[\\w-]+$|styles/[\\w-]+\\.css$).+$',
               message:
                 'Import only the kit public entry points: vscode-workbench, /react, /core, /elements/*, /styles/*.',
             },

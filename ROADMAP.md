@@ -42,29 +42,29 @@ gate a numbered layer. The first is the Stratofold provider track (P1), which ca
 start after layer 3 and should land after layer 4 because both touch the runtime
 composition.
 
-| # | Change | Outcome | Depends on |
-| --- | --- | --- | --- |
-| 0 | `define-core-contracts` | Contracts ratified as OpenSpec specs | - |
-| 1 | `scaffold-shell-app` | Deployed static shell, CI gates, no plugins | - |
-| 2 | `workspace-provider` | Open a real folder, browse, read, edit, save | 0, 1 |
-| 3 | `workspace-plugin-config` | `exo.json` parsed, validated, editable; no plugin runtime | 0, 2 |
-| 4 | `plugin-host` | Consent, manifest load, registration frames, teardown | 0, 2, 3 |
-| 5 | `plugin-file-editors` | Handler sessions, read/save/dirty, external changes | 4 |
-| 6 | `plugin-events` | Topic bus and catalog | 4 |
-| 7 | `plugin-settings` | Plugin-declared settings in the shell's settings UI | 3, 4 |
-| 8 | `plugin-sdk-template` | Typed SDK, plugin template, compatibility policy | 4, 5, 6 |
-| 9 | `monaco-code-plugin` | Monaco reference plugin, visible handler surface, child-path deploy | 8 |
-| 10 | `release-readiness` | Security review, a11y, browser matrix, author docs | 9 |
+| #   | Change                    | Outcome                                                             | Depends on |
+| --- | ------------------------- | ------------------------------------------------------------------- | ---------- |
+| 0   | `define-core-contracts`   | Contracts ratified as OpenSpec specs                                | -          |
+| 1   | `scaffold-shell-app`      | Deployed static shell, CI gates, no plugins                         | -          |
+| 2   | `workspace-provider`      | Open a real folder, browse, read, edit, save                        | 0, 1       |
+| 3   | `workspace-plugin-config` | `exo.json` parsed, validated, editable; no plugin runtime           | 0, 2       |
+| 4   | `plugin-host`             | Consent, manifest load, registration frames, teardown               | 0, 2, 3    |
+| 5   | `plugin-file-editors`     | Handler sessions, read/save/dirty, external changes                 | 4          |
+| 6   | `plugin-events`           | Topic bus and catalog                                               | 4          |
+| 7   | `plugin-settings`         | Plugin-declared settings in the shell's settings UI                 | 3, 4       |
+| 8   | `plugin-sdk-template`     | Typed SDK, plugin template, compatibility policy                    | 4, 5, 6    |
+| 9   | `monaco-code-plugin`      | Monaco reference plugin, visible handler surface, child-path deploy | 8          |
+| 10  | `release-readiness`       | Security review, a11y, browser matrix, author docs                  | 9          |
 
 ---
 
 ## Provider track (parallel, non-blocking)
 
-| # | Change | Outcome | Depends on | Status |
-| --- | --- | --- | --- | --- |
-| P1 | `add-stratofold-provider` | Stratofold vdir as a workspace: connect/restore, browse, read/write/save, viewer/public read-only | 0, 2, 3 | archived 2026-11-15; verified on the deployed shell with Chromium and Firefox |
-| P2 | `adopt-stratofold-0-12` | Client 0.12.0: connection-string connect and zero-byte remote files | P1 | archived 2026-11-15; verified on the deployed shell |
-| P3 | `add-remote-recents` | Automatic connection persistence and a capped recent-workspaces list with reopen/remove | P1, P2 | archived 2026-11-15; verified on the deployed shell |
+| #   | Change                    | Outcome                                                                                           | Depends on | Status                                                                        |
+| --- | ------------------------- | ------------------------------------------------------------------------------------------------- | ---------- | ----------------------------------------------------------------------------- |
+| P1  | `add-stratofold-provider` | Stratofold vdir as a workspace: connect/restore, browse, read/write/save, viewer/public read-only | 0, 2, 3    | archived 2026-11-15; verified on the deployed shell with Chromium and Firefox |
+| P2  | `adopt-stratofold-0-12`   | Client 0.12.0: connection-string connect and zero-byte remote files                               | P1         | archived 2026-11-15; verified on the deployed shell                           |
+| P3  | `add-remote-recents`      | Automatic connection persistence and a capped recent-workspaces list with reopen/remove           | P1, P2     | archived 2026-11-15; verified on the deployed shell                           |
 
 P1 is not part of the numbered v1 critical path. It started after layer 3 and
 lands alongside layers 4-10 without gating one. It integrated through
@@ -634,7 +634,7 @@ any third-party plugin.
 - Met (2026-11-16): disabling the plugin in settings falls back to the shell's
   text renderer with no visible plugin frame.
 - Met: the shell bundle contains no Monaco code and the CI `Monaco absent from
-  shell bundle` step passes, as does the source composition guard.
+shell bundle` step passes, as does the source composition guard.
 - Met (2026-11-16): the same-origin deploy uses `sandbox="allow-scripts"`,
   `localStorage` throws `SecurityError` in the frame, and editing still works;
   the cross-origin `localhost:5176` deploy uses
@@ -889,6 +889,15 @@ when the content view closed; and a localhost plugin with an unregistered
 companion opened its content view with no side bar or error. The CI `verify` job
 and Pages deploy passed; the bundle measured 174,159/176,000 js and
 13,785/14,000 css gzip bytes.
+
+**Follow-up (2026-11-22):** the post-layer-10 change `plugin-theming` adds the
+optional `@exo/plugin-sdk/theme` entry with `applyTheme()` and `followTheme()`,
+the `@exo/plugin-sdk/theme.css` semantic token sheet for dark, light and
+high-contrast, SDK `1.8.0` and shell `0.7.0`. It also adds the styling contract,
+the author-guide styling page and a styling step in the `create-exo-plugin`
+skill, and moves the reference code plugin to the SDK tokens and helper. No
+protocol message, manifest field, permission or consent fingerprint input
+changes. Verification and archive follow the deploy.
 
 ---
 

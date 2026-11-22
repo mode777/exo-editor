@@ -18,7 +18,7 @@ enough to ship a plugin.
 
 | Artifact                                            | Version | Packaging                                        |
 | --------------------------------------------------- | ------- | ------------------------------------------------ |
-| `packages/plugin-sdk` (`@exo/plugin-sdk`)           | `1.7.0` | Private workspace package; no runtime dependency |
+| `packages/plugin-sdk` (`@exo/plugin-sdk`)           | `1.8.0` | Private workspace package; no runtime dependency |
 | `packages/plugin-template` (`@exo/plugin-template`) | `0.1.0` | Private workspace package; built static assets   |
 
 - The SDK MAJOR equals the protocol major it speaks. `PROTOCOL_VERSION` and
@@ -28,15 +28,17 @@ enough to ship a plugin.
   `listDirectory()` helper, `1.4.0` adds the additive local-event helpers and
   `1.5.0` adds the view client, panel/content-view registration and the
   `openFile()`, `openView()` and `requestPanel()` helpers, `1.6.0` adds
-  command registration, `onCommand()` and the command support bit, and `1.7.0`
+  command registration, `onCommand()` and the command support bit, `1.7.0`
   adds `requestNewFile()`, `registerNewFile()` and the creation/template support
-  bits, all without changing the protocol major.
+  bits, and `1.8.0` adds the DOM-only theme helper and the optional token
+  stylesheet, all without changing the protocol major.
 - The packages are not published in v1 (D12). Consumers in this repository use
   the workspace copy. A future publication adds a built `dist` and does not
   change the message protocol.
 - The SDK core is DOM-free: importing `@exo/plugin-sdk` does not read `window`,
-  `document`, `location` or `parent`. `@exo/plugin-sdk/browser` is the only entry
-  point that does, and it is what a browser plugin imports.
+  `document`, `location` or `parent`. `@exo/plugin-sdk/browser` and
+  `@exo/plugin-sdk/theme` are the explicit DOM-only entry points; a browser
+  plugin imports the ones it uses.
 
 ## 3. Browser bootstrap
 
@@ -299,6 +301,34 @@ handler({ command, args? }) -> void | { ok: true } | { ok: false, message? }
   older shell omits the bit. The SDK sends no command-related message on its own;
   a plugin can keep its previous UI when the bit is false.
 
+## 7.4 Theme helper and stylesheet
+
+`@exo/plugin-sdk/theme` is DOM-only and is not part of the DOM-free core. It
+exposes two helpers and the option types:
+
+```ts
+applyTheme(theme, { document? })            -> void
+followTheme(client, { document?, onTheme? }) -> Promise<() => void>
+```
+
+- `applyTheme` writes the exact `ThemeName` to `data-theme` on the target
+  document root. It writes no inline style.
+- `followTheme` applies `client.initialization.theme` immediately, calls
+  `onTheme` with it, subscribes to `theme/changed` when the manifest has
+  `events:subscribe`, applies each later value and calls `onTheme` with it.
+  Without the permission it sends no message and resolves with a no-op cleanup.
+  A failed subscription rejects after the initial theme has been applied.
+- The returned cleanup removes the helper's listener. It does not unsubscribe
+  the topic, because other listeners in the frame may share it.
+- Neither helper adds a protocol message, permission, manifest field or consent
+  input, and neither persists a theme.
+
+`@exo/plugin-sdk/theme.css` is an optional semantic token sheet for dark, light
+and high-contrast. Importing it loads no JavaScript. The `exports` map includes
+`./theme` and `./theme.css`, and `sideEffects` preserves the CSS import in a
+production build. Token names, values and usage rules are in
+[`plugin-styling.md`](./plugin-styling.md).
+
 ## 8. Event client
 
 - `subscribe(topic)` sends `plugin/subscribe` and resolves `{ topic, seq }` from
@@ -350,6 +380,10 @@ handler({ command, args? }) -> void | { ok: true } | { ok: false, message? }
   shell that predates them omits `capabilities.createFile` and
   `capabilities.newFiles`; the SDK treats absence as false and rejects
   `requestNewFile()`/`registerNewFile()` locally with `unsupported-message`.
+- The theme helper and token stylesheet are an additive minor (`1.8.0`). They are
+  plugin-page utilities, not wire features: an older shell still provides
+  `shell/init.theme` and, with the permission, `theme/changed`, and a plugin that
+  does not import them keeps its current behavior.
 - A deprecated SDK export remains functional for the rest of the current major,
   carries an `@deprecated` note with its replacement and is removed only at the
   next major.

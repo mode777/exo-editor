@@ -198,6 +198,8 @@ older shells; it is false when `capabilities.commands` is absent.
 ## Events
 
 ```ts
+import { applyTheme } from '@exo/plugin-sdk/theme'
+
 if (editor.initialization.permissions.includes('events:subscribe')) {
   await editor.subscribe('theme/changed')
   editor.onEvent('theme/changed', (event) => {
@@ -209,6 +211,13 @@ if (editor.initialization.permissions.includes('events:subscribe')) {
 Subscriptions are per handler frame and require the manifest's
 `events:subscribe` permission. Initial state is in `shell/init`; events are
 changes, not a replay. See [`docs/contracts/events.md`](../contracts/events.md).
+
+`followTheme` applies the initialization theme and, with `events:subscribe`,
+keeps the page in step with later `theme/changed` events. `applyTheme` is the
+lower-level primitive for a plugin that already owns the subscription. The
+optional token sheet and the full token list are covered in
+[styling](./styling.md) and
+[`docs/contracts/plugin-styling.md`](../contracts/plugin-styling.md).
 
 ### Messaging between your own frames
 

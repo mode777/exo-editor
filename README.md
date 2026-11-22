@@ -30,8 +30,9 @@ Verification is always against the deployed URL, never a local dev server.
 Post-release updates are additive within protocol major `1`: the workspace file
 picker and directory listing (SDK `1.2.0`/`1.3.0`), plugin-local events
 (`1.4.0`), plugin panels, content views and navigation intents (`1.5.0`, shell
-`0.3.0`), plugin commands in shell-owned surfaces (`1.6.0`, shell `0.4.0`), and
-plugin new-file creation with manifest templates (`1.7.0`, shell `0.5.0`).
+`0.3.0`), plugin commands in shell-owned surfaces (`1.6.0`, shell `0.4.0`),
+plugin new-file creation with manifest templates (`1.7.0`, shell `0.5.0`), and
+the optional plugin styling helper and token sheet (`1.8.0`, shell `0.7.0`).
 Panels mount lazily and content views open as read-only tabs; both are
 user-invoked and excluded from the consent fingerprint.
 
@@ -66,30 +67,31 @@ user-invoked and excluded from the consent fingerprint.
 
 ## Documents
 
-| Document | Contents |
-| --- | --- |
-| [Vision](./docs/vision.md) | Product intent, principles, scope, non-goals |
-| [Architecture](./docs/architecture.md) | Runtime model, lifecycles, trust boundaries, decisions |
-| [Security review](./docs/security-review.md) | Trust-boundary controls, mutation evidence, findings |
-| [Workspace contract](./docs/contracts/workspace-api.md) | Provider interface, paths, errors, isolation |
-| [Manifest contract](./docs/contracts/plugin-manifest.md) | `exo.json`, `exo-manifest.json`, consent, fingerprint |
-| [Protocol contract](./docs/contracts/plugin-protocol.md) | Envelope, handshake, registration, handler sessions |
-| [Events contract](./docs/contracts/events.md) | Topics, ordering, limits |
-| [Plugin SDK contract](./docs/contracts/plugin-sdk.md) | Typed client, origin rules, compatibility policy, template |
-| [Manifest schema](./schema/exo.schema.json) | Shared JSON Schema for `exo.json` and `exo-manifest.json` |
-| [Plugin author guide](./docs/guide/README.md) | Quickstart, manifest, protocol, SDK, hosting, consent, testing |
-| [Agent skill](./.agents/skills/create-exo-plugin/SKILL.md) | Single-file skill for assistants building an Exo plugin and hosting it on GitHub Pages; installable by [raw link](https://raw.githubusercontent.com/mode777/exo-editor/main/.agents/skills/create-exo-plugin/SKILL.md) |
-| [Demo workspace](./examples/demo-workspace/README.md) | Shipped code and template plugins in one workspace |
-| [Walkthrough](./docs/walkthrough.md) | Recorded acceptance path with screenshots |
-| [Accessibility](./docs/accessibility.md) | Scope, automated checks, manual script, upstream exceptions |
-| [Browser support](./docs/browser-support.md) | Supported, unsupported and unverified combinations |
-| [Performance](./docs/performance.md) | Runtime budgets, reference environment, measurements |
-| [Security review](./docs/security-review.md) | Trust-boundary controls, mutation evidence, findings |
-| [Releases](./docs/releases.md) | Version axes, release checklist, deprecation and breaking changes |
-| [Changelog](./CHANGELOG.md) | Release history |
-| [Stratofold provider](./docs/providers/stratofold.md) | Remote-provider track, upstream status, npm blocker |
-| [Roadmap](./ROADMAP.md) | Layered OpenSpec changes and exit criteria |
-| [Agent guide](./AGENTS.md) | Instructions for coding agents working here |
+| Document                                                      | Contents                                                                                                                                                                                                               |
+| ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Vision](./docs/vision.md)                                    | Product intent, principles, scope, non-goals                                                                                                                                                                           |
+| [Architecture](./docs/architecture.md)                        | Runtime model, lifecycles, trust boundaries, decisions                                                                                                                                                                 |
+| [Security review](./docs/security-review.md)                  | Trust-boundary controls, mutation evidence, findings                                                                                                                                                                   |
+| [Workspace contract](./docs/contracts/workspace-api.md)       | Provider interface, paths, errors, isolation                                                                                                                                                                           |
+| [Manifest contract](./docs/contracts/plugin-manifest.md)      | `exo.json`, `exo-manifest.json`, consent, fingerprint                                                                                                                                                                  |
+| [Protocol contract](./docs/contracts/plugin-protocol.md)      | Envelope, handshake, registration, handler sessions                                                                                                                                                                    |
+| [Events contract](./docs/contracts/events.md)                 | Topics, ordering, limits                                                                                                                                                                                               |
+| [Plugin SDK contract](./docs/contracts/plugin-sdk.md)         | Typed client, origin rules, compatibility policy, template                                                                                                                                                             |
+| [Plugin styling contract](./docs/contracts/plugin-styling.md) | Theme helper, token sheet and the three palettes                                                                                                                                                                       |
+| [Manifest schema](./schema/exo.schema.json)                   | Shared JSON Schema for `exo.json` and `exo-manifest.json`                                                                                                                                                              |
+| [Plugin author guide](./docs/guide/README.md)                 | Quickstart, manifest, protocol, SDK, styling, hosting, consent, testing                                                                                                                                                |
+| [Agent skill](./.agents/skills/create-exo-plugin/SKILL.md)    | Single-file skill for assistants building an Exo plugin and hosting it on GitHub Pages; installable by [raw link](https://raw.githubusercontent.com/mode777/exo-editor/main/.agents/skills/create-exo-plugin/SKILL.md) |
+| [Demo workspace](./examples/demo-workspace/README.md)         | Shipped code and template plugins in one workspace                                                                                                                                                                     |
+| [Walkthrough](./docs/walkthrough.md)                          | Recorded acceptance path with screenshots                                                                                                                                                                              |
+| [Accessibility](./docs/accessibility.md)                      | Scope, automated checks, manual script, upstream exceptions                                                                                                                                                            |
+| [Browser support](./docs/browser-support.md)                  | Supported, unsupported and unverified combinations                                                                                                                                                                     |
+| [Performance](./docs/performance.md)                          | Runtime budgets, reference environment, measurements                                                                                                                                                                   |
+| [Security review](./docs/security-review.md)                  | Trust-boundary controls, mutation evidence, findings                                                                                                                                                                   |
+| [Releases](./docs/releases.md)                                | Version axes, release checklist, deprecation and breaking changes                                                                                                                                                      |
+| [Changelog](./CHANGELOG.md)                                   | Release history                                                                                                                                                                                                        |
+| [Stratofold provider](./docs/providers/stratofold.md)         | Remote-provider track, upstream status, npm blocker                                                                                                                                                                    |
+| [Roadmap](./ROADMAP.md)                                       | Layered OpenSpec changes and exit criteria                                                                                                                                                                             |
+| [Agent guide](./AGENTS.md)                                    | Instructions for coding agents working here                                                                                                                                                                            |
 
 ## Contracts are normative
 

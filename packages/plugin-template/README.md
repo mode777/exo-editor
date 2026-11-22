@@ -50,6 +50,13 @@ https://mode777.github.io/exo-editor/plugin-template/exo-manifest-mismatch.json
 The pages mirror their state into `#observation` and the document title because
 handler frames are hidden.
 
+## Giving the template a visible surface
+
+The starter is deliberately headless, so it has no palette. If you switch it to
+`rendering: "frame"` or build a view page, import `@exo/plugin-sdk/theme.css`,
+call `followTheme(client)` from `@exo/plugin-sdk/theme`, and style the page with
+the `--exo-*` tokens. See [`docs/guide/styling.md`](../../docs/guide/styling.md).
+
 ## Manual checks against the deployed shell
 
 1. Add the deployed manifest URL to `exo.json`, approve consent, and confirm the

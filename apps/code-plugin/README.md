@@ -48,7 +48,8 @@ storage and its workers are bundled inline, so the surface still works.
 - Reports dirty state, answers the shell's save request with the current model
   text, keeps failed saves dirty and follows external changes without silently
   replacing a dirty buffer.
-- Applies the initial shell theme and subscribes to `theme/changed`.
+- Applies the initial shell theme and follows `theme/changed` through the SDK
+  `followTheme` helper; the surrounding page uses the SDK `--exo-*` tokens.
 - Refuses files above 5 MiB (or a lower shell limit) without reading them.
 
 Ctrl/Cmd+S inside Monaco sends an id-less `plugin/request-save` intent when the
@@ -85,5 +86,6 @@ model after keyboard and save checks.
 | `editor.html`              | Visible Monaco handler page                                          |
 | `src/controller.ts`        | SDK-only registration of the four globs                              |
 | `src/editor.ts`            | Monaco setup, workers, dirty/save/external-change and theme handling |
+| `src/editor.css`           | Page chrome using the SDK `--exo-*` theme tokens                     |
 | `src/languages.ts`         | Extension, theme and large-file helpers                              |
 | `public/exo-manifest.json` | Plugin manifest; pages resolve inside the deployed child path        |

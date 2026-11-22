@@ -66,6 +66,9 @@ that cannot happen on a third-party Pages site.)
    rejects the whole manifest and no code loads.
 8. **Keep the vendored SDK directory unmodified** so it can be diffed and
    updated against upstream.
+9. **Follow the shell theme.** Import `@exo/plugin-sdk/theme.css`, call
+   `followTheme()` from `@exo/plugin-sdk/theme`, and use `--exo-*` tokens.
+   Support `dark` and `light`; map `high-contrast` for your editor library.
 
 If this skill and the upstream contracts disagree, the contracts win:
 <https://github.com/mode777/exo-editor/tree/main/docs/contracts>.
@@ -110,7 +113,7 @@ my-exo-plugin/
 ├── package.json                   # workspaces wiring
 ├── sdk/                           # vendored @exo/plugin-sdk - keep unmodified
 │   ├── package.json
-│   └── src/
+│   └── src/                       # includes theme.ts and theme.css
 └── plugin/                        # your plugin (from @exo/plugin-template)
     ├── package.json
     ├── vite.config.ts
@@ -284,6 +287,77 @@ Building a real UI:
   then `editor.onEvent('theme/changed', cb)`. Initial state is already in
   `shell/init`; events carry changes.
 
+### Style the visible surface
+
+A visible frame does not inherit the shell CSS. Import the SDK token sheet, apply
+the shell theme once, and let it follow changes:
+
+```ts
+import '@exo/plugin-sdk/theme.css'
+import { followTheme } from '@exo/plugin-sdk/theme'
+
+const stopTheme = await followTheme(editor, {
+  onTheme: (theme) => {
+    // Only when your editor library has its own theme model:
+    // Monaco: dark -> vs-dark, light -> vs, high-contrast -> hc-black.
+  },
+})
+
+editor.onDispose(() => {
+  stopTheme()
+})
+```
+
+- `followTheme` applies `shell/init.theme` immediately, calls `onTheme` for it,
+  and with `events:subscribe` keeps applying later `theme/changed` values. Without
+  the permission it still applies the initial theme and returns a no-op cleanup.
+- `applyTheme(theme)` is the lower-level helper if you already subscribe.
+- Style with the semantic tokens instead of fixed colors:
+
+```css
+html,
+body {
+  height: 100%;
+  margin: 0;
+  background: var(--exo-bg);
+  color: var(--exo-fg);
+  font-family: var(--exo-font-ui);
+  font-size: var(--exo-font-size);
+}
+
+textarea,
+input {
+  border: 1px solid var(--exo-input-border);
+  border-radius: var(--exo-radius);
+  background: var(--exo-input-bg);
+  color: var(--exo-input-fg);
+}
+
+:focus-visible {
+  outline: 2px solid var(--exo-focus);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--exo-selection-bg);
+  color: var(--exo-selection-fg);
+}
+```
+
+- Use `--exo-surface`, `--exo-border`, `--exo-muted-fg`, `--exo-link`,
+  `--exo-danger`, `--exo-warning` and `--exo-success` for the surrounding page.
+  The full token contract is
+  <https://github.com/mode777/exo-editor/blob/main/docs/contracts/plugin-styling.md>.
+- Keep `color-scheme` from the sheet so native controls and scrollbars match.
+  Add `accent-color: var(--exo-accent)` and
+  `scrollbar-color: var(--exo-border) var(--exo-bg)`.
+- Do not recreate shell chrome inside the frame, and do not remove focus rings.
+  Check 4.5:1 text contrast, reduced motion and 200% zoom.
+- A plugin that already renders `vscode-workbench` components may import its
+  public `vscode-workbench/styles/tokens.css`; the helper sets the same
+  `data-theme` attribute. For a standalone plugin, the SDK sheet is smaller and
+  covers high contrast.
+
 ## Step 6 - Local test against the deployed shell
 
 Do not clone or run the shell; the deployed shell is the test surface.
@@ -366,6 +440,9 @@ Then:
 - [ ] Dirty reaches the tab; Save writes the exact text/bytes; a conflicting
       external write leaves the buffer and disk intact and the tab dirty.
 - [ ] An external change is visible and never silently replaces a dirty buffer.
+- [ ] Toggling the shell theme updates the visible page without reopening the
+      file: background, text, inputs, focus ring, selection and scrollbars follow
+      in both dark and light, and the editor library's own theme follows.
 - [ ] Closing the tab disposes the frame; a late save does not recreate the
       file.
 - [ ] Disabling the plugin falls back to the shell text surface.
@@ -384,12 +461,15 @@ Then:
 | `timeout` in the plugin log  | Controller never sent ready or completed | Check the frame console and the SDK boot path                            |
 | `protocol-violation`         | Hand-written protocol code               | Remove it; use the SDK                                                   |
 | Manifest rejected, no frame  | Unknown field or invalid page            | Validate against the schema; keep fields exact                           |
+| Plugin stays dark in light   | No `events:subscribe`, or fixed colors   | Import `theme.css`, call `followTheme`, use `--exo-*` tokens             |
+| Theme CSS is missing         | Import skipped or file not vendored      | Import `@exo/plugin-sdk/theme.css`; copy the whole SDK package           |
 
 ## Maintenance
 
 - Update the vendored SDK by re-copying `packages/plugin-sdk` from upstream
   (same commands as step 2) and bumping the `"@exo/plugin-sdk"` version in
-  `plugin/package.json` to match `sdk/package.json`. Diff before pushing.
+  `plugin/package.json` to match `sdk/package.json`. Keep `theme.ts` and
+  `theme.css` in the copy. Diff before pushing.
 - Authority, in order: the contracts
   (<https://github.com/mode777/exo-editor/tree/main/docs/contracts>), then the
   author guide (<https://github.com/mode777/exo-editor/tree/main/docs/guide>),
