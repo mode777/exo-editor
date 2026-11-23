@@ -28,7 +28,7 @@
 ## 5. Verification
 
 - [x] 5.1 Run lint, format check, typecheck, the full unit test suite, the shell build, bundle budget, CSP, custom elements, no-SDK, no-Monaco, template and code-plugin builds/copies, the secrets check and `openspec validate --all`.
-- [ ] 5.2 Deploy the change and verify the command-target flow against the deployed URL, then record the deployed commit and date.
+- [x] 5.2 Deploy the change and verify the command-target flow against the deployed URL, then record the deployed commit and date.
 
 ## Workflow follow-up
 

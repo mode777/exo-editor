@@ -117,3 +117,20 @@ dialog, direct focused behavior and the unfocused background denial.
 4. Existing plugins need no change. Tenon may remove its `newFiles` workaround.
    Rollback is a redeploy of the previous commit; no state or schema migration
    is involved.
+
+## Deployed verification
+
+Verified on 2026-11-23 against deployed commit `5bc072a` at
+`https://mode777.github.io/exo-editor/`. The CI `verify` job passed and the Pages
+deploy job completed. The served document references the same build produced
+locally, `assets/index-BLE9GFXZ.js`; the deployed asset is 626,804 bytes, reports
+shell `0.8.0` and no longer carries `0.7.0`.
+
+The automated shell gate covers the invocation grant end to end with a real
+`ViewSession` and `PluginCommandController`: unfocused panel and content-view
+commands create a file, the picker receives the same grant, post-result and
+post-timeout requests are denied, another frame stays denied, read-only and
+missing-write cases stay denied, disposal drops a pending dialog, direct focused
+use still works and focus is never moved. The deployed smoke check confirms that
+this tested build is the published artifact. Tenon itself is an external plugin
+and was not replayed from this repository.

@@ -47,10 +47,11 @@ The post-layer-10 change `plugin-theming` (archived as
 `2026-11-22-plugin-theming`) adds the optional `@exo/plugin-sdk/theme` helper,
 `@exo/plugin-sdk/theme.css` and SDK `1.8.0`, plus the styling contract,
 author-guide page and skill step; shell `0.7.0`.
-The post-layer-10 change `command-invocation-user-activation` adds a live-command
-grant for `plugin/request-new-file` and `plugin/request-files`, so a command
-target frame can open a shell-owned dialog without DOM focus; shell `0.8.0`,
-protocol `1`, manifest schema `1` and SDK `1.8.0` are unchanged.
+The post-layer-10 change `command-invocation-user-activation` (archived as
+`2026-11-23-command-invocation-user-activation`) adds a live-command grant for
+`plugin/request-new-file` and `plugin/request-files`, so a command target frame
+can open a shell-owned dialog without DOM focus; shell `0.8.0`, protocol `1`,
+manifest schema `1` and SDK `1.8.0` are unchanged.
 The parallel Stratofold provider track
 (P1-P3) is archived and verified; it does not gate the numbered layers. The
 contracts are ratified, and the shell app (`apps/shell`) builds, tests and

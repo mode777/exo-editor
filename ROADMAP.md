@@ -916,7 +916,14 @@ does not bypass any permission, capability, visibility, size, rate or dialog
 rule. Shell `0.8.0`, protocol `1`, manifest schema `1` and SDK `1.8.0` are
 unchanged, and a panel-target command can now create dynamic content without a
 fixed `newFiles` template. The change keeps the existing focus-based behavior
-for direct panel actions.
+for direct panel actions. Verified against deployed commit `5bc072a` on
+2026-11-23: the CI `verify` job and Pages deploy passed, and the served
+`assets/index-BLE9GFXZ.js` is the tested build and reports shell `0.8.0`. The
+shell-level grant tests cover panel and content-view creation, picker access,
+result/timeout expiry, other frames, read-only workspaces, disposal and direct
+focus use. The bundle measured 174,302/176,000 js and 13,785/14,000 css gzip
+bytes. The change is archived as
+`2026-11-23-command-invocation-user-activation`.
 
 ---
 
