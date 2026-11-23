@@ -3,6 +3,44 @@
 All notable changes to Exo Editor are recorded here. The version axes and the
 release process are in [`docs/releases.md`](./docs/releases.md).
 
+## [0.8.0] - 2026-11-23
+
+Additive post-release update: command-scoped user activation for file dialogs.
+
+### Added
+
+- A live plugin command invocation now treats its exact target frame as
+  user-activated for `plugin/request-new-file` and `plugin/request-files`, even
+  when the frame does not own DOM focus. A panel or content-view command can
+  therefore create a file or open the workspace picker from its `shell/command`
+  handler without stealing focus.
+- The grant begins before command delivery and ends when the invocation settles,
+  times out, the frame is disposed, the plugin stops or the workspace switches.
+  It applies only to the target frame/session, never focuses the frame, and
+  never authorizes a request after the result or timeout.
+
+### Changed
+
+- Shell `0.8.0` relaxes the focus gate only inside a live command invocation.
+  All existing permissions, capabilities, visibility, size, rate, create-only
+  and shell-owned dialog rules remain unchanged. The Tenon plugin can drop its
+  fixed `newFiles` template workaround and create content from its panel-target
+  command.
+
+### Compatibility
+
+- Shell: `0.8.0`
+- Protocol: `1`
+- Manifest schema: `1`
+- SDK: `1.8.0`
+
+### Breaking
+
+- None. This is additive shell behavior within protocol major `1` and manifest
+  schema `1`. No permission, message, manifest field, capability bit or consent
+  fingerprint input is added, and the SDK API is unchanged. An older shell still
+  denies the request and a plugin can keep its `newFiles` fallback.
+
 ## [0.7.0] - 2026-11-22
 
 Additive post-release update: plugin styling and the SDK theme surface.

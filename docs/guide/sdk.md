@@ -129,8 +129,10 @@ if (editor.capabilities.createFile) {
 when the user cancels. It preflights `capabilities.createFile`, the permission
 and the 8 MiB cap with `unsupported-message`, `permission-denied` and
 `too-large`; `already-exists` is the shell's create-only collision and the plugin
-may ask again. A view client has the same helper. Manifest templates are
-registered separately with `registration.registerNewFile(id)`.
+may ask again. A view client has the same helper. A panel or content-view frame
+that is the live target of a command may call it without owning DOM focus; the
+grant ends with the command result or timeout and does not move focus. Manifest
+templates are registered separately with `registration.registerNewFile(id)`.
 
 Rules the SDK enforces for you:
 
@@ -191,9 +193,12 @@ connection.editor.onCommand(async ({ command, args }) => {
 
 The SDK answers every invocation automatically: a resolved handler is success, a
 thrown error or `{ ok: false, message }` is a bounded failure, and the shell
-shows the failure as a non-blocking notice. Up to ten commands that arrive before
-you attach a handler are queued. Check `supportsCommands` when you also support
-older shells; it is false when `capabilities.commands` is absent.
+shows the failure as a non-blocking notice. While the invocation is live, the
+target frame may call `requestNewFile()` or `requestFiles()` even if it does not
+own DOM focus; the grant ends with the result or timeout and never moves focus.
+Up to ten commands that arrive before you attach a handler are queued. Check
+`supportsCommands` when you also support older shells; it is false when
+`capabilities.commands` is absent.
 
 ## Events
 

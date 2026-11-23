@@ -165,3 +165,10 @@ JS, 13,391 CSS). The 8,000-byte allowance keeps roughly 1,643 bytes of headroom;
 no dependency, font or vendored asset is added. Panels mount lazily and content
 views create a frame only when their tab opens, so the change adds no eager
 frame and does not alter the existing runtime budgets.
+
+The `command-invocation-user-activation` change adds the per-frame live-command
+set and its checks to the existing command, picker and new-file paths. The
+measured build is 174,302 JS and 13,785 CSS gzip bytes, an increase of 143 JS
+bytes over the previous measured build and still below the unchanged
+176,000/14,000 ceilings. No dependency, font or vendored asset is added, and the
+grant performs no extra shell render, focus change or runtime measurement.

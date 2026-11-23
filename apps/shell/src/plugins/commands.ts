@@ -72,6 +72,10 @@ export interface CommandTargetSession {
   sendCommand(invocationId: string, commandId: string, args?: CommandArgs): boolean
   onCommandResult(listener: (envelope: Envelope) => void): () => void
   onClosed(listener: (reason: string) => void): () => void
+  /** Mark the target as user-activated for focus-gated intents. */
+  beginUserInvocation?(invocationId: string): void
+  /** Drop the grant when the invocation settles, times out or is disposed. */
+  endUserInvocation?(invocationId: string): void
 }
 
 export interface CommandHost {
@@ -306,6 +310,9 @@ export class PluginCommandController {
       this.handleResult(pending, envelope),
     )
     pending.unsubscribeClosed = target.onClosed((reason) => this.cancelPending(pending, reason))
+    // The frame stays the user's command target for the whole invocation,
+    // including while it opens a shell-owned dialog from its handler.
+    target.beginUserInvocation?.(invocationId)
 
     if (!target.sendCommand(invocationId, commandId, args ?? undefined)) {
       this.clearPending(pending)
@@ -431,6 +438,7 @@ export class PluginCommandController {
   private clearPending(pending: PendingInvocation): void {
     const key = commandKey(pending.identity, pending.commandId)
     if (this.pending.get(key) === pending) this.pending.delete(key)
+    pending.session.endUserInvocation?.(pending.invocationId)
     if (pending.timer !== null) {
       this.clearTimeoutImpl(pending.timer)
       pending.timer = null

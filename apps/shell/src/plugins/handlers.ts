@@ -294,7 +294,11 @@ export class HandlerPool {
         if (input.candidate.rendering !== 'frame') {
           return Promise.resolve({ ok: false as const, code: 'permission-denied' as const })
         }
-        if (!this.surfaces.has(input.path) || !session.active || !session.hasFocus()) {
+        if (
+          !this.surfaces.has(input.path) ||
+          !session.active ||
+          (!session.hasFocus() && !session.hasLiveCommandInvocation())
+        ) {
           return Promise.resolve({ ok: false as const, code: 'permission-denied' as const })
         }
         return (
@@ -306,7 +310,11 @@ export class HandlerPool {
         if (input.candidate.rendering !== 'frame') {
           return Promise.resolve({ ok: false as const, code: 'permission-denied' as const })
         }
-        if (!this.surfaces.has(input.path) || !session.active || !session.hasFocus()) {
+        if (
+          !this.surfaces.has(input.path) ||
+          !session.active ||
+          (!session.hasFocus() && !session.hasLiveCommandInvocation())
+        ) {
           return Promise.resolve({ ok: false as const, code: 'permission-denied' as const })
         }
         return (

@@ -184,10 +184,13 @@ commands.
 An explorer invocation carries `{ path, kind }` for the selected entry; palette
 and editor-title invocations carry no arguments. Long work belongs in a panel
 that reports its own progress: a command result must arrive within ten seconds.
-Commands are excluded from the consent fingerprint and named after your plugin
-on every surface. Set `engines.exo` to a range that includes `0.4.0`, so an older
-shell fails with `incompatible-engine` instead of rejecting the unknown field.
-See the [manifest contract](../contracts/plugin-manifest.md#33-commands).
+While the invocation is live, the target panel or content view may open the
+picker or Save As dialog without owning DOM focus; the grant ends with the
+result or timeout and does not move focus. Commands are excluded from the
+consent fingerprint and named after your plugin on every surface. Set
+`engines.exo` to a range that includes `0.4.0`, so an older shell fails with
+`incompatible-engine` instead of rejecting the unknown field. See the [manifest
+contract](../contracts/plugin-manifest.md#33-commands).
 
 ## New-file templates
 

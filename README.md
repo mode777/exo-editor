@@ -31,8 +31,10 @@ Post-release updates are additive within protocol major `1`: the workspace file
 picker and directory listing (SDK `1.2.0`/`1.3.0`), plugin-local events
 (`1.4.0`), plugin panels, content views and navigation intents (`1.5.0`, shell
 `0.3.0`), plugin commands in shell-owned surfaces (`1.6.0`, shell `0.4.0`),
-plugin new-file creation with manifest templates (`1.7.0`, shell `0.5.0`), and
-the optional plugin styling helper and token sheet (`1.8.0`, shell `0.7.0`).
+plugin new-file creation with manifest templates (`1.7.0`, shell `0.5.0`), the
+optional plugin styling helper and token sheet (`1.8.0`, shell `0.7.0`), and
+command-scoped user activation for the picker and Save As dialog (shell `0.8.0`,
+SDK unchanged).
 Panels mount lazily and content views open as read-only tabs; both are
 user-invoked and excluded from the consent fingerprint.
 

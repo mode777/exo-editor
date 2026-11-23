@@ -43,8 +43,9 @@ instance plus the session echo, not the origin string.
   alone is the older read permission bit and does not prove support. The reply
   is `shell/files-selected` with selected paths or `[]` on cancel; it contains no
   content. Read each path with `plugin/request-file`. The picker is available
-  only to an active, visible, focused handler; an older shell answers
-  `unsupported-message`, so keep a manual path-entry fallback.
+  only to an active, visible frame that is focused or the target of a live
+  command invocation; an older shell answers `unsupported-message`, so keep a
+  manual path-entry fallback.
 - List: `plugin/request-list` asks for one directory level and requires the
   manifest's `workspace:list` permission. Check
   `capabilities.directoryListing` first; absence means an older shell. The reply
@@ -60,8 +61,9 @@ instance plus the session echo, not the origin string.
   `directory` are hints. The shell opens a Save As dialog, writes create-only and
   replies `shell/new-file-result { path, version }` or `{ cancelled: true }`.
   `already-exists` keeps the dialog open; `too-large` names the 8 MiB limit.
-  Only an active, visible, focused frame may ask, and only one dialog exists per
-  shell. The shell does not open the file; call `open-file` if that is useful.
+  Only an active, visible frame that is focused or the target of a live command
+  invocation may ask, and only one dialog exists per shell. The shell does not
+  open the file; call `open-file` if that is useful.
 - Dirty: the plugin reports `plugin/dirty`. The shell never infers it from
   content.
 - Save: the shell sends `shell/request-save`; the handler replies with
@@ -114,10 +116,12 @@ plugin/command-result  { ok: true } | { ok: false, message? } // replyTo = that 
 
 An editor action goes to the active document's handler; a panel or content-view
 command reveals or opens that surface first. Explorer invocations carry the
-selected path and kind. Answer every invocation within ten seconds with exactly
-one result; the shell logs a timeout and keeps the frame mounted. The shell
-allows one in-flight invocation per command, five per plugin and a five-second
-cooldown. See the
+selected path and kind. While that invocation is live, the target frame may open
+the picker or the Save As dialog even if it does not own DOM focus; the grant
+ends with the result or timeout, applies to no other frame, and does not move
+focus. Answer every invocation within ten seconds with exactly one result; the
+shell logs a timeout and keeps the frame mounted. The shell allows one in-flight
+invocation per command, five per plugin and a five-second cooldown. See the
 [protocol contract](../contracts/plugin-protocol.md#561-commands).
 
 ## Events

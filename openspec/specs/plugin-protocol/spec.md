@@ -1071,7 +1071,7 @@ A target frame SHALL answer `shell/command` with `plugin/command-result` carryin
 
 ### Requirement: New-file creation request
 
-An editor or view frame with `workspace:write` SHALL send a correlated `plugin/request-new-file` carrying exactly one of `text` or `bytes`, an optional suggested name and an optional directory hint. The shell SHALL open one shell-owned Save As dialog, write the result create-only and reply `shell/new-file-result { path, version }` or `{ cancelled: true }`.
+An editor or view frame with `workspace:write` SHALL send a correlated `plugin/request-new-file` carrying exactly one of `text` or `bytes`, an optional suggested name and an optional directory hint. The shell SHALL open one shell-owned Save As dialog, write the result create-only and reply `shell/new-file-result { path, version }` or `{ cancelled: true }`. A frame that is the target of a live command invocation SHALL be treated as user-activated for this request even without DOM focus, until the invocation settles, times out or the frame is disposed.
 
 #### Scenario: Text creation
 
@@ -1110,7 +1110,17 @@ An editor or view frame with `workspace:write` SHALL send a correlated `plugin/r
 
 #### Scenario: Hidden or inactive frame
 
-- **WHEN** the frame is not visible, active or focused
+- **WHEN** the frame is not visible or active, or is not focused and has no live command invocation
+- **THEN** the shell replies `permission-denied` and opens no dialog
+
+#### Scenario: Live command target without focus
+
+- **WHEN** the target frame of a live command invocation sends `plugin/request-new-file` without owning DOM focus
+- **THEN** the shell opens the Save As dialog, applies every existing permission, capability, size, rate and dialog rule and does not move focus
+
+#### Scenario: Request after the invocation settles
+
+- **WHEN** the same frame sends `plugin/request-new-file` after its command result, timeout or disposal
 - **THEN** the shell replies `permission-denied` and opens no dialog
 
 #### Scenario: Collision
@@ -1173,7 +1183,7 @@ Editor `shell/init` SHALL carry `capabilities.requestFiles` as the permission bi
 
 ### Requirement: File picker request
 
-An active editor handler SHALL be able to send one correlated `plugin/request-files` carrying optional `multiple` and `directory` fields; an omitted `multiple` defaults to `false`. The shell SHALL validate the message shape, the `workspace:read` permission, the handler phase and the active-frame gate, and SHALL reply with `shell/files-selected` carrying only selected workspace paths or with `shell/error`.
+An active editor handler or view frame SHALL be able to send one correlated `plugin/request-files` carrying optional `multiple` and `directory` fields; an omitted `multiple` defaults to `false`. The shell SHALL validate the message shape, the `workspace:read` permission, the frame phase and the active-frame gate, and SHALL reply with `shell/files-selected` carrying only selected workspace paths or with `shell/error`. A frame that is the target of a live command invocation SHALL be treated as user-activated for this request even without DOM focus, until the invocation settles, times out or the frame is disposed.
 
 #### Scenario: Single selection
 
@@ -1204,6 +1214,16 @@ An active editor handler SHALL be able to send one correlated `plugin/request-fi
 
 - **WHEN** a registration frame sends `plugin/request-files`
 - **THEN** the shell rejects it as a protocol violation and opens no picker
+
+#### Scenario: Live command target without focus
+
+- **WHEN** the target frame of a live command invocation sends `plugin/request-files` without owning DOM focus
+- **THEN** the shell opens the picker, applies every existing permission, rate and dialog rule and does not move focus
+
+#### Scenario: Request after the invocation settles
+
+- **WHEN** the same frame sends `plugin/request-files` after its command result, timeout or disposal
+- **THEN** the shell replies `permission-denied` and opens no picker
 
 #### Scenario: Directory hint
 
@@ -1241,11 +1261,11 @@ The picker SHALL return only paths the user explicitly selected, SHALL exclude `
 
 ### Requirement: File picker concurrency and lifecycle
 
-The shell SHALL allow at most one pending picker request per frame and one open picker across all frames, SHALL reply `rate-limited` to a request that arrives while a picker is open, and SHALL accept a request only from the active, visible, focused handler. The shell SHALL close the picker without a reply when that handler is disposed, its plugin is removed, its tab closes, its tab becomes inactive or the workspace switches.
+The shell SHALL allow at most one pending picker request per frame and one open picker across all frames, SHALL reply `rate-limited` to a request that arrives while a picker is open, and SHALL accept a request only from an active, visible frame that is focused or the target of a live command invocation. The shell SHALL close the picker without a reply when that frame is disposed, its plugin is removed, its tab closes, its tab becomes inactive or the workspace switches.
 
 #### Scenario: Inactive or hidden frame
 
-- **WHEN** a hidden, inactive or unfocused handler sends `plugin/request-files`
+- **WHEN** a hidden or inactive frame, or an unfocused frame without a live command invocation, sends `plugin/request-files`
 - **THEN** the shell replies `permission-denied` and opens no picker
 
 #### Scenario: One picker globally

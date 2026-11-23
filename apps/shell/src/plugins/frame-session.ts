@@ -236,6 +236,7 @@ export abstract class FrameSession {
   private newFileAbort: AbortController | null = null
   private newFileWindow: { start: number; count: number } | null = null
   private intentWindow: { start: number; count: number } | null = null
+  private readonly liveCommandInvocations = new Set<string>()
   private readonly commandResultListeners = new Set<(envelope: Envelope) => void>()
   private readonly closeListeners = new Set<(reason: 'closed' | 'error') => void>()
 
@@ -291,6 +292,30 @@ export abstract class FrameSession {
 
   hasFocus(): boolean {
     return this.frame?.hasFocus?.() ?? false
+  }
+
+  /**
+   * Mark a live command invocation for this exact frame. While any invocation
+   * for this frame is live, focus-gated user intents from it are allowed even
+   * when another shell element owns DOM focus.
+   */
+  beginUserInvocation(invocationId: string): void {
+    if (this.phase !== 'active') return
+    this.liveCommandInvocations.add(invocationId)
+  }
+
+  /** Drop the grant for one invocation; other live invocations stay valid. */
+  endUserInvocation(invocationId: string): void {
+    this.liveCommandInvocations.delete(invocationId)
+  }
+
+  hasLiveCommandInvocation(): boolean {
+    return this.liveCommandInvocations.size > 0
+  }
+
+  /** A visible frame that owns focus or is the target of a live command. */
+  private userActivated(): boolean {
+    return this.visible() && (this.hasFocus() || this.hasLiveCommandInvocation())
   }
 
   /** Send one `shell/command` to this active frame; false means nothing was sent. */
@@ -380,6 +405,7 @@ export abstract class FrameSession {
     this.cancelFilePicker()
     this.cancelNewFile()
     this.listing.reset()
+    this.liveCommandInvocations.clear()
     this.onClosing()
     this.notifyClosed('closed')
     if (!this.frame) {
@@ -407,6 +433,7 @@ export abstract class FrameSession {
     this.listing.reset()
     this.readings.clear()
     this.readIds.clear()
+    this.liveCommandInvocations.clear()
     this.onClosing()
     this.frame?.close()
     this.frame = null
@@ -489,6 +516,7 @@ export abstract class FrameSession {
     this.cancelFilePicker()
     this.cancelNewFile()
     this.listing.reset()
+    this.liveCommandInvocations.clear()
     this.onClosing()
     this.frame?.close()
     this.frame = null
@@ -506,6 +534,7 @@ export abstract class FrameSession {
     this.listing.reset()
     this.readings.clear()
     this.readIds.clear()
+    this.liveCommandInvocations.clear()
     this.onClosing()
     this.frame?.close()
     this.frame = null
@@ -606,6 +635,9 @@ export abstract class FrameSession {
 
   private handleCommandResult(envelope: Envelope): void {
     if (this.phase !== 'active') return
+    // The grant ends before the result is handled, so a handler that answers
+    // first and then asks for a dialog is treated as a late request.
+    if (envelope.replyTo) this.endUserInvocation(envelope.replyTo)
     for (const listener of [...this.commandResultListeners]) {
       try {
         listener(envelope)
@@ -805,6 +837,11 @@ export abstract class FrameSession {
       this.log(`${this.logPrefix}-picker`, 'permission-denied')
       return
     }
+    if (!this.userActivated()) {
+      this.sendError('permission-denied', id)
+      this.log(`${this.logPrefix}-picker`, 'permission-denied')
+      return
+    }
     if (this.pickerId !== null) {
       this.sendError('rate-limited', id)
       this.log(`${this.logPrefix}-picker`, 'rate-limited')
@@ -929,7 +966,7 @@ export abstract class FrameSession {
       this.log(`${this.logPrefix}-new-file`, 'permission-denied')
       return
     }
-    if (!this.visible() || !this.hasFocus()) {
+    if (!this.userActivated()) {
       this.sendError('permission-denied', id)
       this.log(`${this.logPrefix}-new-file`, 'permission-denied')
       return

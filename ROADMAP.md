@@ -906,6 +906,18 @@ contract and raw skill URLs returned 200. The CI `verify` job and Pages deploy
 passed; the bundle measured 174,159/176,000 js and 13,785/14,000 css gzip bytes.
 The change is archived as `2026-11-22-plugin-theming`.
 
+**Follow-up (2026-11-23):** the post-layer-10 change
+`command-invocation-user-activation` adds an invocation-scoped grant so the exact
+target frame of a live command may use `plugin/request-new-file` and
+`plugin/request-files` without owning DOM focus. The grant starts before
+`shell/command` delivery and ends with the result, timeout, disposal, plugin stop
+or workspace switch; it never moves focus, never authorizes another frame and
+does not bypass any permission, capability, visibility, size, rate or dialog
+rule. Shell `0.8.0`, protocol `1`, manifest schema `1` and SDK `1.8.0` are
+unchanged, and a panel-target command can now create dynamic content without a
+fixed `newFiles` template. The change keeps the existing focus-based behavior
+for direct panel actions.
+
 ---
 
 ## Deferred beyond v1

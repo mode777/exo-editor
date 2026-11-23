@@ -67,6 +67,7 @@ class FakeHost implements CommandHost {
 class FakeSession implements CommandTargetSession {
   active = true
   readonly sent: Array<{ invocationId: string; commandId: string; args?: unknown }> = []
+  readonly liveInvocations = new Set<string>()
   private readonly resultListeners = new Set<(envelope: Envelope) => void>()
   private readonly closeListeners = new Set<(reason: string) => void>()
 
@@ -74,6 +75,14 @@ class FakeSession implements CommandTargetSession {
     if (!this.active) return false
     this.sent.push({ invocationId, commandId, args })
     return true
+  }
+
+  beginUserInvocation(invocationId: string): void {
+    this.liveInvocations.add(invocationId)
+  }
+
+  endUserInvocation(invocationId: string): void {
+    this.liveInvocations.delete(invocationId)
   }
 
   onCommandResult(listener: (envelope: Envelope) => void): () => void {
@@ -343,6 +352,32 @@ describe('command controller', () => {
     vi.advanceTimersByTime(COMMAND_TIMEOUT_MS)
     expect(host.logs.filter((log) => log.code === 'timeout')).toEqual([])
     expect(controller.getSnapshot().notices).toEqual([])
+  })
+
+  it('scopes user invocation grants to the target frame and the live invocation', async () => {
+    vi.useFakeTimers()
+    const session = new FakeSession()
+    const host = new FakeHost()
+    host.entries = [
+      entry({ command: command({ id: 'first', registrationOrder: 0 }) }),
+      entry({ command: command({ id: 'second', registrationOrder: 1 }) }),
+    ]
+    const { controller } = setup({ host, activeEditor: () => session })
+
+    expect(await controller.invoke(IDENTITY, 'first', 'palette')).toEqual({ ok: true })
+    expect(await controller.invoke(IDENTITY, 'second', 'palette')).toEqual({ ok: true })
+    expect([...session.liveInvocations]).toEqual(['cmd-1', 'cmd-2'])
+
+    session.emitResult('cmd-1', { ok: true })
+    expect([...session.liveInvocations]).toEqual(['cmd-2'])
+
+    vi.advanceTimersByTime(COMMAND_TIMEOUT_MS)
+    expect(session.liveInvocations.size).toBe(0)
+
+    expect(await controller.invoke(IDENTITY, 'first', 'palette')).toEqual({ ok: true })
+    expect([...session.liveInvocations]).toEqual(['cmd-3'])
+    session.dispose()
+    expect(session.liveInvocations.size).toBe(0)
   })
 
   it('rejects an explorer invocation without a resource and ignores a stale command', async () => {

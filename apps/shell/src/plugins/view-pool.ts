@@ -629,7 +629,12 @@ export class ViewPool {
       },
       onRequestFiles: this.onRequestFiles,
       onRequestNewFile: (request) => {
-        if (!record.handle.visible || !record.session?.active || !record.session?.hasFocus()) {
+        const session = record.session
+        if (
+          !record.handle.visible ||
+          !session?.active ||
+          (!session.hasFocus() && !session.hasLiveCommandInvocation())
+        ) {
           return Promise.resolve({ ok: false as const, code: 'permission-denied' as const })
         }
         return (

@@ -373,11 +373,17 @@ plugin/request-files   { multiple?: boolean, directory?: WorkspacePath }
 shell/files-selected   { paths: WorkspacePath[] }      // [] means cancelled
 ```
 
-- `plugin/request-files` is an editor-phase, correlated request. It requires
-  `workspace:read` and `capabilities.filePicker`. The shell SHALL reject it with
-  `permission-denied` unless the handler is active, visible, focused and not
-  disposing, and SHALL reply `rate-limited` when a picker is already open or the
-  frame already has one pending.
+- `plugin/request-files` is a correlated request available to an editor
+  handler or view frame. It requires `workspace:read` and
+  `capabilities.filePicker`. The shell SHALL reject it with `permission-denied`
+  unless the frame is active, visible, not disposing, and either focused or the
+  target of a live command invocation. The shell SHALL reply `rate-limited` when
+  a picker is already open or the frame already has one pending.
+- While a plugin command invocation is live for the target frame, that frame is
+  treated as user-activated for `plugin/request-files` even if it does not own
+  DOM focus. The grant ends when the invocation settles, times out, or the frame
+  is disposed; it does not apply to another frame or to a request sent after the
+  invocation settles. The shell does not move focus as part of the grant.
 - `multiple` defaults to `false`; a multiple selection returns at most 32 paths
   in selection order. `directory` is an optional start hint, not a grant. The
   shell normalizes and contains it and falls back silently to the handler file's
@@ -461,9 +467,16 @@ shell/new-file-result    { path: WorkspacePath, version: string }
 
 - `plugin/request-new-file` is an editor-phase and view-phase, correlated
   request. It requires `workspace:write`, a writable session,
-  `capabilities.createFile`, and an active, visible, focused frame. The shell
-  replies `permission-denied` and opens no dialog for a missing permission, a
-  read-only workspace or a hidden/inactive/unfocused frame.
+  `capabilities.createFile`, and an active, visible frame that is either focused
+  or the target of a live command invocation. The shell replies
+  `permission-denied` and opens no dialog for a missing permission, a read-only
+  workspace or a hidden/inactive/unfocused frame outside a live invocation.
+- While a plugin command invocation is live for the target frame, that frame is
+  treated as user-activated for `plugin/request-new-file` even if it does not
+  own DOM focus. The grant ends when the invocation settles, times out, or the
+  frame is disposed; it does not apply to another frame or to a request sent
+  after the invocation settles. The shell does not move focus as part of the
+  grant.
 - The request carries exactly one of `text` or `bytes`. Both, neither or an
   unknown field is a protocol violation. `text` is UTF-8 encoded; `bytes` are
   written unchanged. Neither is decoded, evaluated or transformed.
@@ -644,6 +657,14 @@ plugin/command-result  { ok: true } | { ok: false, message?: string }
   identity that owns the command's target: the active document handler, a
   revealed panel or an opened content-view tab. The registration frame never
   receives one.
+- From delivery until `plugin/command-result`, the ten-second timeout, frame
+  disposal, plugin stop or workspace switch, the exact target frame is treated
+  as user-activated for `plugin/request-new-file` and `plugin/request-files`
+  even if it does not own DOM focus. The shell does not focus the frame as part
+  of an invocation. The grant covers only the target frame/session and its live
+  invocation: another frame is not authorized, and a request after the result
+  or timeout is denied. All existing permissions, capabilities, visibility,
+  size, rate and dialog rules remain in force.
 - `args` is present only for an explorer context invocation and carries the
   selected entry's normalized path and `file`/`directory` kind. Palette and
   editor-title invocations carry no arguments. No file content, handle, `File` or
