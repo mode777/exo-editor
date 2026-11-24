@@ -52,6 +52,10 @@ The post-layer-10 change `command-invocation-user-activation` (archived as
 `plugin/request-new-file` and `plugin/request-files`, so a command target frame
 can open a shell-owned dialog without DOM focus; shell `0.8.0`, protocol `1`,
 manifest schema `1` and SDK `1.8.0` are unchanged.
+Shell `0.8.1` is a bug fix: the sash paints above visible plugin frames and
+keeps pointer capture through a drag, so resizing the secondary side bar no
+longer freezes, jumps or stays active after release. Protocol `1`, manifest
+schema `1` and SDK `1.8.0` are unchanged.
 The parallel Stratofold provider track
 (P1-P3) is archived and verified; it does not gate the numbered layers. The
 contracts are ratified, and the shell app (`apps/shell`) builds, tests and

@@ -925,6 +925,26 @@ focus use. The bundle measured 174,302/176,000 js and 13,785/14,000 css gzip
 bytes. The change is archived as
 `2026-11-23-command-invocation-user-activation`.
 
+**Follow-up (2026-11-24):** shell `0.8.1` fixes sash drags that crossed a
+visible plugin frame. Plugin frames are fixed overlays at z-index 20, so the
+secondary side-bar overlay covered the right half of the sash and swallowed the
+pointer moves and release: the pane froze, jumped and kept resizing after the
+button was up. The sash now paints above plugin surfaces, and a shell-level
+pointerdown capture keeps the gesture on the shell; the primary side bar and
+bottom panel share the capture path. Protocol `1`, manifest schema `1` and SDK
+`1.8.0` are unchanged. The upstream `vscode-workbench` `0.1.3` demo was checked
+first and does not reproduce the defect because its side bars contain no
+cross-origin frames. Verified against deployed commit `d6bbb29` on 2026-11-24
+with `chrome-headless-shell` 131 and the deployed fixture's **Fixture
+Inspector**: the sash center hit-tested the handle, a fast 132px shrink tracked
+monotonically from 330 to the 240px minimum, the body kept `is-resizing` until
+release and cleared afterwards, and moving the mouse after release left the
+width at 240. The CI `verify` job passed and Pages served
+`assets/index-DwnK4pZb.js` for shell `0.8.1`; the first deploy attempt hit a
+GitHub artifact lookup error and the retry passed after removing the duplicate
+`github-pages` artifacts. The bundle measured 174,420/176,000 js and
+13,788/14,000 css gzip bytes.
+
 ---
 
 ## Deferred beyond v1
