@@ -59,6 +59,23 @@ plus the shell text surface. The recorded acceptance path is
 - Disabling the plugin falls back to the shell text surface.
 - A same-origin plugin has no storage and a cross-origin plugin keeps its own.
 
+## Panels and editor-bound context
+
+- Register a primary, secondary and bottom panel. The primary adds an activity
+  item, the secondary appears in the view picker, and the bottom panel appears as
+  a tab. Only the active bottom tab mounts an iframe; switching tabs retains the
+  frame without a new handshake.
+- With two files of the same plugin open, a panel that subscribes to
+  `editor/active` follows the active tab. Switching to a shell text file, a
+  content view, another plugin's editor or no tab produces `active: false` and
+  the panel shows its empty state.
+- A panel edit published on a `local/*` topic with the active `instanceId`
+  reaches only that editor, becomes undoable in the editor's own history, marks
+  the tab dirty and saves through the normal shell flow. The panel never gets a
+  save or write method.
+- A panel of another plugin, including one with the same manifest id on another
+  origin, receives `activeEditor: null` and no `editor/active` event.
+
 ## Troubleshooting
 
 | Symptom                                      | Likely cause                                                       | Fix                                                                               |
@@ -93,6 +110,8 @@ and [`docs/contracts/plugin-manifest.md`](../contracts/plugin-manifest.md).
       contrast when the editor library supports it) with readable contrast and a
       visible focus ring.
 - [ ] The plugin does not touch storage in same-origin mode.
+- [ ] A bottom panel mounts only when its tab is active, and an editor-bound
+      panel follows `editor/active` without receiving a save or write method.
 - [ ] The plugin has no `postMessage`, envelope or handshake code outside the
       SDK.
 - [ ] The deployed manifest URL works from the deployed shell.

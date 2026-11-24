@@ -71,6 +71,9 @@ class FakePool implements DocumentEditorHost {
   dirtySequence(): number {
     return this.seq
   }
+  get(): undefined {
+    return undefined
+  }
   attach(): void {}
   async detach(): Promise<void> {}
   publish(): boolean {

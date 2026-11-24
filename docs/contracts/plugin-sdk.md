@@ -18,7 +18,7 @@ enough to ship a plugin.
 
 | Artifact                                            | Version | Packaging                                        |
 | --------------------------------------------------- | ------- | ------------------------------------------------ |
-| `packages/plugin-sdk` (`@exo/plugin-sdk`)           | `1.9.0` | Private workspace package; no runtime dependency |
+| `packages/plugin-sdk` (`@exo/plugin-sdk`)           | `1.10.0` | Private workspace package; no runtime dependency |
 | `packages/plugin-template` (`@exo/plugin-template`) | `0.1.0` | Private workspace package; built static assets   |
 
 - The SDK MAJOR equals the protocol major it speaks. `PROTOCOL_VERSION` and
@@ -31,8 +31,11 @@ enough to ship a plugin.
   command registration, `onCommand()` and the command support bit, `1.7.0`
   adds `requestNewFile()`, `registerNewFile()` and the creation/template support
   bits, `1.8.0` adds the DOM-only theme helper and the optional token
-  stylesheet, and `1.9.0` exposes the active content view from `shell/init` and
-  the `view/active` event topic, all without changing the protocol major.
+  stylesheet, `1.9.0` exposes the active content view from `shell/init` and
+  the `view/active` event topic, and `1.10.0` exposes the editor instance id,
+  the active-editor context and `editor/active`, accepts the `bottom` view
+  location and adds the registration `bottomPanel` bit, all without changing the
+  protocol major.
 - The packages are not published in v1 (D12). Consumers in this repository use
   the workspace copy. A future publication adds a built `dist` and does not
   change the message protocol.
@@ -125,6 +128,9 @@ complete()                          -> one plugin/register-complete, then shell/
   registrations.
 - `registerNewFile(id)` rejects locally with `unsupported-message` when the
   registration init omits `capabilities.newFiles`.
+- The registration init also carries `capabilities.bottomPanel`; it is `false`
+  on an older shell. The SDK exposes the bit but does not preflight
+  `registerPanel(id)` by location, because the location is manifest-owned.
 - A second `complete()` rejects locally as `protocol-violation` and sends no
   second message.
 - A registration call after completion rejects locally.
@@ -138,8 +144,9 @@ complete()                          -> one plugin/register-complete, then shell/
 
 ```ts
 editor.file // FileMetadata from shell/init, no content
+editor.instanceId // opaque editor frame id, or null on an older shell
 editor.capabilities // read, write, requestFiles, filePicker, createFile, directoryListing,
-                   // localEvents, openFile, openView, requestPanel, commands
+                   // localEvents, openFile, openView, requestPanel, commands, editorContext
 editor.limits // maxFileSize, maxRequestBytes
 editor.settings // resolved shell settings
 editor.readFile(path, 'utf8' | 'binary')
@@ -224,6 +231,7 @@ and exposes no save or dirty methods.
 ```ts
 view.view // ViewInitData from shell/init: kind, id, title, instanceId, location?, payload?, openedBy?
 view.activeContentView // { pluginId, viewId, instanceId, instanceKey } | null
+view.activeEditor // { pluginId, path, instanceId } | null
 view.capabilities // same shape as the editor capabilities
 view.limits // maxFileSize, maxRequestBytes
 view.settings // resolved shell settings
@@ -389,6 +397,13 @@ production build. Token names, values and usage rules are in
 - `activeContentView` and `view/active` are an additive minor (`1.9.0`). An older
   shell omits the init field and rejects the topic; the SDK reports `null` and
   leaves event subscription to the shell's error reply.
+- `activeEditor`, `editor.instanceId`, `editor/active` and
+  `capabilities.editorContext` are an additive minor (`1.10.0`). An older shell
+  omits them; the SDK reports `null`/`false` and the plugin keeps working. The
+  `bottom` view location is also additive, but an SDK that predates it rejects
+  the unknown location, so a plugin that declares a bottom panel must build
+  against `1.10.0` or a client that accepts it. Registration
+  `capabilities.bottomPanel` follows the same absence-is-false rule.
 - A deprecated SDK export remains functional for the rest of the current major,
   carries an `@deprecated` note with its replacement and is removed only at the
   next major.

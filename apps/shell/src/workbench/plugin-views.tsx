@@ -1,5 +1,10 @@
 import { useCallback, useRef } from 'react'
-import type { ViewDefinition, WorkbenchConfig, WorkbenchViewRegistry } from 'vscode-workbench'
+import {
+  useWorkbenchStore,
+  type ViewDefinition,
+  type WorkbenchConfig,
+  type WorkbenchViewRegistry,
+} from 'vscode-workbench'
 import { usePluginHost, useViewPoolSnapshot, useWorkspaceRuntime } from '../workspace/context'
 import type { PluginHostRecord, PluginHostSnapshot } from '../plugins/host'
 import type { RegisteredPanel } from '../plugins/registration'
@@ -25,14 +30,26 @@ function pluginInfo(record: PluginHostRecord): ViewPluginInfo {
   }
 }
 
-function panelDefinition(record: PluginHostRecord, panel: RegisteredPanel): ViewDefinition {
-  if (!record.identity) throw new Error('A panel needs an active plugin identity.')
-  const id = pluginViewId(record.identity, panel.id)
+interface PanelEntry {
+  identity: string
+  record: PluginHostRecord
+  panel: RegisteredPanel
+}
+
+function panelDefinition(entry: PanelEntry, bottomViewIds: string[]): ViewDefinition {
+  const { identity, record, panel } = entry
+  const id = pluginViewId(identity, panel.id)
   const definition: ViewDefinition = {
     id,
     title: `${panel.title} — ${record.manifest?.name ?? 'Plugin'}`,
     icon: panel.icon ?? 'window',
-    component: () => <PanelSurface identity={record.identity as string} panelId={panel.id} />,
+    component: () => (
+      <PanelSurface
+        identity={identity}
+        panelId={panel.id}
+        {...(panel.location === 'bottom' ? { bottomViewIds } : {})}
+      />
+    ),
   }
   if (panel.location === 'secondary') {
     definition.actions = [
@@ -46,26 +63,38 @@ function panelDefinition(record: PluginHostRecord, panel: RegisteredPanel): View
   return definition
 }
 
-/** Derive the activity bar, both side-bar registries and the views from the host. */
+/** Derive the activity bar, all three view registries and the views from the host. */
 export function derivePluginWorkbench(host: PluginHostSnapshot): {
   config: WorkbenchConfig
   views: WorkbenchViewRegistry
 } {
-  const primary: ViewDefinition[] = []
-  const secondary: ViewDefinition[] = []
+  const entries: PanelEntry[] = []
   for (const record of host.records) {
     if (record.phase !== 'active' || !record.manifest || !record.identity) continue
     for (const panel of record.panels) {
-      const definition = panelDefinition(record, panel)
-      if (panel.location === 'primary') primary.push(definition)
-      else secondary.push(definition)
+      entries.push({ identity: record.identity, record, panel })
     }
+  }
+
+  const bottomViewIds = entries
+    .filter((entry) => entry.panel.location === 'bottom')
+    .map((entry) => pluginViewId(entry.identity, entry.panel.id))
+  const primary: ViewDefinition[] = []
+  const secondary: ViewDefinition[] = []
+  const bottom: ViewDefinition[] = []
+  for (const entry of entries) {
+    const definition = panelDefinition(entry, bottomViewIds)
+    if (entry.panel.location === 'primary') primary.push(definition)
+    else if (entry.panel.location === 'secondary') secondary.push(definition)
+    else bottom.push(definition)
   }
 
   const primaryViews: Record<string, ViewDefinition> = { ...workbenchViews.primary }
   for (const definition of primary) primaryViews[definition.id] = definition
   const secondaryViews: Record<string, ViewDefinition> = {}
   for (const definition of secondary) secondaryViews[definition.id] = definition
+  const panelViews: Record<string, ViewDefinition> = {}
+  for (const definition of bottom) panelViews[definition.id] = definition
 
   return {
     config: {
@@ -90,20 +119,43 @@ export function derivePluginWorkbench(host: PluginHostSnapshot): {
         enabled: secondary.length > 0,
         views: secondary.map((view) => view.id),
       },
+      bottomPanel: {
+        ...workbenchConfig.bottomPanel,
+        enabled: bottom.length > 0,
+        views: bottom.map((view) => view.id),
+      },
     },
     views: {
       primary: primaryViews,
       secondary: secondaryViews,
-      panel: {},
+      panel: panelViews,
     },
   }
 }
 
-function PanelSurface({ identity, panelId }: { identity: string; panelId: string }) {
+function PanelSurface({
+  identity,
+  panelId,
+  bottomViewIds,
+}: {
+  identity: string
+  panelId: string
+  /** Ordered bottom view ids; present only for a bottom panel. */
+  bottomViewIds?: string[]
+}) {
   const runtime = useWorkspaceRuntime()
   const host = usePluginHost()
   const handles = useViewPoolSnapshot()
+  const activePanelView = useWorkbenchStore((state) => state.activePanelView)
   const key = `panel:${identity}:${panelId}`
+  const id = pluginViewId(identity, panelId)
+  const activeBottomView =
+    bottomViewIds === undefined || bottomViewIds.length === 0
+      ? null
+      : bottomViewIds.includes(activePanelView)
+        ? activePanelView
+        : bottomViewIds[0]
+  const shown = bottomViewIds === undefined || activeBottomView === id
   const handle = handles.find((entry) => entry.key === key)
   const record = host.records.find((entry) => entry.identity === identity)
   const panel = record?.panels.find((entry) => entry.id === panelId)
@@ -145,7 +197,7 @@ function PanelSurface({ identity, panelId }: { identity: string; panelId: string
 
   return (
     <div className="exo-view-surface">
-      {handle?.phase === 'failed' && (
+      {shown && handle?.phase === 'failed' && (
         <div className="exo-view-error" role="alert">
           <span>{handle.error?.message ?? `The ${panel.title} panel could not start.`}</span>
           <button type="button" onClick={() => runtime.views.retry(key)}>
@@ -153,12 +205,14 @@ function PanelSurface({ identity, panelId }: { identity: string; panelId: string
           </button>
         </div>
       )}
-      <div
-        ref={attach}
-        className="exo-view-placeholder"
-        role="region"
-        aria-label={`${panel.title} — ${record.manifest?.name ?? 'plugin'}`}
-      />
+      {shown && (
+        <div
+          ref={attach}
+          className="exo-view-placeholder"
+          role="region"
+          aria-label={`${panel.title} — ${record.manifest?.name ?? 'plugin'}`}
+        />
+      )}
     </div>
   )
 }

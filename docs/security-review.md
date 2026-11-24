@@ -33,6 +33,7 @@ reverting. Findings are recorded in [Findings](#findings).
 | 13 | View surfaces and navigation intents | `plugin-views` - Panel contributions; Content-view contributions; Navigation and panel intents; Cross-plugin content views; View lifecycle | `plugins/frame-session.ts` (shared gate, path and intent checks), `plugins/view-session.ts`, `plugins/view-pool.ts` (lazy mount, caps, surfaces), `workspace/runtime.ts` (open-file/view/panel resolution) | `view-session.test.ts`, `view-pool.test.ts`, `runtime.views.test.ts`, `plugin-views.test.tsx`, `ContentViewSurface.test.tsx`, `SecondaryViewPicker.test.tsx` |
 | 14 | Plugin command surface | `plugin-commands` - Command contribution semantics; Command registration activation; Command invocation; Command results and failures; Command runtime limits; Command attribution and isolation; Command teardown | `plugins/commands.ts` (registry, single controller, target resolution, timers, limits, notices), `plugins/frame-session.ts` (`shell/command` delivery, active-phase result routing, init support bit), `plugins/registration.ts` (subset, dedupe, `target-not-registered`), `workbench/commands.ts` (synthetic palette ids), `explorer/ExplorerView.tsx`, `document/DocumentArea.tsx` | `commands.test.ts`, `registration.test.ts`, `host.test.ts`, `commands.test.ts` (palette), `ExplorerView.commands.test.tsx`, `DocumentArea.commands.test.tsx`, `CommandNotices.test.tsx` |
 | 15 | New-file creation | `plugin-file-creation` all requirements; `workspace-access` - Create-only writes; Create-only provider parity; `plugin-protocol` - New-file creation request; New-file capability negotiation; Limits; `editor-shell` - Explorer new-file templates; New-file Save As dialog; `plugin-host` - New-file template registration | `plugins/new-file.ts` (single dialog, create-only write, cancellation, reset), `plugins/frame-session.ts` (shape, permission, focus, size and rate gates, correlated result), `plugins/manifest.ts` (decoded limits, reserved names), `plugins/registration.ts` (declared id, `workspace:write`), `workspace/providers/*` (`createOnly`), `document/NewFileDialog.tsx`, `explorer/ExplorerView.tsx` | `new-file.test.ts`, `handler.test.ts`, `NewFileDialog.test.tsx`, `manifest.test.ts`, `registration.test.ts`, `host.test.ts`, `conformance.ts`, `consent.test.ts`, `ExplorerView.commands.test.tsx`, `new-file.test.ts` (SDK) |
+| 16 | Editor-bound panels | `plugin-views` - Active editor context; Panel contributions; Panel registration and lazy mounting; `plugin-events` - V1 topic catalog; Delivery semantics; Change producers; `plugin-protocol` - View frame initialization; View and intent capability negotiation; Bottom panel capability negotiation; `editor-shell` - Plugin bottom panels; Active editor tracking in the workbench | `plugins/view-pool.ts` (identity filter, bottom location), `plugins/view-session.ts` (activeEditor init), `workspace/runtime.ts` (active editor derivation and targeted publish), `plugins/frame-session.ts` (editorContext bit), `plugins/handler.ts` (instanceId), `workbench/plugin-views.tsx` (active-tab-only bottom placeholder), `plugins/consent.ts` (fingerprint unchanged) | `runtime.editor-context.test.ts`, `view-pool.test.ts`, `view-session.test.ts`, `handler.test.ts`, `events.test.ts`, `plugin-views.test.tsx`, `sdk-conformance.test.ts`, `consent.test.ts`, `manifest.test.ts` |
 
 ## Control details
 
@@ -379,6 +380,45 @@ reverting. Findings are recorded in [Findings](#findings).
   remains offerable from the released workspace. Remove the fingerprint
   exclusion by adding `newFiles` to `fingerprintInput`: the consent exclusion
   test fails on a content change.
+
+### 16. Editor-bound panels
+
+- Requirements: `plugin-views` "Active editor context for view frames", "Panel
+  contributions" and "Panel registration and lazy mounting"; `plugin-events`
+  "V1 topic catalog", "Delivery semantics" and "Change producers";
+  `plugin-protocol` "View frame initialization", "View and intent capability
+  negotiation" and "Bottom panel capability negotiation"; `editor-shell` "Plugin
+  bottom panels" and "Active editor tracking in the workbench".
+- Enforcement: `ViewPool` filters `activeEditor` by the full plugin identity, not
+  only the manifest id, so a same-id plugin on another origin receives `null`.
+  `WorkspaceRuntime.syncActiveEditor` advertises only the active tab's active
+  handler; text, content, failed, mounting, background and other-plugin surfaces
+  clear it. The `editor/active` event uses `EventBus.publish` with the target
+  identity, so another plugin receives neither the event nor the path. The value
+  carries only `pluginId`, path and `instanceId`; no bytes, handle or save
+  method. A bottom panel is added to the workbench `panel` registry, and
+  `PanelSurface` renders its placeholder only when it is the resolved active
+  bottom tab, so an inactive tab creates no iframe. A view frame still has no
+  dirty/save path; the editor applies panel edits through its own history and
+  saves normally. Consent is unchanged: bottom panels are user-invoked and the
+  active editor is the plugin's own document metadata.
+- Tests: `runtime.editor-context.test.ts` covers editor-to-editor, text,
+  content, other-plugin, no-tab, rename and remount transitions;
+  `view-pool.test.ts` covers the bottom location, identity filtering and the
+  same-id different-origin case; `view-session.test.ts` covers the
+  `activeEditor` init and metadata-only shape; `handler.test.ts` covers the
+  per-frame instance id and `from` equality; `events.test.ts` covers targeted
+  delivery and sequencing; `plugin-views.test.tsx` covers derived bottom tabs,
+  active-only mounting, the first-tab fallback and an axe scan;
+  `sdk-conformance.test.ts` drives a real view through the SDK and
+  `consent.test.ts` pins the fingerprint exclusion.
+- Mutation: remove the identity comparison in `ViewPool.mount`'s
+  `activeEditor` callback: the same-id different-origin test receives the other
+  plugin's context and fails. Remove `{ target: next.identity }` from the
+  runtime publish: the cross-plugin `events.test.ts` case receives the event and
+  fails. Remove `editor: { instanceId }` from `HandlerSession.buildModeInit`:
+  the handler init test fails. Remove the `shown` guard in `PanelSurface`:
+  `plugin-views.test.tsx` creates two frames for two tabs and fails.
 
 ## Findings
 

@@ -207,9 +207,36 @@ describe('view session', () => {
         instanceId: 'panel-1',
         location: 'primary',
       },
+      activeContentView: null,
+      activeEditor: null,
     })
     expect((init?.payload as { file?: unknown }).file).toBeUndefined()
     expect(context.session.active).toBe(true)
+  })
+
+  it('initializes with the active editor context and no file content', async () => {
+    const context = await start({
+      activeEditor: () => ({
+        identity: IDENTITY,
+        pluginId: 'com.example.viewer',
+        path: '/src/a.txt',
+        instanceId: 'session-a',
+      }),
+    })
+    ready(context)
+    const init = posted(context.frame, 'shell/init')
+    expect(init?.payload).toMatchObject({
+      activeEditor: {
+        pluginId: 'com.example.viewer',
+        path: '/src/a.txt',
+        instanceId: 'session-a',
+      },
+    })
+    const active = (init?.payload as { activeEditor?: Record<string, unknown> }).activeEditor
+    expect(active).not.toHaveProperty('identity')
+    expect(active).not.toHaveProperty('content')
+    expect(active).not.toHaveProperty('bytes')
+    expect(JSON.stringify(init?.payload)).not.toContain('hello')
   })
 
   it('ignores a ready from the wrong origin or session', async () => {

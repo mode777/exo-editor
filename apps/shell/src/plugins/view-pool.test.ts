@@ -11,6 +11,7 @@ import {
   type PanelViewInput,
   type ViewPluginInfo,
 } from './view-pool'
+import type { ActiveEditor } from './view-session'
 
 const SHELL_ORIGIN = 'https://editor.example.com'
 const PLUGIN_ORIGIN = 'https://plugins.example.com'
@@ -77,6 +78,7 @@ async function createPool(
   overrides: {
     events?: EventBus
     onCompanionPanel?: (change: CompanionPanelChange) => void
+    activeEditor?: () => ActiveEditor | null
   } = {},
 ) {
   const transport = new FakeFrameTransport()
@@ -103,6 +105,7 @@ async function createPool(
       logView: (_identity, phase, code) => logs.push({ phase, ...(code ? { code } : {}) }),
     },
     workspaceName: 'demo',
+    ...(overrides.activeEditor === undefined ? {} : { activeEditor: overrides.activeEditor }),
   })
   return { pool, transport, workspace, logs }
 }
@@ -151,6 +154,67 @@ describe('view pool', () => {
     pool.attachPanelSurface(input, placeholder())
     expect(transport.frames).toHaveLength(1)
     expect(frame.surfaceShown).toBe(true)
+  })
+
+  it('mounts a bottom panel with its location and retains it', async () => {
+    const { pool, transport } = await createPool()
+    const input = panelInput()
+    input.panel.location = 'bottom'
+    pool.attachPanelSurface(input, placeholder())
+    expect(transport.frames).toHaveLength(1)
+    const frame = transport.frames[0] as FakeFrame
+    ready(frame)
+    const init = posted(frame, 'shell/init') as { payload?: unknown } | undefined
+    expect(init?.payload).toMatchObject({
+      mode: 'view',
+      view: { kind: 'panel', id: 'outline', location: 'bottom' },
+    })
+    expect(pool.getSnapshot()).toMatchObject([
+      { kind: 'panel', viewId: 'outline', location: 'bottom', phase: 'active', visible: true },
+    ])
+
+    pool.attachPanelSurface(input, null)
+    expect(posted(frame, 'shell/dispose')).toBeUndefined()
+    expect(frame.surfaceShown).toBe(false)
+
+    pool.attachPanelSurface(input, placeholder())
+    expect(transport.frames).toHaveLength(1)
+    expect(frame.surfaceShown).toBe(true)
+  })
+
+  it('exposes activeEditor only to a view of the same identity', async () => {
+    const active: ActiveEditor = {
+      identity: IDENTITY,
+      pluginId: 'com.example.viewer',
+      path: '/notes.txt',
+      instanceId: 'editor-1',
+    }
+    const { pool, transport } = await createPool({ activeEditor: () => active })
+    const input = panelInput()
+    pool.attachPanelSurface(input, placeholder())
+    const matching = transport.frames[0] as FakeFrame
+    ready(matching)
+    expect(posted(matching, 'shell/init')).toMatchObject({
+      payload: {
+        activeEditor: {
+          pluginId: 'com.example.viewer',
+          path: '/notes.txt',
+          instanceId: 'editor-1',
+        },
+      },
+    })
+
+    const other = panelInput()
+    other.plugin = {
+      ...other.plugin,
+      identity: 'https://other.example.com::com.example.viewer',
+      origin: 'https://other.example.com',
+    }
+    other.panel = { ...other.panel, id: 'other-outline' }
+    pool.attachPanelSurface(other, placeholder())
+    const different = transport.frames[1] as FakeFrame
+    ready(different, 'https://other.example.com')
+    expect(posted(different, 'shell/init')).toMatchObject({ payload: { activeEditor: null } })
   })
 
   it('opens, deduplicates and closes content-view tabs with frames', async () => {

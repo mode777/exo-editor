@@ -39,7 +39,8 @@ when the pointer crosses a visible plugin frame; `0.8.2` fixes switching
 between content-view tabs so the newly active instance's frame is shown; and
 `0.8.3` keeps a content-view companion visible only while its tab is active;
 `0.9.0` exposes the active content-view instance in `shell/init` and through the
-targeted `view/active` event (SDK `1.9.0`).
+targeted `view/active` event (SDK `1.9.0`); `0.10.0` adds editor-bound panels,
+the bottom panel location and the targeted `editor/active` event (SDK `1.10.0`).
 Panels mount lazily and content views open as read-only tabs; both are
 user-invoked and excluded from the consent fingerprint.
 

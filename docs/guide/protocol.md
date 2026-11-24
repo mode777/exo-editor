@@ -83,11 +83,14 @@ instance plus the session echo, not the origin string.
 ## Panels, content views and intents
 
 A view frame (`exo-mode=view`) gets `{ view: { kind, id, title, instanceId,
-location?, payload?, openedBy? } }` instead of a file. A panel is mounted on its
-first reveal and retained hidden; a content view is one frame per open tab. A
-content view may receive a 64 KiB JSON payload, and `openedBy` when another
-plugin opened it. The payload is data, not content and not a channel back: the
-opener only receives `shell/open-result`.
+location?, payload?, openedBy? }, activeContentView, activeEditor }` instead of a
+file. `location` is `primary`, `secondary` or `bottom`. A panel is mounted on its
+first reveal and retained hidden; only the active bottom tab mounts a frame. A
+content view is one frame per open tab. A content view may receive a 64 KiB JSON
+payload, and `openedBy` when another plugin opened it. The payload is data, not
+content and not a channel back: the opener only receives `shell/open-result`.
+`activeEditor` is `{ pluginId, path, instanceId }` when the active tab is a file
+handled by an editor of the same plugin, otherwise `null`; it is metadata only.
 
 Both editor and view frames can ask the shell to navigate or change layout:
 
@@ -134,10 +137,16 @@ workspace state are already in `shell/init`; events carry changes, not replay.
 The same permission also carries plugin-local messages. A handler sends a
 correlated `plugin/publish` on a `local/<name>` topic and the shell delivers a
 `shell/event` with `from` set to the publishing frame's session id to every
-subscribed frame of the same plugin. Two plugins may use `local/state`
-independently. The shell does not interpret the payload, keeps no history and
-does not route it to another plugin. The payload limit is 1 MiB, with 100
-events/s per topic and 200/s per frame.
+subscribed frame of the same plugin. For an editor frame, `from` equals the
+`editor.instanceId` in its init, so a panel can accept only the active editor's
+reply. Two plugins may use `local/state` independently. The shell does not
+interpret the payload, keeps no history and does not route it to another plugin.
+The payload limit is 1 MiB, with 100 events/s per topic and 200/s per frame.
+
+The targeted `editor/active` topic reports `{ pluginId, active: true, path,
+instanceId }` or `{ pluginId, active: false }` to the plugin's subscribed frames.
+Subscribe when a panel follows the active editor; the initial value is in
+`shell/init.activeEditor`.
 
 ## Errors
 

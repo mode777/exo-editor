@@ -211,6 +211,13 @@ describe('consent fingerprint', () => {
             entry: 'views/outline.html',
             entryUrl: 'https://plugins.example.com/monaco/views/outline.html',
           },
+          {
+            id: 'inspection',
+            title: 'Inspection',
+            location: 'bottom',
+            entry: 'views/inspection.html',
+            entryUrl: 'https://plugins.example.com/monaco/views/inspection.html',
+          },
         ],
         contentViews: [
           {

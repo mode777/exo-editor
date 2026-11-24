@@ -44,6 +44,7 @@
               type: 'plugin/register',
               payload: {
                 fileEditors: [
+                  { glob: '**/*.bound.txt', entry: 'editor-bound.html' },
                   { glob: '**/*.local.txt', entry: 'editor-local-events.html' },
                   { glob: '**/*.local-other.txt', entry: 'editor-local-events.html' },
                   { glob: '**/*.list.txt', entry: 'editor-list.html' },
@@ -55,7 +56,12 @@
                   { glob: '**/*.txt', entry: 'editor.html' },
                   { glob: '**/*.sibling.txt', entry: 'sibling.html' },
                 ],
-                panels: ['fixture-panel', 'fixture-inspector', 'fixture-inspector-2'],
+                panels: [
+                  'fixture-panel',
+                  'fixture-inspector',
+                  'fixture-inspector-2',
+                  'fixture-inspection',
+                ],
                 contentViews: ['fixture-tutorial', 'fixture-generator'],
                 newFiles: ['fixture.text', 'fixture.binary'],
                 commands: [

@@ -143,24 +143,34 @@ interface ShellInit {
   settings: Record<string, boolean | string | number>
   /** Present only when mode is 'editor'. Never contains file content. */
   file?: FileMetadata
+  /**
+   * Present only when mode is 'editor'. Opaque shell-assigned id for this
+   * handler frame; stable while the frame lives and different after a remount.
+   */
+  editor?: { instanceId: string }
   /** Present only when mode is 'view'. */
   view?: {
     kind: 'panel' | 'content'
     id: string
     title: string
     instanceId: string
-    location?: 'primary' | 'secondary'
+    location?: 'primary' | 'secondary' | 'bottom'
     /** One-shot data supplied at open time; never file content. */
     payload?: unknown
     /** Present when another plugin opened this content view. */
     openedBy?: { pluginId: string; pluginName: string; origin: string }
   }
   /**
-   * Registration init carries `{ localEvents, newFiles }`. Editor and view init
-   * carry the permission bits plus the shell support bits: `filePicker`,
-   * `createFile`, `directoryListing`, `localEvents`, `openFile`, `openView`,
-   * `requestPanel` and `commands` are absent on older shells and a plugin must
-   * treat absence as false.
+   * Present only when mode is 'view'. The active file editor of this plugin
+   * when its tab is active, otherwise `null`. Metadata only.
+   */
+  activeEditor?: { pluginId: string; path: string; instanceId: string } | null
+  /**
+   * Registration init carries `{ localEvents, newFiles, bottomPanel }`. Editor
+   * and view init carry the permission bits plus the shell support bits:
+   * `filePicker`, `createFile`, `directoryListing`, `localEvents`, `openFile`,
+   * `openView`, `requestPanel`, `commands` and `editorContext` are absent on
+   * older shells and a plugin must treat absence as false.
    */
   capabilities?: {
     read?: boolean
@@ -169,12 +179,14 @@ interface ShellInit {
     filePicker?: boolean
     createFile?: boolean
     newFiles?: boolean
+    bottomPanel?: boolean
     directoryListing?: boolean
     localEvents?: boolean
     openFile?: boolean
     openView?: boolean
     requestPanel?: boolean
     commands?: boolean
+    editorContext?: boolean
   }
   /** Present only when mode is 'editor' or 'view'. */
   limits?: { maxFileSize: number; maxRequestBytes: number }
@@ -326,8 +338,8 @@ RegistrationRejection  = 'not-declared' | 'permission-denied' | 'invalid-glob'
 
 ### 5.1 Init
 
-The editor-mode `shell/init` carries the file block; there is no second init
-message.
+The editor-mode `shell/init` carries the file block and the editor instance block;
+there is no second init message.
 
 ```ts
 interface FileMetadata {
@@ -339,7 +351,16 @@ interface FileMetadata {
   version: string
   languageHint?: string   // extension-derived hint, not a guarantee
 }
+
+interface EditorInstance {
+  instanceId: string      // opaque shell-assigned id for this handler frame
+}
 ```
+
+`editor.instanceId` is stable for the mounted frame and changes when the document
+is reopened, retried or moved to another matching editor. It is the same value
+used in a view frame's `activeEditor` and `editor/active`, and the shell also
+uses it as the local-event `from` value for that frame.
 
 Content is **not** included. The plugin requests it.
 
@@ -569,7 +590,9 @@ shell/published      { topic: 'local/<name>', seq: number }        // replyTo = 
   `unsupported-topic`, a payload over 1 MiB with `too-large`, and an excess rate
   with `rate-limited`. The shell does not interpret, log or persist the payload.
 - The shell sets `from` on the resulting `shell/event` to the publishing frame's
-  opaque `exo-session`. Delivery is limited to subscribed handler frames of the
+  opaque `exo-session`. For an editor frame this equals `editor.instanceId`, so a
+  panel can accept a reply only when `from` matches the active editor it
+  addressed. Delivery is limited to subscribed handler and view frames of the
   same plugin identity and is at-most-once with no replay. A publisher that also
   subscribed receives its own event.
 - `shell/published` means the shell accepted the event, not that a peer handled
@@ -591,6 +614,7 @@ shell/init (view) {
   mode: 'view',
   view: { kind: 'panel' | 'content', id, title, instanceId, location?, payload?, openedBy? },
   activeContentView: { pluginId, viewId, instanceId, instanceKey } | null,
+  activeEditor: { pluginId, path, instanceId } | null,
   capabilities, limits
 }
 ```
@@ -599,16 +623,23 @@ shell/init (view) {
   frame starts, limited to the same plugin; it is `null` when another surface or
   no tab is active. Later changes arrive as `view/active` events for frames with
   `events:subscribe`.
+- `activeEditor` describes the active file editor when its tab is active,
+  limited to the same plugin identity; it is `null` when the active tab is a
+  shell text file, another plugin's editor, a content view or no tab. It carries
+  only the plugin id, workspace path and editor instance id. Later changes
+  arrive as `editor/active` events for frames with `events:subscribe`.
 - A panel is a singleton frame, mounted on first reveal and retained hidden while
-  another primary or secondary view is active. A never-revealed panel creates no
-  iframe.
+  another primary, secondary or bottom view is active. A never-revealed panel
+  creates no iframe; an inactive bottom tab creates no iframe until it becomes
+  the active bottom tab.
 - A content view is one frame per open tab instance. The tab id is derived from
   the plugin identity, view id and instance key. Opening an existing instance key
   focuses its tab and ignores a new payload.
-- The view block never contains a file path, bytes, `File`, `Blob` or handle.
-  `payload` is structured-cloneable data of at most 64 KiB and is passed only in
-  `shell/init`; it is never put in the frame URL or the log. `openedBy` is advisory
-  display data added by the shell, not the caller.
+- The view block never contains a file block, bytes, `File`, `Blob` or handle.
+  `activeEditor.path` is workspace metadata, not content. `payload` is
+  structured-cloneable data of at most 64 KiB and is passed only in `shell/init`;
+  it is never put in the frame URL or the log. `openedBy` is advisory display
+  data added by the shell, not the caller.
 - A view frame can subscribe to shell topics and publish local topics under the
   same identity, permission, sequence and queue rules as an editor frame. It can
   read files, list directories and open the picker only through the normal
@@ -643,10 +674,13 @@ shell/panel-result    { panel, open: boolean }
   target. An unknown plugin or unregistered view is `not-found`. The payload is
   limited to 64 KiB JSON; an oversized payload is `too-large` and opens nothing.
   There is no reverse channel: the opener receives only `shell/open-result`.
-- `request-panel` only addresses the caller's own registered panels. `show`
-  reveals and lazily mounts the panel, `hide` closes the region only when that
-  panel is active, and `toggle` switches it. The result carries the panel id and
-  its resulting open state; an unregistered panel is `not-found`.
+- `request-panel` only addresses the caller's own registered panels. The shell
+  resolves the panel's manifest location, including `bottom`. `show` reveals and
+  lazily mounts the panel, `hide` closes the region only when that panel is
+  active and visible, and `toggle` switches it. For a bottom panel, `show` opens
+  the bottom region on that tab and `hide` closes the region only when that tab
+  is the active bottom tab. The result carries the panel id and its resulting
+  open state; an unregistered panel is `not-found`.
 - Each frame is limited to ten intents in a rolling second. Excess requests are
   `rate-limited`, not a teardown. A malformed intent is a protocol violation.
 

@@ -3,6 +3,48 @@
 All notable changes to Exo Editor are recorded here. The version axes and the
 release process are in [`docs/releases.md`](./docs/releases.md).
 
+## [0.10.0] - 2026-11-24
+
+Additive post-release update: editor-bound panels and a bottom panel location.
+
+### Added
+
+- `contributes.panels` accepts `location: "bottom"`. Registered bottom panels
+  appear as tabs in the shell bottom region; only the active tab mounts a frame,
+  and multiple bottom panels share the region. The panel limit stays eight
+  across all locations. A manifest that uses the location must declare
+  `engines.exo` at or above `0.10.0`.
+- A view frame's `shell/init` now carries `activeEditor` with
+  `{ pluginId, path, instanceId }` or `null`, limited to the same plugin
+  identity. The shell catalog adds the targeted `editor/active` topic with
+  `{ pluginId, active: true, path, instanceId }` or `{ pluginId, active: false }`.
+- An editor frame's `shell/init` carries `editor.instanceId`, the same opaque id
+  used in `activeEditor`, `editor/active` and the local-event `from`. Editor and
+  view init add `capabilities.editorContext`; registration init adds
+  `capabilities.bottomPanel`.
+- SDK `1.10.0` exposes `view.activeEditor`, `EditorClient.instanceId`, the
+  `editor/active` topic and the new capability bits, and accepts the `bottom`
+  view location.
+- Panels can follow the active editor through the existing `local/*` events:
+  publish a payload containing the target instance id, handle only the matching
+  editor, and accept a reply only when `from` matches. The editor keeps the
+  document, history, dirty state and save flow; a view still has no save path.
+
+### Compatibility
+
+- Shell: `0.10.0`
+- Protocol: `1`
+- Manifest schema: `1`
+- SDK: `1.10.0`
+
+### Breaking
+
+- None for existing plugins. An older shell reports `incompatible-engine` for a
+  manifest that uses the bottom location, and an older SDK rejects the unknown
+  `view.location`; a plugin that declares a bottom panel must build against SDK
+  `1.10.0` (or a client that accepts the location). The active-editor fields are
+  additive: an older shell omits them and a new SDK reports `null`/`false`.
+
 ## [0.9.0] - 2026-11-24
 
 Additive post-release update: active content-view context for panels.

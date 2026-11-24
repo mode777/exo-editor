@@ -945,6 +945,20 @@ GitHub artifact lookup error and the retry passed after removing the duplicate
 `github-pages` artifacts. The bundle measured 174,420/176,000 js and
 13,788/14,000 css gzip bytes.
 
+**Follow-up (2026-11-24):** the post-layer-10 change `editor-bound-panels` adds
+the `bottom` panel location, `activeEditor` and `editor.instanceId` in
+`shell/init`, the targeted `editor/active` topic and the registration
+`bottomPanel` / runtime `editorContext` support bits. Bottom panels share the
+workbench bottom region as tabs and only the active tab mounts a frame. A panel
+can follow the active file editor through `local/*` events by targeting the
+editor's opaque instance id; the editor keeps the document, history, dirty state
+and save flow, and a view frame still has no save path. SDK `1.10.0` exposes
+`view.activeEditor`, `EditorClient.instanceId` and the typed topic and accepts
+the bottom location; shell `0.10.0`, protocol `1` and manifest schema `1`. The
+deployed fixture adds **Fixture Inspection** and a `*.bound.txt` editor with
+snapshot, edit, undo and save observations. Deployed verification is recorded in
+the change design after the Pages deploy.
+
 ---
 
 ## Deferred beyond v1

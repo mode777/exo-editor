@@ -3,4 +3,4 @@
  * manifest `engines.exo` ranges. Kept in one place and pinned to the package
  * version by `version.test.ts`.
  */
-export const SHELL_VERSION = '0.9.0'
+export const SHELL_VERSION = '0.10.0'

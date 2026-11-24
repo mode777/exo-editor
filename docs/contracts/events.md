@@ -64,7 +64,9 @@ shell/event         { topic: string, seq: number, from?: string, payload: unknow
   identity and never routes to another plugin.
 - A local event carries `from`, the publishing frame's opaque `exo-session`.
   The shell sets it; a plugin cannot forge another frame's id through the
-  payload.
+  payload. For an editor frame this value equals the `editor.instanceId` in its
+  initialization, so a panel can accept a reply only when `from` matches the
+  active editor it addressed.
 - A publisher that is also subscribed receives its own event. There is no
   ordering guarantee between `shell/published` and delivery to the publisher.
 - The shell does not interpret, log or persist the payload. Plugins own their
@@ -106,6 +108,7 @@ interface ShellEvent<T> {
 | `workspace/closed`       | `{ reason: 'switch' \| 'close' }`                                                              | The workspace is being released; the last event a frame receives                                         |
 | `config/changed`         | `{ pluginId, values: Record<string, unknown> }`                                                | A plugin's contributed settings change; only that plugin's subscribed handler and view frames receive it |
 | `view/active`            | `{ pluginId, active: false }` or `{ pluginId, active: true, viewId, instanceId, instanceKey }` | A plugin's active content-view tab changes or clears; only that plugin's subscribed frames receive it    |
+| `editor/active`          | `{ pluginId, active: false }` or `{ pluginId, active: true, path, instanceId }`                | A plugin's active file editor changes, is renamed or clears; only that plugin's subscribed frames receive it |
 
 Topic names are `<namespace>/<event>`, lowercase, `[a-z0-9-]` segments, maximum
 64 characters. New topics are added by changing this contract and the OpenSpec
@@ -116,8 +119,8 @@ spec; a plugin must ignore topics it does not know.
 `local/<name>` is not part of the shell catalog. It exists only for the frames
 of one plugin and is governed by the local rules in section 2. A plugin cannot
 add a shell topic, cannot publish a shell topic, and cannot observe another
-plugin's local topic. `config/changed` and `view/active` are the targeted shell
-topics.
+plugin's local topic. `config/changed`, `view/active` and `editor/active` are the
+targeted shell topics.
 
 `config/changed` carries the full new value map for the named plugin, not a
 delta. It requires `events:subscribe`, and the shell delivers it only to that
@@ -132,6 +135,15 @@ includes `viewId`, `instanceId` and `instanceKey`; a clear event carries only
 to that plugin's subscribed frames, and is published when the active tab changes.
 The current value at frame start is in `shell/init.activeContentView`; the event
 is a change notification, not a replay.
+
+`editor/active` carries the plugin's active file editor. An active event includes
+the workspace `path` and the editor `instanceId`; a clear event carries only
+`{ pluginId, active: false }`. It requires `events:subscribe`, is delivered only
+to that plugin's subscribed frames, and is published when the active file tab's
+handler changes, is renamed or clears. The current value at frame start is in
+`shell/init.activeEditor`; the event is a change notification, not a replay.
+`instanceId` is the same opaque value as the editor's `editor.instanceId` and its
+local-event `from`.
 
 ### `workspace/closed` ordering
 

@@ -9,6 +9,7 @@ export const EVENT_TOPICS = [
   'workspace/closed',
   'config/changed',
   'view/active',
+  'editor/active',
 ] as const
 
 export type ShellEventTopic = (typeof EVENT_TOPICS)[number]
@@ -44,12 +45,17 @@ export type ViewActivePayload =
       instanceKey: string
     }
 
+export type EditorActivePayload =
+  | { pluginId: string; active: false }
+  | { pluginId: string; active: true; path: WorkspacePath; instanceId: string }
+
 export interface EventPayloads {
   'theme/changed': ThemeChangedPayload
   'workspace/file-changed': FileChangedPayload
   'workspace/closed': WorkspaceClosedPayload
   'config/changed': ConfigChangedPayload
   'view/active': ViewActivePayload
+  'editor/active': EditorActivePayload
 }
 
 export interface ShellEvent<T = unknown> {

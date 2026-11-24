@@ -5,6 +5,7 @@ import { MemoryWorkspaceProvider } from '../workspace/providers/memory'
 import { MemoryHandleStore } from '../workspace/providers/folder/handle-store'
 import { FakeFrameTransport, type FakeFrame } from '../plugins/frame-test-support'
 import type { PluginHost, PluginHostRecord, ViewLifecycle } from '../plugins/host'
+import type { CommandEntry } from '../plugins/commands'
 import { validateManifest, type PluginManifest } from '../plugins/manifest'
 import type { RegisteredContentView, RegisteredPanel } from '../plugins/registration'
 import { pluginViewId } from '../workbench/plugin-views'
@@ -55,6 +56,12 @@ function manifestFor(
                   title: 'Inspector',
                   location: 'secondary',
                   entry: 'views/inspector.html',
+                },
+                {
+                  id: 'inspection',
+                  title: 'Inspection',
+                  location: 'bottom',
+                  entry: 'views/inspection.html',
                 },
               ],
             }
@@ -138,6 +145,9 @@ function hostStub(records: PluginHostRecord[]) {
     }),
     logHandler: vi.fn(),
     logView: vi.fn(),
+    logCommand: vi.fn(),
+    findCommand: vi.fn(),
+    listCommands: vi.fn(() => []),
   }
   return {
     host: host as unknown as PluginHost,
@@ -233,6 +243,130 @@ describe('runtime view intents', () => {
     await flush()
     expect(posted(frame, 'shell/open-result')).toMatchObject({ replyTo: 'open' })
     expect(useWorkbenchStore.getState().tabs.some((tab) => tab.path === '/notes.txt')).toBe(true)
+    runtime.dispose()
+  })
+
+  it('shows, hides and toggles a bottom panel through request-panel', async () => {
+    const record = recordFor(manifestFor(ORIGIN_A, 'com.example.viewer', 'panel'), IDENTITY_A, 0)
+    const { runtime, transport } = await createRuntime([record])
+    const bottom = record.panels.find((panel) => panel.location === 'bottom')
+    if (!bottom) throw new Error('Bottom panel fixture missing')
+    const input = panelInput(record)
+    runtime.views.attachPanelSurface(
+      {
+        ...input,
+        panel: {
+          ...input.panel,
+          id: bottom.id,
+          title: bottom.title,
+          location: 'bottom',
+          entryUrl: bottom.entryUrl,
+        },
+      },
+      placeholder(),
+    )
+    const frame = transport.frames[0]
+    if (!frame) throw new Error('Frame not found')
+    ready(frame, ORIGIN_A)
+    const viewId = pluginViewId(IDENTITY_A, bottom.id)
+    useWorkbenchStore.setState({ bottomPanelVisible: false, activePanelView: 'problems' })
+
+    send(frame, ORIGIN_A, 'plugin/request-panel', 'show', { panel: bottom.id, action: 'show' })
+    await flush()
+    expect(useWorkbenchStore.getState()).toMatchObject({
+      bottomPanelVisible: true,
+      activePanelView: viewId,
+    })
+    expect(posted(frame, 'shell/panel-result')?.payload).toMatchObject({
+      panel: bottom.id,
+      open: true,
+    })
+
+    useWorkbenchStore.setState({ bottomPanelVisible: true, activePanelView: 'other-panel' })
+    send(frame, ORIGIN_A, 'plugin/request-panel', 'hide-other', {
+      panel: bottom.id,
+      action: 'hide',
+    })
+    await flush()
+    expect(useWorkbenchStore.getState().bottomPanelVisible).toBe(true)
+    const hideResults = frame.posted
+      .map((entry) => entry.message as { type?: string; payload?: unknown })
+      .filter((message) => message.type === 'shell/panel-result')
+    expect(hideResults.at(-1)?.payload).toMatchObject({
+      panel: bottom.id,
+      open: false,
+    })
+
+    useWorkbenchStore.setState({ bottomPanelVisible: true, activePanelView: viewId })
+    send(frame, ORIGIN_A, 'plugin/request-panel', 'hide', { panel: bottom.id, action: 'hide' })
+    await flush()
+    expect(useWorkbenchStore.getState().bottomPanelVisible).toBe(false)
+
+    send(frame, ORIGIN_A, 'plugin/request-panel', 'toggle', { panel: bottom.id, action: 'toggle' })
+    await flush()
+    expect(useWorkbenchStore.getState()).toMatchObject({
+      bottomPanelVisible: true,
+      activePanelView: viewId,
+    })
+    runtime.dispose()
+  })
+
+  it('reveals a bottom panel for a command and delivers after the handshake', async () => {
+    const record = recordFor(manifestFor(ORIGIN_A, 'com.example.viewer', 'panel'), IDENTITY_A, 0)
+    const { runtime, transport } = await createRuntime([record])
+    const bottom = record.panels.find((panel) => panel.location === 'bottom')
+    if (!bottom) throw new Error('Bottom panel fixture missing')
+    const command: CommandEntry = {
+      identity: IDENTITY_A,
+      pluginId: 'com.example.viewer',
+      pluginName: 'com.example.viewer',
+      pluginVersion: '1.0.0',
+      origin: ORIGIN_A,
+      pluginOrder: 0,
+      command: {
+        id: 'inspect',
+        title: 'Inspect',
+        target: { kind: 'panel', id: bottom.id },
+        menus: ['commandPalette'],
+        registrationOrder: 0,
+      },
+    }
+    vi.spyOn(runtime.pluginHost, 'findCommand').mockReturnValue(command)
+    useWorkbenchStore.setState({ bottomPanelVisible: false, activePanelView: 'problems' })
+    const invocation = runtime.commands.invoke(IDENTITY_A, 'inspect', 'palette')
+    expect(useWorkbenchStore.getState()).toMatchObject({
+      bottomPanelVisible: true,
+      activePanelView: pluginViewId(IDENTITY_A, bottom.id),
+    })
+
+    const input = panelInput(record)
+    runtime.views.attachPanelSurface(
+      {
+        ...input,
+        panel: {
+          ...input.panel,
+          id: bottom.id,
+          title: bottom.title,
+          location: 'bottom',
+          entryUrl: bottom.entryUrl,
+        },
+      },
+      placeholder(),
+    )
+    const frame = transport.frames[0]
+    if (!frame) throw new Error('Frame not found')
+    ready(frame, ORIGIN_A)
+    const delivered = (await vi.waitFor(() => {
+      const message = posted(frame, 'shell/command')
+      if (!message) throw new Error('Command not delivered')
+      return message
+    })) as { id?: string; payload?: unknown }
+    expect(delivered.payload).toMatchObject({ command: 'inspect' })
+    frame.emit(
+      { exo: 1, type: 'plugin/command-result', replyTo: delivered.id, payload: { ok: true } },
+      ORIGIN_A,
+    )
+    await expect(invocation).resolves.toEqual({ ok: true })
     runtime.dispose()
   })
 

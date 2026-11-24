@@ -356,6 +356,12 @@ describe('plugin host', () => {
                 location: 'secondary',
                 entry: 'views/inspector.html',
               },
+              {
+                id: 'inspection',
+                title: 'Inspection',
+                location: 'bottom',
+                entry: 'views/inspection.html',
+              },
             ],
             contentViews: [
               {
@@ -384,7 +390,7 @@ describe('plugin host', () => {
       {
         exo: 1,
         type: 'plugin/register',
-        payload: { panels: ['outline', 'inspector'], contentViews: ['tutorial'] },
+        payload: { panels: ['outline', 'inspector', 'inspection'], contentViews: ['tutorial'] },
       },
       'https://plugins.example.com',
     )
@@ -413,6 +419,14 @@ describe('plugin host', () => {
         entryUrl: 'https://plugins.example.com/monaco/views/inspector.html',
         registrationOrder: 1,
       },
+      {
+        id: 'inspection',
+        title: 'Inspection',
+        location: 'bottom',
+        entry: 'views/inspection.html',
+        entryUrl: 'https://plugins.example.com/monaco/views/inspection.html',
+        registrationOrder: 2,
+      },
     ])
     expect(record?.contentViews).toEqual([
       {
@@ -421,7 +435,7 @@ describe('plugin host', () => {
         entry: 'views/tutorial.html',
         entryUrl: 'https://plugins.example.com/monaco/views/tutorial.html',
         companionPanel: 'inspector',
-        registrationOrder: 2,
+        registrationOrder: 3,
       },
     ])
 
@@ -548,6 +562,41 @@ describe('plugin host', () => {
     })
 
     const { host, transport, config } = createHost(undefined, { consentStore })
+    config.setEntries(entries(MANIFEST_URL))
+    await waitForRecord(host, MANIFEST_URL, 'registering')
+    expect(host.getSnapshot().consentRequest).toBeNull()
+    await activate(host, transport)
+    expect(host.getSnapshot().records[0].phase).toBe('active')
+    host.dispose()
+  })
+
+  it('skips the prompt when an approved plugin adds a bottom panel', async () => {
+    const storage = new MemoryStorage()
+    const consentStore = new ConsentStore({ storage })
+    const contributes = {
+      fileEditors: [{ glob: '**/*.ts', entry: 'editor.html', label: 'Code', priority: 0 }],
+      panels: [
+        {
+          id: 'inspection',
+          title: 'Inspection',
+          location: 'bottom',
+          entry: 'views/inspection.html',
+        },
+      ],
+    }
+    const manifest = validatedManifest({ contributes })
+    const fingerprint = await computeFingerprint(manifest, digest)
+    consentStore.grant({
+      manifestOrigin: manifest.manifestOrigin,
+      pluginId: manifest.id,
+      manifestUrl: manifest.manifestUrl,
+      version: manifest.version,
+      fingerprint,
+      grantedAt: '2026-11-14T00:00:00.000Z',
+    })
+
+    const fetchImpl = vi.fn(async () => jsonResponse(manifestJson({ contributes }), MANIFEST_URL))
+    const { host, transport, config } = createHost(fetchImpl, { consentStore })
     config.setEntries(entries(MANIFEST_URL))
     await waitForRecord(host, MANIFEST_URL, 'registering')
     expect(host.getSnapshot().consentRequest).toBeNull()

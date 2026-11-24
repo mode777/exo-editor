@@ -397,7 +397,7 @@ export class RegistrationSession {
       permissions: this.options.manifest.permissions,
       locale: this.options.locale,
       settings: this.options.settings ?? {},
-      capabilities: { localEvents: true, newFiles: true },
+      capabilities: { localEvents: true, newFiles: true, bottomPanel: true },
     })
     this.registrationTimer = this.setTimeoutImpl(() => {
       this.fail('timeout', 'register')

@@ -103,7 +103,7 @@
           "maxLength": 40,
           "pattern": "^[a-z0-9-]+$"
         },
-        "location": { "enum": ["primary", "secondary"] },
+        "location": { "enum": ["primary", "secondary", "bottom"] },
         "entry": { "$ref": "#/$defs/relativePage" }
       }
     },

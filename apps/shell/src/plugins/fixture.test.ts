@@ -15,11 +15,11 @@ describe('deployed plugin fixture', () => {
     const result = validateManifest(
       JSON.parse(raw) as unknown,
       'https://mode777.github.io/exo-editor/plugin-host-fixture/exo-manifest.json',
-      '0.5.0',
+      '0.10.0',
     )
     expect(result.ok).toBe(true)
     if (!result.ok) return
-    expect(result.manifest.fileEditors).toHaveLength(9)
+    expect(result.manifest.fileEditors).toHaveLength(10)
     expect(result.manifest.configuration?.properties).toMatchObject({
       'fixture.greeting': { type: 'string', default: 'hello from fixture' },
       'fixture.repeat': { type: 'boolean', default: false },
@@ -33,7 +33,14 @@ describe('deployed plugin fixture', () => {
       'fixture-panel',
       'fixture-inspector',
       'fixture-inspector-2',
+      'fixture-inspection',
     ])
+    expect(result.manifest.panels.find((panel) => panel.id === 'fixture-inspection')).toMatchObject(
+      {
+        location: 'bottom',
+        entryUrl: 'https://mode777.github.io/exo-editor/plugin-host-fixture/view-bottom.html',
+      },
+    )
     expect(result.manifest.contentViews.map((view) => view.id)).toEqual([
       'fixture-tutorial',
       'fixture-generator',
@@ -104,6 +111,8 @@ describe('deployed plugin fixture', () => {
       contributes: { fileEditors: Array<{ glob: string; entry: string; priority: number }> }
     }
     const byGlob = new Map(manifest.contributes.fileEditors.map((entry) => [entry.glob, entry]))
+    expect(byGlob.get('**/*.bound.txt')?.entry).toBe('editor-bound.html')
+    expect(byGlob.get('**/*.bound.txt')?.priority).toBeGreaterThan(60)
     expect(byGlob.get('**/*.local.txt')?.entry).toBe('editor-local-events.html')
     expect(byGlob.get('**/*.local.txt')?.priority).toBeGreaterThan(0)
     expect(byGlob.get('**/*.list.txt')?.entry).toBe('editor-list.html')
@@ -149,7 +158,7 @@ describe('deployed plugin fixture', () => {
     const result = validateManifest(
       JSON.parse(raw) as unknown,
       'https://mode777.github.io/exo-editor/plugin-host-fixture/other-manifest.json',
-      '0.5.0',
+      '0.10.0',
     )
     expect(result.ok).toBe(true)
     if (!result.ok) return

@@ -17,6 +17,8 @@
     results: [],
     commands: [],
     errors: [],
+    activeEditor: null,
+    snapshots: [],
     storage: 'unavailable',
     disposed: 'pending',
   }
@@ -45,6 +47,29 @@
 
   function subscribe(topic, id) {
     post('plugin/subscribe', { topic }, id)
+  }
+
+  function publish(payload) {
+    post('plugin/publish', { topic: 'local/fixture', payload }, `pub-${Date.now()}`)
+  }
+
+  function requestSnapshot() {
+    if (!state.activeEditor) return
+    publish({ kind: 'snapshot', target: state.activeEditor.instanceId })
+  }
+
+  function requestEdit() {
+    if (!state.activeEditor) return
+    publish({
+      kind: 'edit',
+      target: state.activeEditor.instanceId,
+      text: `\n[panel edit ${Date.now()}]`,
+    })
+  }
+
+  function requestUndo() {
+    if (!state.activeEditor) return
+    publish({ kind: 'undo', target: state.activeEditor.instanceId })
   }
 
   function wire(buttonId, run) {
@@ -136,6 +161,9 @@
     ),
   )
   wire('subscribe-theme', () => subscribe('theme/changed', `theme-${Date.now()}`))
+  wire('snapshot', () => requestSnapshot())
+  wire('edit', () => requestEdit())
+  wire('undo', () => requestUndo())
 
   window.addEventListener('message', (event) => {
     if (!host) return
@@ -150,18 +178,43 @@
       state.view = data.payload.view
       state.capabilities = data.payload.capabilities
       state.settings = data.payload.settings || {}
+      state.activeEditor = data.payload.activeEditor || null
       render()
       if (state.capabilities && state.capabilities.localEvents)
         subscribe('local/fixture', 'sub-local')
+      if (state.capabilities && state.capabilities.editorContext)
+        subscribe('editor/active', 'sub-active-editor')
       return
     }
     if (data.type === 'shell/subscribed') {
       state.subscriptions.push(data.payload)
       render()
+      if (data.payload.topic === 'local/fixture') requestSnapshot()
       return
     }
     if (data.type === 'shell/event') {
       state.events.push(data.payload)
+      if (data.payload.topic === 'editor/active') {
+        state.activeEditor = data.payload.payload.active
+          ? {
+              pluginId: data.payload.payload.pluginId,
+              path: data.payload.payload.path,
+              instanceId: data.payload.payload.instanceId,
+            }
+          : null
+        if (state.activeEditor) requestSnapshot()
+      }
+      if (
+        data.payload.topic === 'local/fixture' &&
+        data.payload.payload &&
+        data.payload.payload.kind === 'snapshot'
+      ) {
+        state.snapshots.push({
+          from: data.payload.from,
+          instanceId: data.payload.payload.instanceId,
+          text: data.payload.payload.text,
+        })
+      }
       render()
       return
     }

@@ -175,6 +175,58 @@ or `null`; subscribe to `view/active` for later changes. A view must name a
 `/`-rooted path for `openFile`. Panels mount on first reveal; content views open a
 tab per instance key.
 
+### Editor-bound panels
+
+A panel can follow the active file editor without receiving file or write
+authority. The shell advertises the active editor to views of the same plugin:
+
+```ts
+// panel or content-view page
+const active = view.activeEditor // { pluginId, path, instanceId } | null
+await view.subscribe('editor/active')
+view.onEvent('editor/active', (event) => {
+  // { pluginId, active: true, path, instanceId } or { pluginId, active: false }
+  if (!event.payload.active) clearPanel()
+  else requestSnapshot(event.payload.instanceId)
+})
+```
+
+The editor receives its own opaque id and can gate on the same topic:
+
+```ts
+// editor page
+const own = connection.editor.instanceId
+await connection.editor.subscribe('editor/active')
+await connection.editor.subscribeLocal('local/inspector')
+connection.editor.onLocalEvent('local/inspector', (event) => {
+  if (event.payload.target !== own) return
+  if (event.payload.kind === 'snapshot') {
+    connection.editor.publishLocal('local/inspector', {
+      kind: 'snapshot',
+      instanceId: own,
+      text: buffer,
+    })
+  }
+  // Apply edits through your own history, report dirty, and save normally.
+})
+```
+
+The panel publishes a plugin-defined payload containing the target
+`instanceId`; every subscribed editor frame receives it and only the matching
+instance handles it. The editor's reply carries its `instanceId` in `from`, so
+the panel can accept only the active editor. The shell does not inspect the
+payload; the existing 1 MiB and rate limits apply. The editor remains the only
+writer: it applies edits through its history, reports dirty with `plugin/dirty`
+and saves through the normal `shell/request-save` flow. A view still has no save
+or dirty method. Subscribe to `editor/active` and request a snapshot on mount
+and on every active change; the shell does not replay history.
+
+`view.location` can be `"primary"`, `"secondary"` or `"bottom"`. A bottom panel
+needs SDK `1.10.0` (older SDKs reject the unknown location) and
+`engines.exo` at or above `0.10.0`. `plugin/request-panel` keeps its existing
+active-and-visible gate, so a headless editor cannot reveal a panel; the user
+can still open the bottom tab directly.
+
 ## Commands
 
 Register the command ids you want active, then attach one handler in the frame

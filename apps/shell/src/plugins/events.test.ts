@@ -266,6 +266,50 @@ describe('subscriptions', () => {
     expect(events.map((event) => event.seq)).toEqual([3])
   })
 
+  it('delivers editor/active only to the named identity and sequences it', () => {
+    const { bus, flush } = harness()
+    const first = collector('first', 'https://a.example.com::com.example.a')
+    const second = collector('second', 'https://b.example.com::com.example.b')
+    const firstSubscriber = bus.createSubscriber(first.sink)
+    const secondSubscriber = bus.createSubscriber(second.sink)
+    firstSubscriber.subscribe('editor/active')
+    secondSubscriber.subscribe('editor/active')
+
+    bus.publish(
+      'editor/active',
+      {
+        pluginId: 'com.example.a',
+        active: true,
+        path: '/src/a.ts',
+        instanceId: 'session-a',
+      },
+      { target: 'https://a.example.com::com.example.a' },
+    )
+    flush()
+
+    expect(first.events).toHaveLength(1)
+    expect(first.events[0]?.payload).toEqual({
+      pluginId: 'com.example.a',
+      active: true,
+      path: '/src/a.ts',
+      instanceId: 'session-a',
+    })
+    expect(second.events).toHaveLength(0)
+    expect(bus.sequence('editor/active')).toBe(1)
+
+    bus.publish(
+      'editor/active',
+      { pluginId: 'com.example.a', active: false },
+      { target: 'https://a.example.com::com.example.a' },
+    )
+    flush()
+
+    expect(first.events).toHaveLength(2)
+    expect(first.events[1]?.payload).toEqual({ pluginId: 'com.example.a', active: false })
+    expect(second.events).toHaveLength(0)
+    expect(bus.sequence('editor/active')).toBe(2)
+  })
+
   it('delivers a targeted event only to the named identity and still sequences it', () => {
     const { bus, flush } = harness()
     const first = collector('first', 'https://a.example.com::com.example.a')

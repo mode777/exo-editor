@@ -129,11 +129,13 @@ async function start(
 }
 
 function ready(context: Started, origin = PLUGIN_ORIGIN) {
+  const url = new URL(context.frame.options.url)
+  const sessionId = new URLSearchParams(url.hash.slice(1)).get('exo-session') ?? ''
   context.frame.emit(
     {
       exo: 1,
       type: 'plugin/ready',
-      payload: { protocolVersion: '1', sessionId: 'session-1' },
+      payload: { protocolVersion: '1', sessionId },
     },
     origin,
   )
@@ -224,6 +226,23 @@ describe('handler session', () => {
     expect(url.hash).toContain('exo-session=session-1')
   })
 
+  it('exposes a stable per-frame editor instance id', async () => {
+    const first = await start()
+    expect(first.handler.instanceId).toBe('session-1')
+    ready(first)
+    expect(postedType(first.frame, 'shell/init')?.payload).toMatchObject({
+      editor: { instanceId: 'session-1' },
+    })
+
+    const second = await start({ createSessionId: () => 'session-2' })
+    expect(second.handler.instanceId).toBe('session-2')
+    ready(second)
+    expect(postedType(second.frame, 'shell/init')?.payload).toMatchObject({
+      editor: { instanceId: 'session-2' },
+    })
+    expect(second.handler.instanceId).not.toBe(first.handler.instanceId)
+  })
+
   it('sends metadata-only init after ready', async () => {
     const context = await start({ settings: { 'editor.size': 2 } })
     ready(context)
@@ -233,6 +252,7 @@ describe('handler session', () => {
       mode: 'editor',
       plugin: { id: 'com.example.code', version: '1.2.0' },
       file: { path: '/src/a.ts', name: 'a.ts', dir: '/src', version: context.stat.version },
+      editor: { instanceId: 'session-1' },
       capabilities: {
         read: true,
         write: true,
@@ -1117,6 +1137,7 @@ describe('handler subscriptions', () => {
   it('publishes a local event, acknowledges it and delivers it to the publisher', async () => {
     const context = await start({ candidate: subscribed() })
     ready(context)
+    expect(context.handler.instanceId).toBe('session-1')
     context.frame.emit(
       { exo: 1, type: 'plugin/subscribe', id: 's1', payload: { topic: 'local/state' } },
       PLUGIN_ORIGIN,

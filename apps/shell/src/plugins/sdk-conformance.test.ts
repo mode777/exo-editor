@@ -15,6 +15,7 @@ import { HandlerSession, type HandlerSaveRequest } from './handler'
 import { validateManifest, type PluginManifest } from './manifest'
 import { RegistrationSession, type RegistrationOutcome } from './registration'
 import type { EditorCandidate } from './registry'
+import { ViewSession } from './view-session'
 
 const SHELL_ORIGIN = 'https://editor.example.com'
 const PLUGIN_ORIGIN = 'https://plugins.example.com'
@@ -50,7 +51,7 @@ function manifest(): PluginManifest {
   return result.manifest
 }
 
-function bridge(frame: FakeFrame, mode: 'register' | 'editor', sessionId = SESSION_ID) {
+function bridge(frame: FakeFrame, mode: 'register' | 'editor' | 'view', sessionId = SESSION_ID) {
   const shellWindow = { name: 'shell' }
   const pluginWindow = frame.window
   const transport = new FakePluginTransport({
@@ -300,6 +301,9 @@ describe('SDK conformance against the shell', () => {
     const first = await startHandler('/one.template.txt', 'frame-a', 'com.example.template')
     const second = await startHandler('/two.template.txt', 'frame-b', 'com.example.template')
     const other = await startHandler('/three.template.txt', 'frame-c', 'com.example.other')
+    expect(first.editor.instanceId).toBe('frame-a')
+    expect(second.editor.instanceId).toBe('frame-b')
+    expect(other.editor.instanceId).toBe('frame-c')
 
     await expect(first.editor.subscribeLocal('local/state')).resolves.toMatchObject({ seq: 0 })
     await expect(second.editor.subscribeLocal('local/state')).resolves.toMatchObject({ seq: 0 })
@@ -333,6 +337,92 @@ describe('SDK conformance against the shell', () => {
     await first.handler.dispose('closed')
     await second.handler.dispose('closed')
     await other.handler.dispose('closed')
+    await session.dispose()
+  })
+
+  it('exposes the active editor and types editor/active for a real view frame', async () => {
+    const provider = new MemoryWorkspaceProvider({
+      now: () => 1000,
+      initialFiles: { '/exo.json': '{}', '/notes.template.txt': 'hello' },
+    })
+    const handle = await provider.open()
+    const session = new Session(handle)
+    const events = new EventBus()
+    const transport = new FakeFrameTransport()
+    const identity = `${PLUGIN_ORIGIN}::com.example.template`
+    const view = new ViewSession({
+      plugin: {
+        identity,
+        pluginId: 'com.example.template',
+        pluginName: 'Exo Template',
+        pluginVersion: '0.1.0',
+        origin: PLUGIN_ORIGIN,
+        permissions: ['workspace:read', 'events:subscribe'],
+      },
+      entryUrl: `${PLUGIN_ORIGIN}/plugin/views/inspection.html`,
+      view: {
+        kind: 'panel',
+        id: 'inspection',
+        title: 'Inspection',
+        instanceId: 'panel-1',
+        location: 'bottom',
+      },
+      activeContentView: () => null,
+      activeEditor: () => ({
+        identity,
+        pluginId: 'com.example.template',
+        path: '/notes.template.txt',
+        instanceId: 'frame-a',
+      }),
+      session,
+      transport,
+      shellVersion: '0.10.0',
+      shellOrigin: SHELL_ORIGIN,
+      workspaceName: 'demo',
+      theme: 'dark',
+      locale: 'en',
+      events,
+      maxFileSize: 10 * 1024 * 1024,
+      maxRequestBytes: 16 * 1024 * 1024,
+      createSessionId: () => 'view-1',
+      onFailure: () => {},
+    })
+    view.start()
+    const frame = transport.frames[0] as FakeFrame
+    const sdk = bridge(frame, 'view', 'view-1')
+    const connection = await connectPlugin({ transport: sdk, timeoutMs: 1000 })
+    if (connection.mode !== 'view') throw new Error('expected view mode')
+    expect(connection.view.view.location).toBe('bottom')
+    expect(connection.view.activeEditor).toEqual({
+      pluginId: 'com.example.template',
+      path: '/notes.template.txt',
+      instanceId: 'frame-a',
+    })
+    expect(connection.view.capabilities.editorContext).toBe(true)
+
+    const seen: unknown[] = []
+    connection.view.onEvent('editor/active', (event) => seen.push(event.payload))
+    await connection.view.subscribe('editor/active')
+    events.publish(
+      'editor/active',
+      {
+        pluginId: 'com.example.template',
+        active: true,
+        path: '/notes.template.txt',
+        instanceId: 'frame-b',
+      },
+      { target: identity },
+    )
+    events.flush()
+    await vi.waitFor(() => expect(seen).toHaveLength(1))
+    expect(seen[0]).toEqual({
+      pluginId: 'com.example.template',
+      active: true,
+      path: '/notes.template.txt',
+      instanceId: 'frame-b',
+    })
+
+    await view.dispose('closed')
     await session.dispose()
   })
 
@@ -420,7 +510,7 @@ function registerInit(overrides: Partial<RegistrationInit> = {}): RegistrationIn
     permissions: ['workspace:read', 'workspace:write'],
     locale: 'en',
     settings: {},
-    capabilities: { localEvents: true, newFiles: true },
+    capabilities: { localEvents: true, newFiles: true, bottomPanel: true },
     ...overrides,
   }
 }

@@ -698,6 +698,7 @@ export abstract class FrameSession {
         openView: true,
         requestPanel: true,
         commands: true,
+        editorContext: true,
       },
       limits: {
         maxFileSize: this.options.maxFileSize,

@@ -55,8 +55,8 @@ the deployed URL below, not a local dev server or local build.
     consent stays approved.
 13. **Open a plugin panel and content view.** Add the deployed plugin-host
     fixture manifest (`/plugin-host-fixture/exo-manifest.json`) to a scratch
-    workspace, approve it, and reveal its primary and secondary panels. The
-    activity item and chrome name the plugin; the secondary picker switches
+    workspace, approve it, and reveal its primary, secondary and bottom panels.
+    The activity item and chrome name the plugin; the secondary picker switches
     views without a new handshake. Open its content view: a read-only tab with no
     Save or dirty state, a bounded payload, and a frame that is disposed when the
     tab closes. A second plugin opens the same content view and receives
@@ -93,6 +93,18 @@ the deployed URL below, not a local dev server or local build.
     tab becomes active. Select another secondary view before closing the last
     tab: that other panel stays visible. No plugin heartbeat, polling or extra
     lifecycle message is involved.
+17. **Follow the active editor from a bottom panel.** With the fixture active,
+    open a `*.bound.txt` file. The bottom region shows Fixture Inspection and the
+    panel records the active path and instance id. Open a second `*.bound.txt`
+    file and switch tabs: the panel follows the active tab and the inactive
+    editor is not advertised. Choose **Apply panel edit**: the active editor
+    appends the text, the tab becomes dirty and the panel records the applied
+    snapshot. Choose **Undo panel edit**: the editor restores its previous buffer
+    and stays dirty. Save with the tab's Save action and confirm the normal
+    fixture marker is written; the panel has no save or write action. Switch to
+    `notes.txt` or the other plugin's editor: the panel shows its empty state.
+    Close and reopen the bottom region: the retained frame returns without a new
+    handshake, and an inactive bottom tab creates no iframe.
 
 ## Screenshots
 

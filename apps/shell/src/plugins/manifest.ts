@@ -54,7 +54,7 @@ export const PLUGIN_PERMISSIONS = [
 ] as const
 export const MANIFEST_SETTING_TYPES = ['boolean', 'string', 'number'] as const
 export const MANIFEST_RENDERINGS = ['hidden', 'frame'] as const
-export const MANIFEST_PANEL_LOCATIONS = ['primary', 'secondary'] as const
+export const MANIFEST_PANEL_LOCATIONS = ['primary', 'secondary', 'bottom'] as const
 export const MANIFEST_COMMAND_MENUS = [
   'commandPalette',
   'explorer/context',

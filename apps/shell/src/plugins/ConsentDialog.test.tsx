@@ -146,6 +146,13 @@ describe('consent dialog', () => {
             entry: 'other.html',
             entryUrl: 'https://plugins.example.com/monaco/other.html',
           },
+          {
+            id: 'inspection',
+            title: 'Inspection',
+            location: 'bottom',
+            entry: 'views/inspection.html',
+            entryUrl: 'https://plugins.example.com/monaco/views/inspection.html',
+          },
         ],
         contentViews: [
           {
@@ -162,6 +169,8 @@ describe('consent dialog', () => {
     expect(text).toContain('activity-bar item')
     expect(text).toContain('Inspector')
     expect(text).toContain('Right side bar')
+    expect(text).toContain('Inspection')
+    expect(text).toContain('Bottom panel tab')
     expect(text).toContain('Tutorial')
     expect(text).toContain('Read-only tab')
     expect(text).toContain('open workspace files and views')

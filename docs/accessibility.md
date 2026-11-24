@@ -10,7 +10,7 @@ Exo owns these surfaces and checks them:
 
 - explorer (workspace header and its actions, tree, banners, context menu, inline rename)
 - document area (text editor, plugin frame surface, content-view chrome and placeholder, banners, actions)
-- plugin panels (side-bar header action and shell-owned placeholder)
+- plugin panels (side-bar header action, bottom tab strip and shell-owned placeholder)
 - secondary-view picker
 - settings dialog, including plugin settings, raw `exo.json` and the plugin log
 - consent dialog
@@ -128,6 +128,13 @@ Run against the deployed URL with the demo workspace from
     notice is announced, the Dismiss button is reachable and the notice also
     disappears after the timeout. At 200% zoom, the action row wraps without
     clipping and the palette, menu and toolbar remain keyboard reachable.
+11. With the fixture active, open a `*.bound.txt` file and the bottom region.
+    Tab to the **Fixture Inspection** tab and switch between bottom tabs with
+    the keyboard; the placeholder region announces the panel and plugin name,
+    and an inactive tab creates no iframe. Use the panel's snapshot/edit/undo
+    buttons with the keyboard; focus stays in the panel and the editor tab
+    reports dirty. Close and reopen the region and confirm focus returns to a
+    reachable control.
 
 ## Known limitations
 
@@ -142,7 +149,9 @@ Run against the deployed URL with the demo workspace from
 - A panel or content-view iframe is positioned over a shell-owned placeholder
   with an accessible region name. The frame's internal focus order and content
   belong to the plugin; only the placeholder, titles, tabs and controls are
-  Exo-owned.
+  Exo-owned. The bottom tab strip is upstream chrome; Exo supplies the tab
+  titles, plugin names and placeholder names and does not patch its keyboard
+  model.
 - The activity bar is upstream chrome; Exo supplies panel items and includes the
   plugin name in their titles, but does not patch its keyboard model.
 - The upstream command palette and its keyboard model are excluded from the

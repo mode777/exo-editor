@@ -836,11 +836,11 @@ describe('new-file registration', () => {
     )
   }
 
-  it('advertises the newFiles support bit', () => {
+  it('advertises the newFiles and bottomPanel support bits', () => {
     const context = start()
     ready(context)
     expect(postedType(context.frame, 'shell/init')?.payload).toMatchObject({
-      capabilities: { newFiles: true },
+      capabilities: { newFiles: true, bottomPanel: true },
     })
   })
 

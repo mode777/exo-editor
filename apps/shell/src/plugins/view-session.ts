@@ -1,4 +1,4 @@
-import type { WorkspaceSession } from '../workspace/contract'
+import type { WorkspacePath, WorkspaceSession } from '../workspace/contract'
 import type { FrameTransport } from './frame'
 import type { FilePickerOpenRequest, FilePickerOutcome } from './file-picker'
 import type { NewFileOutcome, NewFileRequest } from './new-file'
@@ -30,7 +30,7 @@ export interface ViewInitData {
   title: string
   instanceId: string
   /** Present for a panel. */
-  location?: 'primary' | 'secondary'
+  location?: 'primary' | 'secondary' | 'bottom'
   /** One-shot data supplied by the opener; never file content. */
   payload?: unknown
   openedBy?: ViewOpenedBy
@@ -44,12 +44,22 @@ export interface ActiveContentView {
   instanceKey: string
 }
 
+/** The active file editor of this plugin, filtered by identity in the view pool. */
+export interface ActiveEditor {
+  identity: string
+  pluginId: string
+  path: WorkspacePath
+  instanceId: string
+}
+
 export interface ViewSessionOptions {
   plugin: FrameSessionPlugin
   entryUrl: string
   view: ViewInitData
   /** Reads the active content view when the handshake is sent. */
   activeContentView?: () => ActiveContentView | null
+  /** Reads the active file editor when the handshake is sent. */
+  activeEditor?: () => ActiveEditor | null
   session: WorkspaceSession
   transport: FrameTransport
   shellVersion: string
@@ -134,6 +144,7 @@ export class ViewSession extends FrameSession {
   protected buildModeInit(): Record<string, unknown> {
     const view = this.viewOptions.view
     const active = this.viewOptions.activeContentView?.() ?? null
+    const activeEditor = this.viewOptions.activeEditor?.() ?? null
     return {
       view: {
         kind: view.kind,
@@ -150,6 +161,13 @@ export class ViewSession extends FrameSession {
             viewId: active.viewId,
             instanceId: active.instanceId,
             instanceKey: active.instanceKey,
+          }
+        : null,
+      activeEditor: activeEditor
+        ? {
+            pluginId: activeEditor.pluginId,
+            path: activeEditor.path,
+            instanceId: activeEditor.instanceId,
           }
         : null,
     }

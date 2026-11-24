@@ -67,7 +67,7 @@ import {
 import { pluginViewId } from '../workbench/plugin-views'
 import type { ViewPluginInfo } from '../plugins/view-pool'
 import { contentViewKey } from '../plugins/view-pool'
-import type { ActiveContentView } from '../plugins/view-session'
+import type { ActiveContentView, ActiveEditor } from '../plugins/view-session'
 import type { PluginManifest } from '../plugins/manifest'
 
 export type WorkspacePhase =
@@ -168,6 +168,8 @@ export class WorkspaceRuntime {
   private generationCount = 0
   private contentInstance = 0
   private activeContent: ContentViewTabInfo | null = null
+  private activeEditor: ActiveEditor | null = null
+  private readonly documentSubscription: () => void
   private remote: RemoteWorkspaceSummary | null = null
   private remoteError: RemoteErrorSummary | null = null
 
@@ -210,7 +212,10 @@ export class WorkspaceRuntime {
       options.handlerPool ??
       new HandlerPool({
         events: this.events,
-        onHandlerClosed: (path) => this.documents.handleHandlerClosed(path),
+        onHandlerClosed: (path) => {
+          this.documents.handleHandlerClosed(path)
+          this.syncActiveEditor()
+        },
         onSaveRequested: (path) => this.documents.saveFromPlugin(path),
         onRequestFiles: (request) => this.filePicker.request(request),
         onRequestNewFile: (request) =>
@@ -268,6 +273,7 @@ export class WorkspaceRuntime {
       onSaved: (change) => this.publishShellChange(change),
       editors: this.handlers,
     })
+    this.documentSubscription = this.documents.subscribeAny(() => this.syncActiveEditor())
   }
 
   subscribe = (listener: () => void): (() => void) => {
@@ -498,15 +504,18 @@ export class WorkspaceRuntime {
       path: nextPath,
       stat,
     })
+    this.syncActiveEditor()
   }
 
   deletePath(path: WorkspacePath): void {
     this.documents.deleteUnder(path)
     removeTabsUnder(path)
+    this.syncActiveEditor()
   }
 
   closeDocuments(paths: WorkspacePath[]): void {
     for (const path of paths) this.documents.close(path)
+    this.syncActiveEditor()
   }
 
   /** Dispose the frames behind tabs the workbench removed. */
@@ -523,10 +532,11 @@ export class WorkspaceRuntime {
   }
 
   /** Show a plugin panel from the palette or a view picker. */
-  showPanel(viewId: string, location: 'primary' | 'secondary'): void {
+  showPanel(viewId: string, location: 'primary' | 'secondary' | 'bottom'): void {
     const store = useWorkbenchStore.getState()
     if (location === 'primary') store.showPrimaryView(viewId)
-    else store.showSecondaryView(viewId)
+    else if (location === 'secondary') store.showSecondaryView(viewId)
+    else store.showPanelView(viewId)
   }
 
   /**
@@ -539,53 +549,54 @@ export class WorkspaceRuntime {
     const tab = tabId ? store.tabs.find((entry) => entry.id === tabId) : undefined
     const next = tab ? (contentViewOf(tab) ?? null) : null
     const previous = this.activeContent
-    if (previous?.key === next?.key) return
+    if (previous?.key !== next?.key) {
+      const previousCompanion = previous ? this.companionOf(previous) : null
+      const nextCompanion = next ? this.companionOf(next) : null
+      const sharedCompanion =
+        previousCompanion !== null &&
+        nextCompanion !== null &&
+        previousCompanion.identity === nextCompanion.identity &&
+        previousCompanion.panelId === nextCompanion.panelId
 
-    const previousCompanion = previous ? this.companionOf(previous) : null
-    const nextCompanion = next ? this.companionOf(next) : null
-    const sharedCompanion =
-      previousCompanion !== null &&
-      nextCompanion !== null &&
-      previousCompanion.identity === nextCompanion.identity &&
-      previousCompanion.panelId === nextCompanion.panelId
+      this.activeContent = next
 
-    this.activeContent = next
+      if (previousCompanion && !sharedCompanion) {
+        this.applyCompanionChange({
+          action: 'hide',
+          identity: previousCompanion.identity,
+          panelId: previousCompanion.panelId,
+        })
+      }
+      if (nextCompanion) {
+        this.applyCompanionChange({
+          action: 'show',
+          identity: nextCompanion.identity,
+          panelId: nextCompanion.panelId,
+        })
+      }
 
-    if (previousCompanion && !sharedCompanion) {
-      this.applyCompanionChange({
-        action: 'hide',
-        identity: previousCompanion.identity,
-        panelId: previousCompanion.panelId,
-      })
+      if (previous && (!next || previous.identity !== next.identity)) {
+        this.events.publish(
+          'view/active',
+          { pluginId: previous.pluginId, active: false },
+          { target: previous.identity },
+        )
+      }
+      if (next) {
+        this.events.publish(
+          'view/active',
+          {
+            pluginId: next.pluginId,
+            active: true,
+            viewId: next.viewId,
+            instanceId: next.key,
+            instanceKey: next.instanceKey,
+          },
+          { target: next.identity },
+        )
+      }
     }
-    if (nextCompanion) {
-      this.applyCompanionChange({
-        action: 'show',
-        identity: nextCompanion.identity,
-        panelId: nextCompanion.panelId,
-      })
-    }
-
-    if (previous && (!next || previous.identity !== next.identity)) {
-      this.events.publish(
-        'view/active',
-        { pluginId: previous.pluginId, active: false },
-        { target: previous.identity },
-      )
-    }
-    if (next) {
-      this.events.publish(
-        'view/active',
-        {
-          pluginId: next.pluginId,
-          active: true,
-          viewId: next.viewId,
-          instanceId: next.key,
-          instanceKey: next.instanceKey,
-        },
-        { target: next.identity },
-      )
-    }
+    this.syncActiveEditor()
   }
 
   private activeContentViewContext(): ActiveContentView | null {
@@ -597,6 +608,61 @@ export class WorkspaceRuntime {
       instanceId: active.key,
       instanceKey: active.instanceKey,
     }
+  }
+
+  /**
+   * Derive the active file editor from the active tab, the document surface and
+   * the mounted handler. Only an active handler of the active tab is advertised;
+   * a mounting, failed, text, content-view or background surface clears it.
+   */
+  private syncActiveEditor(): void {
+    if (!this.session) {
+      this.activeEditor = null
+      return
+    }
+    const path = activeDocumentPath()
+    const document = path ? this.documents.get(path) : undefined
+    const handler = path ? this.handlers.get(path) : undefined
+    const next: ActiveEditor | null =
+      path &&
+      document?.surface === 'plugin' &&
+      document.pluginPhase === 'active' &&
+      document.editor &&
+      handler?.active
+        ? {
+            identity: document.editor.identity,
+            pluginId: document.editor.pluginId,
+            path,
+            instanceId: handler.instanceId,
+          }
+        : null
+    const previous = this.activeEditor
+    if (
+      previous?.identity === next?.identity &&
+      previous?.path === next?.path &&
+      previous?.instanceId === next?.instanceId
+    ) {
+      return
+    }
+    this.activeEditor = next
+    if (previous && (!next || previous.identity !== next.identity)) {
+      this.events.publish(
+        'editor/active',
+        { pluginId: previous.pluginId, active: false },
+        { target: previous.identity },
+      )
+    }
+    if (next) {
+      this.events.publish(
+        'editor/active',
+        { pluginId: next.pluginId, active: true, path: next.path, instanceId: next.instanceId },
+        { target: next.identity },
+      )
+    }
+  }
+
+  private activeEditorContext(): ActiveEditor | null {
+    return this.activeEditor ? { ...this.activeEditor } : null
   }
 
   private companionOf(content: ContentViewTabInfo): { identity: string; panelId: string } | null {
@@ -794,24 +860,29 @@ export class WorkspaceRuntime {
     if (!record?.identity || !panel) return { ok: false, code: 'not-found' }
     const viewId = pluginViewId(record.identity, panel.id)
     const store = useWorkbenchStore.getState()
-    const primary = panel.location === 'primary'
-    const isOpen = primary
-      ? store.primarySideBarVisible && store.activePrimaryView === viewId
-      : store.secondarySideBarVisible && store.activeSecondaryView === viewId
+    const location = panel.location
+    const isOpen =
+      location === 'primary'
+        ? store.primarySideBarVisible && store.activePrimaryView === viewId
+        : location === 'secondary'
+          ? store.secondarySideBarVisible && store.activeSecondaryView === viewId
+          : store.bottomPanelVisible && store.activePanelView === viewId
+    const show = () => this.showPanel(viewId, location)
+    const hide = () => {
+      if (location === 'primary') store.togglePrimarySideBar(viewId)
+      else if (location === 'secondary') store.toggleSecondarySideBar(viewId)
+      else store.toggleBottomPanel()
+    }
     if (request.action === 'show') {
-      if (primary) store.showPrimaryView(viewId)
-      else store.showSecondaryView(viewId)
+      show()
       return { ok: true, open: true }
     }
     if (request.action === 'hide') {
-      if (isOpen) {
-        if (primary) store.togglePrimarySideBar(viewId)
-        else store.toggleSecondarySideBar(viewId)
-      }
+      if (isOpen) hide()
       return { ok: true, open: false }
     }
-    if (primary) store.togglePrimarySideBar(viewId)
-    else store.toggleSecondarySideBar(viewId)
+    if (isOpen) hide()
+    else show()
     return { ok: true, open: !isOpen }
   }
 
@@ -835,6 +906,7 @@ export class WorkspaceRuntime {
     this.pluginSettings.detach()
     this.pluginConfig.detach()
     await this.deactivate('close')
+    this.documentSubscription()
     this.documents.clear()
     this.listeners.clear()
     this.startPromise = null
@@ -997,6 +1069,7 @@ export class WorkspaceRuntime {
       workspaceName: handle.descriptor.name,
       settings: this.pluginSettings,
       activeContentView: () => this.activeContentViewContext(),
+      activeEditor: () => this.activeEditorContext(),
     })
   }
 
@@ -1036,6 +1109,7 @@ export class WorkspaceRuntime {
     const previousProvider = this.provider
     this.session = null
     this.provider = null
+    this.activeEditor = null
     // Cancel in-flight saves and drop document state before the old session is
     // released, so no write can reach the previous workspace.
     this.documents.clear()

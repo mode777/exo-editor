@@ -14,7 +14,12 @@ import {
   type PanelIntent,
   type PanelIntentOutcome,
 } from './frame-session'
-import { ViewSession, type ActiveContentView, type ViewOpenedBy } from './view-session'
+import {
+  ViewSession,
+  type ActiveContentView,
+  type ActiveEditor,
+  type ViewOpenedBy,
+} from './view-session'
 import type { PluginSettingsStore } from './settings'
 
 export const MAX_CONTENT_VIEW_TABS = 10
@@ -35,7 +40,7 @@ export interface PanelViewInput {
     id: string
     title: string
     icon?: string
-    location: 'primary' | 'secondary'
+    location: 'primary' | 'secondary' | 'bottom'
     entryUrl: string
   }
 }
@@ -72,7 +77,7 @@ export interface ViewHandle {
   viewId: string
   title: string
   entryUrl: string
-  location?: 'primary' | 'secondary'
+  location?: 'primary' | 'secondary' | 'bottom'
   instanceKey?: string
   phase: ViewHandlePhase
   visible: boolean
@@ -94,6 +99,8 @@ export interface ViewPoolAttachOptions {
   settings?: PluginSettingsStore
   /** Current active content-view tab, filtered per plugin on mount. */
   activeContentView?: () => ActiveContentView | null
+  /** Current active file editor, filtered by plugin identity on mount. */
+  activeEditor?: () => ActiveEditor | null
 }
 
 export interface ViewPoolOptions {
@@ -590,7 +597,7 @@ export class ViewPool {
       title: string
       entryUrl: string
       instanceId: string
-      location?: 'primary' | 'secondary'
+      location?: 'primary' | 'secondary' | 'bottom'
       payload?: unknown
       openedBy?: ViewOpenedBy
     },
@@ -612,6 +619,10 @@ export class ViewPool {
       activeContentView: () => {
         const active = attached.activeContentView?.() ?? null
         return active?.pluginId === record.plugin.pluginId ? active : null
+      },
+      activeEditor: () => {
+        const active = attached.activeEditor?.() ?? null
+        return active?.identity === record.plugin.identity ? active : null
       },
       session: attached.session,
       transport: this.transport,

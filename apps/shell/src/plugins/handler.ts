@@ -237,6 +237,11 @@ export class HandlerSession extends FrameSession {
     return this.file.path
   }
 
+  /** The opaque session id shared by init, active-editor context and local `from`. */
+  get instanceId(): string {
+    return this.sessionId
+  }
+
   start(): void {
     this.mountFrame({
       entryUrl: this.candidate.entryUrl,
@@ -298,7 +303,7 @@ export class HandlerSession extends FrameSession {
   }
 
   protected buildModeInit(): Record<string, unknown> {
-    return { file: { ...this.file } }
+    return { file: { ...this.file }, editor: { instanceId: this.sessionId } }
   }
 
   protected handleModeMessage(envelope: Envelope): boolean {

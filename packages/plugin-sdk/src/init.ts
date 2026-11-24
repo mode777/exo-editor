@@ -2,6 +2,7 @@ import {
   ExoProtocolError,
   isPlainObject,
   type ActiveContentView,
+  type ActiveEditor,
   type EditorCapabilities,
   type EditorInit,
   type EditorLimits,
@@ -104,6 +105,12 @@ function fileAt(value: Record<string, unknown>, path: string): FileMetadata {
   return metadata
 }
 
+function editorAt(value: Record<string, unknown>, path: string): { instanceId: string } | null {
+  if (value.editor === undefined || value.editor === null) return null
+  const editor = objectAt(value, 'editor', path)
+  return { instanceId: stringAt(editor, 'instanceId', `${path}.editor`) }
+}
+
 function capabilitiesAt(value: Record<string, unknown>, path: string): EditorCapabilities {
   const capabilities = objectAt(value, 'capabilities', path)
   return {
@@ -142,6 +149,10 @@ function capabilitiesAt(value: Record<string, unknown>, path: string): EditorCap
       capabilities.commands === undefined
         ? false
         : booleanAt(capabilities, 'commands', `${path}.capabilities`),
+    editorContext:
+      capabilities.editorContext === undefined
+        ? false
+        : booleanAt(capabilities, 'editorContext', `${path}.capabilities`),
   }
 }
 
@@ -159,8 +170,8 @@ function viewAt(value: Record<string, unknown>, path: string): ViewInitData {
   }
   if (view.location !== undefined) {
     const location = stringAt(view, 'location', `${path}.view`)
-    if (location !== 'primary' && location !== 'secondary') {
-      invalid(`${path}.view.location`, 'expected primary or secondary')
+    if (location !== 'primary' && location !== 'secondary' && location !== 'bottom') {
+      invalid(`${path}.view.location`, 'expected primary, secondary or bottom')
     }
     data.location = location
   }
@@ -190,11 +201,23 @@ function activeContentViewAt(
   }
 }
 
+function activeEditorAt(value: Record<string, unknown>, path: string): ActiveEditor | null {
+  if (value.activeEditor === undefined || value.activeEditor === null) return null
+  const active = objectAt(value, 'activeEditor', path)
+  return {
+    pluginId: stringAt(active, 'pluginId', `${path}.activeEditor`),
+    path: stringAt(active, 'path', `${path}.activeEditor`),
+    instanceId: stringAt(active, 'instanceId', `${path}.activeEditor`),
+  }
+}
+
 function registrationCapabilitiesAt(
   value: Record<string, unknown>,
   path: string,
 ): RegistrationCapabilities {
-  if (value.capabilities === undefined) return { localEvents: false, newFiles: false }
+  if (value.capabilities === undefined) {
+    return { localEvents: false, newFiles: false, bottomPanel: false }
+  }
   const capabilities = objectAt(value, 'capabilities', path)
   return {
     localEvents:
@@ -205,6 +228,10 @@ function registrationCapabilitiesAt(
       capabilities.newFiles === undefined
         ? false
         : booleanAt(capabilities, 'newFiles', `${path}.capabilities`),
+    bottomPanel:
+      capabilities.bottomPanel === undefined
+        ? false
+        : booleanAt(capabilities, 'bottomPanel', `${path}.capabilities`),
   }
 }
 
@@ -285,6 +312,7 @@ export function parseShellInit(
       mode,
       view: viewAt(init, '/'),
       activeContentView: activeContentViewAt(init, '/'),
+      activeEditor: activeEditorAt(init, '/'),
       capabilities: capabilitiesAt(init, '/'),
       limits: limitsAt(init, '/'),
     } satisfies ViewInit
@@ -294,6 +322,7 @@ export function parseShellInit(
     ...base,
     mode,
     file: fileAt(init, '/'),
+    editor: editorAt(init, '/'),
     capabilities: capabilitiesAt(init, '/'),
     limits: limitsAt(init, '/'),
   } satisfies EditorInit

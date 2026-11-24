@@ -51,16 +51,17 @@ without breaking the other variants.
 and acknowledges `shell/dispose`. State is mirrored into `#observation` and the
 document title so a hidden frame remains inspectable in devtools.
 
-| File glob           | Page                       | Behaviour                                                                                                           |
-| ------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `**/*.local.txt`    | `editor-local-events.html` | Visible frame with a Publish button; subscribes to `local/fixture` and records acknowledgements and received events |
-| `**/*.list.txt`     | `editor-list.html`         | Probes `plugin/request-list`: root, relative, large, file, missing and reserved                                     |
-| `**/*.picker.txt`   | `editor-picker.html`       | Visible frame with a Pick button; exercises `plugin/request-files`                                                  |
-| `**/*.events.txt`   | `editor-events.html`       | Subscribes to the four v1 topics and records sequences and events                                                   |
-| `**/*.txt`          | `editor.html`              | Read, report dirty, save with a `[fixture save N]` marker, acknowledge dispose                                      |
-| `**/*.append.txt`   | `editor-append.html`       | Same, with an `[fixture append N]` marker and a second visible edit signal                                          |
-| `**/*.repeat.txt`   | `editor-repeat.html`       | Requests the same file twice and records both versions in `#observation`                                            |
-| `**/*.neverack.txt` | `editor-never-ack.html`    | Ignores `shell/dispose` so the 1 s teardown timeout is observable                                                   |
+| File glob           | Page                       | Behaviour                                                                                                                                          |
+| ------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `**/*.bound.txt`    | `editor-bound.html`        | Subscribes to `editor/active` and `local/fixture`; answers panel snapshots, applies edits with history and undo, and saves through the normal flow |
+| `**/*.local.txt`    | `editor-local-events.html` | Visible frame with a Publish button; subscribes to `local/fixture` and records acknowledgements and received events                                |
+| `**/*.list.txt`     | `editor-list.html`         | Probes `plugin/request-list`: root, relative, large, file, missing and reserved                                                                    |
+| `**/*.picker.txt`   | `editor-picker.html`       | Visible frame with a Pick button; exercises `plugin/request-files`                                                                                 |
+| `**/*.events.txt`   | `editor-events.html`       | Subscribes to the four v1 topics and records sequences and events                                                                                  |
+| `**/*.txt`          | `editor.html`              | Read, report dirty, save with a `[fixture save N]` marker, acknowledge dispose                                                                     |
+| `**/*.append.txt`   | `editor-append.html`       | Same, with an `[fixture append N]` marker and a second visible edit signal                                                                         |
+| `**/*.repeat.txt`   | `editor-repeat.html`       | Requests the same file twice and records both versions in `#observation`                                                                           |
+| `**/*.neverack.txt` | `editor-never-ack.html`    | Ignores `shell/dispose` so the 1 s teardown timeout is observable                                                                                  |
 
 The `events` mode subscribes to `theme/changed`, `workspace/file-changed`,
 `workspace/closed` and `config/changed` after `shell/init`. `#observation`
@@ -214,11 +215,13 @@ No secrets, backend or build step are involved.
 
 ## Panels and content views
 
-The manifest also declares a primary panel (`fixture-panel`), a secondary panel
-(`fixture-inspector`) and a content view (`fixture-tutorial`). The controller
-registers all three ids. The pages are dependency-free views that perform the
-`exo-mode=view` handshake and mirror `{ view, capabilities, settings,
-subscriptions, events, results, errors }` into `#observation` and the title.
+The manifest also declares a primary panel (`fixture-panel`), two secondary
+panels (`fixture-inspector`, `fixture-inspector-2`), a bottom panel
+(`fixture-inspection`) and a content view (`fixture-tutorial`). The controller
+registers all of them. The pages are dependency-free views that perform the
+`exo-mode=view` handshake and mirror `{ view, capabilities, activeEditor,
+settings, subscriptions, events, snapshots, results, errors }` into
+`#observation` and the title.
 
 - `view-primary.html` is the hub: Publish local event, Subscribe theme, Open
   `/notes.txt`, Toggle secondary panel, Open fixture content view and Open the
@@ -321,3 +324,30 @@ Manual checks:
    `too-large` with a message naming 8388608 bytes.6. Disable the plugin while the dialog is open. The dialog closes without a
    write. Switch workspaces with a dialog open: it closes before the old session
    is released, and neither workspace gains the file.
+
+## Editor-bound bottom panel
+
+`fixture-inspection` is a bottom panel. It shows `activeEditor` from
+`shell/init`, subscribes to `editor/active`, and exposes **Request snapshot**,
+**Apply panel edit** and **Undo panel edit** buttons. `editor-bound.html` is a
+visible handler for `**/*.bound.txt`; it subscribes to the same local topic,
+checks the target `instanceId`, replies with a snapshot, applies an edit through
+a small history stack, reports dirty, and saves with the normal marker.
+
+Manual checks:
+
+1. Open a `*.bound.txt` file. The bottom region shows **Fixture Inspection** and
+   the panel observation records the active path and instance id.
+2. Open a second `*.bound.txt` file and switch tabs. The panel follows the active
+   tab and records the new path/instance id; the inactive editor keeps its own
+   instance id.
+3. Choose **Apply panel edit**. The active editor appends the panel text, reports
+   dirty, and the panel records the applied snapshot. Choose **Undo panel edit**:
+   the editor restores the previous buffer and stays dirty.
+4. Save with the tab's Save action. The file receives the normal fixture marker;
+   the panel does not write the file itself.
+5. Switch to `notes.txt` (shell text) or to the other plugin's editor. The panel
+   receives `activeEditor: null` and shows no active path.
+6. Open a bottom panel tab that is not active: no iframe is created until that
+   tab is selected. Close and reopen the bottom region: the retained frame is
+   shown without a new handshake.

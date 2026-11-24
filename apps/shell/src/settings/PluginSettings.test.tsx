@@ -134,6 +134,9 @@ class FakePluginPool implements DocumentEditorHost {
   dirtySequence(): number {
     return 0
   }
+  get(): undefined {
+    return undefined
+  }
   closeFor(): void {}
   attach(): void {}
   async detach(): Promise<void> {}

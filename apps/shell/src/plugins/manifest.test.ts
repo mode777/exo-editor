@@ -261,6 +261,27 @@ describe('manifest validation', () => {
       field: '/engines/exo',
     })
     expect(validate({ engines: { exo: '>=0.1.0' } }).ok).toBe(true)
+    expect(
+      errorOf(
+        validateManifest(
+          manifest({
+            engines: { exo: '>=0.10.0' },
+            contributes: {
+              panels: [
+                {
+                  id: 'inspection',
+                  title: 'Inspection',
+                  location: 'bottom',
+                  entry: 'bottom.html',
+                },
+              ],
+            },
+          }),
+          MANIFEST_URL,
+          '0.9.0',
+        ),
+      ),
+    ).toMatchObject({ code: 'incompatible-engine', field: '/engines/exo' })
   })
 
   it('rejects an out-of-root or cross-origin controller entry', () => {
@@ -608,6 +629,7 @@ describe('manifest validation', () => {
             entry: 'views/outline.html',
           },
           { id: 'inspector', title: 'Inspector', location: 'secondary', entry: 'other.html' },
+          { id: 'inspection', title: 'Inspection', location: 'bottom', entry: 'bottom.html' },
         ],
         contentViews: [
           {
@@ -636,6 +658,13 @@ describe('manifest validation', () => {
         location: 'secondary',
         entry: 'other.html',
         entryUrl: 'https://plugins.example.com/monaco/other.html',
+      },
+      {
+        id: 'inspection',
+        title: 'Inspection',
+        location: 'bottom',
+        entry: 'bottom.html',
+        entryUrl: 'https://plugins.example.com/monaco/bottom.html',
       },
     ])
     expect(result.manifest.contentViews).toEqual([
@@ -670,7 +699,7 @@ describe('manifest validation', () => {
       [{ ...valid, title: '' }, '/contributes/panels/0/title'],
       [{ ...valid, title: 'x'.repeat(MANIFEST_MAX_VIEW_TITLE + 1) }, '/contributes/panels/0/title'],
       [{ ...valid, icon: 'List-Tree' }, '/contributes/panels/0/icon'],
-      [{ ...valid, location: 'bottom' }, '/contributes/panels/0/location'],
+      [{ ...valid, location: 'center' }, '/contributes/panels/0/location'],
       [{ ...valid, entry: 'views/outline.txt' }, '/contributes/panels/0/entry'],
       [{ ...valid, location: undefined }, '/contributes/panels/0/location'],
       [{ ...valid, extra: true }, '/contributes/panels/0/extra'],
@@ -678,6 +707,15 @@ describe('manifest validation', () => {
     for (const [panel, field] of cases) {
       expect(errorOf(validate({ contributes: { panels: [panel] } })).field).toBe(field)
     }
+    expect(
+      validate({
+        contributes: {
+          panels: [
+            { id: 'inspection', title: 'Inspection', location: 'bottom', entry: 'bottom.html' },
+          ],
+        },
+      }).ok,
+    ).toBe(true)
   })
 
   it('rejects duplicate panel ids and the panel limit', () => {
@@ -685,10 +723,11 @@ describe('manifest validation', () => {
     expect(errorOf(validate({ contributes: { panels: [panel, panel] } })).field).toBe(
       '/contributes/panels/1/id',
     )
+    const locations = ['primary', 'secondary', 'bottom'] as const
     const panels = Array.from({ length: MANIFEST_MAX_PANELS + 1 }, (_, index) => ({
       id: `panel-${index}`,
       title: `Panel ${index}`,
-      location: 'primary',
+      location: locations[index % locations.length],
       entry: 'panel.html',
     }))
     expect(errorOf(validate({ contributes: { panels } })).field).toBe('/contributes/panels')
@@ -735,6 +774,7 @@ describe('manifest validation', () => {
     const panels = [
       { id: 'asset-params', title: 'Parameters', location: 'secondary', entry: 'params.html' },
       { id: 'outline', title: 'Outline', location: 'primary', entry: 'outline.html' },
+      { id: 'inspection', title: 'Inspection', location: 'bottom', entry: 'bottom.html' },
     ]
     const shared = validate({
       contributes: {
@@ -791,6 +831,16 @@ describe('manifest validation', () => {
           title: 'Asset Preview',
           entry: 'preview.html',
           companionPanel: 'outline',
+        },
+        '/contributes/contentViews/0/companionPanel',
+        'A companionPanel must name a secondary panel.',
+      ],
+      [
+        {
+          id: 'asset-preview',
+          title: 'Asset Preview',
+          entry: 'preview.html',
+          companionPanel: 'inspection',
         },
         '/contributes/contentViews/0/companionPanel',
         'A companionPanel must name a secondary panel.',

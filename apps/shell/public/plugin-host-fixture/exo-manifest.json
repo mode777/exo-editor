@@ -8,7 +8,7 @@
     "name": "Exo"
   },
   "engines": {
-    "exo": ">=0.5.0"
+    "exo": ">=0.10.0"
   },
   "runtime": {
     "entry": "plugin.html"
@@ -36,6 +36,13 @@
         "icon": "inspect",
         "location": "secondary",
         "entry": "view-secondary.html"
+      },
+      {
+        "id": "fixture-inspection",
+        "title": "Fixture Inspection",
+        "icon": "checklist",
+        "location": "bottom",
+        "entry": "view-bottom.html"
       }
     ],
     "contentViews": [
@@ -126,6 +133,13 @@
       }
     },
     "fileEditors": [
+      {
+        "glob": "**/*.bound.txt",
+        "entry": "editor-bound.html",
+        "label": "Fixture Bound Editor",
+        "priority": 70,
+        "rendering": "frame"
+      },
       {
         "glob": "**/*.local.txt",
         "entry": "editor-local-events.html",

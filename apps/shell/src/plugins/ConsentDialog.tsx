@@ -138,7 +138,7 @@ export function ConsentDialog({ request, shellOrigin, onApprove, onDeny }: Conse
         <section className="exo-consent-section" aria-labelledby="exo-consent-panels">
           <h3 id="exo-consent-panels">Panels it can add</h3>
           {manifest.panels.length === 0 ? (
-            <p className="exo-settings-hint">This plugin adds no side-bar panels.</p>
+            <p className="exo-settings-hint">This plugin adds no panels.</p>
           ) : (
             <ul className="exo-consent-list">
               {manifest.panels.map((panel) => (
@@ -147,7 +147,9 @@ export function ConsentDialog({ request, shellOrigin, onApprove, onDeny }: Conse
                   <div className="exo-consent-page">
                     {panel.location === 'primary'
                       ? 'Left side bar, with an activity-bar item.'
-                      : 'Right side bar, opened from the view picker.'}
+                      : panel.location === 'secondary'
+                        ? 'Right side bar, opened from the view picker.'
+                        : 'Bottom panel tab.'}
                   </div>
                   <div className="exo-consent-page">
                     <code>{panel.entryUrl}</code>

@@ -26,6 +26,10 @@
     pendingListRead: null,
     listStarted: false,
     local: { subscription: null, published: [], events: [] },
+    instanceId: null,
+    activeEditor: null,
+    history: [],
+    panelEdits: [],
     dirty: false,
     disposed: 'pending',
     external: null,
@@ -169,8 +173,14 @@
       permissions: payload.permissions,
       settings: payload.settings,
     }
+    state.instanceId =
+      payload.editor && payload.editor.instanceId ? payload.editor.instanceId : null
     if (fixtureMode === 'events') subscribeAll()
     if (fixtureMode === 'local-events') subscribeLocal()
+    if (fixtureMode === 'bound') {
+      subscribeLocal()
+      post('plugin/subscribe', { topic: 'editor/active' }, undefined, 'sub-active-editor')
+    }
     if (fixtureMode === 'list') setTimeout(startListing, 300)
     render()
     // Delay the first read so a verifier can observe init without content.
@@ -190,6 +200,10 @@
 
   function subscribeLocal() {
     post('plugin/subscribe', { topic: 'local/fixture' }, undefined, 'sub-local')
+  }
+
+  function publishBound(payload) {
+    post('plugin/publish', { topic: 'local/fixture', payload }, undefined, `bound-${Date.now()}`)
   }
 
   function publishLocal() {
@@ -223,6 +237,44 @@
 
   function onEvent(payload) {
     state.events.push(payload)
+    if (payload && payload.topic === 'editor/active') {
+      state.activeEditor = payload.payload.active
+        ? {
+            pluginId: payload.payload.pluginId,
+            path: payload.payload.path,
+            instanceId: payload.payload.instanceId,
+          }
+        : null
+    }
+    if (
+      fixtureMode === 'bound' &&
+      payload &&
+      payload.topic === 'local/fixture' &&
+      payload.payload &&
+      payload.payload.target === state.instanceId
+    ) {
+      const message = payload.payload
+      if (message.kind === 'snapshot') {
+        publishBound({
+          kind: 'snapshot',
+          instanceId: state.instanceId,
+          text: state.buffer || '',
+        })
+      } else if (message.kind === 'edit') {
+        state.history.push(state.buffer || '')
+        state.buffer = `${state.buffer || ''}${message.text || ''}`
+        state.panelEdits.push({ kind: 'edit', text: message.text || '' })
+        markDirty()
+        publishBound({ kind: 'applied', instanceId: state.instanceId, text: state.buffer })
+      } else if (message.kind === 'undo') {
+        if (state.history.length > 0) {
+          state.buffer = state.history.pop()
+          state.panelEdits.push({ kind: 'undo' })
+          markDirty()
+          publishBound({ kind: 'applied', instanceId: state.instanceId, text: state.buffer })
+        }
+      }
+    }
     if (payload && typeof payload.topic === 'string' && payload.topic.startsWith('local/')) {
       state.local.events.push(payload)
     }
@@ -278,6 +330,11 @@
     render()
     if (fixtureMode === 'local-events') {
       // Stay clean on open so the local-event check does not prompt a save.
+      return
+    }
+    if (fixtureMode === 'bound') {
+      // The bound editor stays clean on open and becomes dirty only after a
+      // panel edit or undo.
       return
     }
     if (fixtureMode === 'repeat' && state.reads.length === 1) {
