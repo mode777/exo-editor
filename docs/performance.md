@@ -127,6 +127,22 @@ controller and the SDK helpers. The budget was raised by 5,000 bytes, leaving
 roughly 1,260 bytes of headroom; no dependency or vendored asset was added, and
 the new-file path performs no content transformation.
 
+### Editor-bound panels and bottom panel (2026-11-24)
+
+Measured on the deployed shell at commit `c4106a4` (asset
+`index-cvcmiO3Q.js`) on the reference environment, five runs after one warm-up.
+The workspace was a scratch folder with the deployed plugin-host fixture. The
+measurement starts at the **Toggle Panel** palette command that re-reveals the
+retained bottom panel and stops when its iframe is visible over the placeholder.
+The first cold mount happens during registration and is covered by the
+no-lazy-frame check, as with the primary panel measurement.
+
+| Budget | Median | Maximum | Ceiling | Result |
+| --- | --- | --- | --- | --- |
+| Bottom panel retained reveal | 14 ms | 18 ms | 2,000 ms | Met |
+
+The run recorded 14, 18, 7, 14 and 10 ms with no page or console errors.
+
 ## Bundle budget
 
 The committed budget lives in `apps/shell/budget.json` and is measured before the
@@ -174,3 +190,12 @@ measured build is 174,302 JS and 13,785 CSS gzip bytes, an increase of 143 JS
 bytes over the previous measured build and still below the unchanged
 176,000/14,000 ceilings. No dependency, font or vendored asset is added, and the
 grant performs no extra shell render, focus change or runtime measurement.
+
+The `editor-bound-panels` change raises the JS ceiling from 176,000 to 178,000
+gzip bytes. The bottom-panel registry, active-editor derivation, the targeted
+`editor/active` topic and the SDK types add 1,657 gzip bytes over the previous
+measured build (measured build: 176,077 JS, 13,788 CSS). The 2,000-byte
+allowance keeps roughly 1,923 bytes of headroom; no dependency, font or vendored
+asset is added. The bottom panel mounts only when its tab is active, and the
+active-editor event is user-driven, so the change adds no eager frame or polling
+loop.

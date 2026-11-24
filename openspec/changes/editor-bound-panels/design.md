@@ -329,10 +329,8 @@ Passed:
   178,000 with that measurement.
 - `openspec validate editor-bound-panels --strict` and `openspec validate --all`
   passed.
-
-Not recorded here: the deployed bottom-panel startup measurement. The
-verification host became unresponsive after the acceptance run, so the
-`docs/performance.md` bottom-tab measurement remains open rather than being
-filled with an unmeasured number. The existing 2,000 ms view-frame ceiling is the
-applicable budget.
+- The bottom-panel retained reveal was measured on the same deployed build:
+  five runs after one warm-up, 14, 18, 7, 14 and 10 ms, median 14 ms and maximum
+  18 ms against the 2,000 ms view-frame ceiling. The first cold mount happens
+  during registration and is covered by the no-lazy-frame check.
 

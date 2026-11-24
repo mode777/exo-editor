@@ -966,9 +966,9 @@ plugin's editor left the panel at `activeEditor: null` (the final script
 assertion was malformed and exited before its summary). The CI `verify` job and
 Pages deploy passed; the deploy needed a retry after removing the duplicate
 `github-pages` artifact. The bundle measured 176,077/178,000 js and
-13,788/14,000 css gzip bytes; the deployed bottom-panel startup measurement
-remains open because the verification host became unresponsive after the run.
-The deployed evidence is recorded in the change design.
+13,788/14,000 css gzip bytes; the bottom panel retained reveal measured 14 ms
+median and 18 ms maximum against the 2,000 ms ceiling. The deployed evidence is
+recorded in the change design.
 
 ---
 

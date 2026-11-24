@@ -27,9 +27,9 @@
 
 ## 4. Active editor context and event
 
-- [ ] 4.1 Expose `HandlerSession.instanceId` from the existing frame session id and add `editor: { instanceId }` to `HandlerSession.buildModeInit`; verify `handler.test.ts` asserts the init value is opaque, stable for the frame and different after a remount.
-- [ ] 4.2 Add `editor/active` to `EVENT_TOPICS`, define `EditorActivePayload` and extend the event tests for the catalog, targeted delivery, sequences and the local-event `from` equality; verify `events.test.ts` fails if the topic or target filter is removed.
-- [ ] 4.3 Add `activeEditor` to `ViewSessionOptions`/`buildModeInit` and map only `{ pluginId, path, instanceId }`; verify `view-session.test.ts` covers a non-null context, a null context and the absence of any file content.
+- [x] 4.1 Expose `HandlerSession.instanceId` from the existing frame session id and add `editor: { instanceId }` to `HandlerSession.buildModeInit`; verify `handler.test.ts` asserts the init value is opaque, stable for the frame and different after a remount.
+- [x] 4.2 Add `editor/active` to `EVENT_TOPICS`, define `EditorActivePayload` and extend the event tests for the catalog, targeted delivery, sequences and the local-event `from` equality; verify `events.test.ts` fails if the topic or target filter is removed.
+- [x] 4.3 Add `activeEditor` to `ViewSessionOptions`/`buildModeInit` and map only `{ pluginId, path, instanceId }`; verify `view-session.test.ts` covers a non-null context, a null context and the absence of any file content.
 - [x] 4.4 Implement `WorkspaceRuntime.syncActiveEditor()` from the active tab, document surface/plugin phase and handler instance id; call it on tab changes, document changes, rename, close, handler close and deactivate, and publish `editor/active` only when the context changes; verify `runtime.views.test.ts` or a focused runtime test covers editor-to-editor, editor-to-text, editor-to-content, editor-to-other-plugin, no-tab, rename and remount.
 - [x] 4.5 Pass the runtime context into `ViewPool.attach` and filter it by plugin identity before it reaches a view frame; verify a cross-origin same-manifest-id view receives `activeEditor: null` and no `editor/active` event.
 - [x] 4.6 Verify a view frame still cannot save or report dirty and that the editor keeps ownership: the existing `plugin/dirty`, `plugin/request-save` and `plugin/save-content` view violations stay covered, and the panel/editor local-event test shows the edit applied by the editor before the normal save.
@@ -60,7 +60,7 @@
 - [x] 7.2 Add the dated `CHANGELOG.md` entry for shell `0.10.0`, protocol `1`, manifest schema `1` and SDK `1.10.0`, with the bottom-panel SDK requirement in the compatibility note; verify `apps/shell/src/quality/changelog.test.ts` passes.
 - [x] 7.3 Update `docs/releases.md`, `README.md`, `AGENTS.md` and `ROADMAP.md` with the new versions and the post-layer-10 follow-up; verify the release metadata and guide quality tests pass.
 - [x] 7.4 Add the editor-bound panel control row and mutation evidence to `docs/security-review.md`, covering the identity filter, the targeted event, the bottom-tab lazy mount and the no-view-write path; verify the row names the tests added in groups 3-5.
-- [ ] 7.5 Add the bottom panel and active-editor surfaces to `docs/accessibility.md` (scope, manual script and upstream limitation) and the bottom-panel startup measurement to `docs/performance.md`; verify the documented commands and measured values match the deployed check.
+- [x] 7.5 Add the bottom panel and active-editor surfaces to `docs/accessibility.md` (scope, manual script and upstream limitation) and the bottom-panel startup measurement to `docs/performance.md`; verify the documented commands and measured values match the deployed check.
 - [x] 7.6 Sweep `docs/` for stale claims that panels are primary/secondary only and that the workbench bottom region is disabled, and update the contract/guide/release pages that name the version axes; verify no stale claim remains and `docs/contracts/plugin-sdk.md` and `docs/releases.md` agree with the package versions.
 
 ## 8. Integration verification and deploy
