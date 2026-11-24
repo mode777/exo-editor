@@ -15,6 +15,7 @@ import 'vscode-workbench/styles/global.css'
 import 'vscode-workbench/styles/workbench.css'
 import './app.css'
 import { App } from './App'
+import { installResizePointerCapture } from './workbench/resize-capture'
 import { configurePresetStore } from './workbench/tabs'
 
 const container = document.getElementById('root')
@@ -23,6 +24,7 @@ if (!container) {
 }
 
 configurePresetStore()
+installResizePointerCapture()
 
 createRoot(container).render(
   <StrictMode>

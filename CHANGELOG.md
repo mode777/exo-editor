@@ -3,6 +3,33 @@
 All notable changes to Exo Editor are recorded here. The version axes and the
 release process are in [`docs/releases.md`](./docs/releases.md).
 
+## [0.8.1] - 2026-11-24
+
+Bug-fix shell release: sash drags stay with the shell across plugin frames.
+
+### Fixed
+
+- Dragging the secondary side-bar sash no longer freezes, jumps or keeps
+  resizing after the mouse button is released when the pointer crosses a visible
+  plugin frame. The sash now paints above plugin surfaces and captures the
+  pointer for the rest of the drag, so the shell keeps receiving pointer moves
+  and the release. The primary side bar and bottom panel use the same capture
+  path.
+- The full 7px secondary side-bar sash now starts a drag; the plugin overlay no
+  longer covers its right half.
+
+### Compatibility
+
+- Shell: `0.8.1`
+- Protocol: `1`
+- Manifest schema: `1`
+- SDK: `1.8.0`
+
+### Breaking
+
+- None. No message, manifest field, permission, capability, consent fingerprint
+  input or SDK API changes.
+
 ## [0.8.0] - 2026-11-23
 
 Additive post-release update: command-scoped user activation for file dialogs.

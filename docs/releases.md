@@ -10,7 +10,7 @@ replace the contracts; the normative version rules are in
 
 | Axis              | Current | Where it lives                                                         | Meaning                                                                      |
 | ----------------- | ------- | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| Shell SemVer      | `0.8.0` | `apps/shell/package.json`, `SHELL_VERSION`, advertised in `shell/init` | The deployed shell release; independent of the protocol major                |
+| Shell SemVer      | `0.8.1` | `apps/shell/package.json`, `SHELL_VERSION`, advertised in `shell/init` | The deployed shell release; independent of the protocol major                |
 | Protocol major    | `1`     | Envelope `exo: 1`, `PROTOCOL_VERSION`, handshake                       | The wire compatibility axis; the shell accepts exactly one major per release |
 | Manifest schema   | `1`     | `manifest.schemaVersion` / `exo.json` `schemaVersion`                  | The manifest shape; a new version needs a validator and a consent re-prompt  |
 | SDK SemVer        | `1.8.0` | `packages/plugin-sdk/package.json`                                     | The client package; its MAJOR equals the protocol major it speaks            |
@@ -24,10 +24,11 @@ SDK version answers "which client API is this".
 ## Current release
 
 The first public release is shell `0.1.0`, protocol `1`, manifest schema `1`,
-SDK `1.1.0`, dated 2026-11-16. The current shell is `0.8.0`, protocol `1`,
-manifest schema `1` and SDK `1.8.0`, dated 2026-11-23; `0.8.0` adds
-command-scoped user activation for the picker and Save As dialog without
-changing the protocol, manifest or SDK. Shell `0.7.0` shipped the plugin styling
+SDK `1.1.0`, dated 2026-11-16. The current shell is `0.8.1`, protocol `1`,
+manifest schema `1` and SDK `1.8.0`, dated 2026-11-24; `0.8.1` fixes sash drags
+across plugin frames without changing the protocol, manifest or SDK. Shell
+`0.8.0` adds command-scoped user activation for the picker and Save As dialog,
+also without changing the protocol, manifest or SDK. Shell `0.7.0` shipped the plugin styling
 guide and SDK theme helper without a shell runtime change, `0.6.0` added
 declarative content-view companion panels, `0.5.0` added plugin new-file
 creation and manifest templates, `0.4.0` added plugin commands, and `0.2.0`

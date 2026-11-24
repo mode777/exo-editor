@@ -1,6 +1,14 @@
 /* Exo-owned surfaces only. Region chrome, tokens and global layout come from
    vscode-workbench's stylesheets. */
 
+/* Visible plugin frames are fixed overlays at z-index 20, which covers the
+   right half of the secondary sidebar sash. Keep the sash above them so the
+   whole 7px handle starts a drag; resize-capture.ts keeps that drag when the
+   pointer crosses a frame. */
+.resize-handle {
+  z-index: 21;
+}
+
 .exo-explorer {
   display: flex;
   flex-direction: column;
