@@ -212,6 +212,7 @@ describe('content view tabs', () => {
     title: 'Tutorial',
     pluginName: 'Other Plugin',
     identity: 'https://plugins.example.com::com.example.other',
+    pluginId: 'com.example.other',
     viewId: 'tutorial',
     instanceKey: 'k1',
   }

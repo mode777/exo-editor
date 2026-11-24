@@ -542,7 +542,7 @@ The SDK SHALL expose `EditorClient.publishLocal(topic, payload)` and `EditorClie
 
 ### Requirement: View connection and client
 
-The SDK SHALL accept `exo-mode=view` in the browser fragment, SHALL perform the same handshake and sender validation as editor mode, SHALL return a `{ mode: 'view' }` connection with the typed `ViewInit`, and SHALL expose a `ViewClient` with mediated reads, listings, file picker, local events, navigation intents and panel requests.
+The SDK SHALL accept `exo-mode=view` in the browser fragment, SHALL perform the same handshake and sender validation as editor mode, SHALL return a `{ mode: 'view' }` connection with the typed `ViewInit`, SHALL expose the initial `activeContentView` and type the `view/active` topic, and SHALL expose a `ViewClient` with mediated reads, listings, file picker, local events, navigation intents and panel requests.
 
 #### Scenario: View mode is parsed
 
@@ -568,6 +568,11 @@ The SDK SHALL accept `exo-mode=view` in the browser fragment, SHALL perform the 
 
 - **WHEN** a content view opens with a payload
 - **THEN** the SDK exposes the payload and instance id for the lifetime of the connection and does not fetch or rewrite them
+
+#### Scenario: Active content-view context
+
+- **WHEN** `shell/init` carries `activeContentView` or a subscribed frame receives `view/active`
+- **THEN** the SDK exposes the validated content-view instance or `null` and leaves routing decisions to the plugin
 
 #### Scenario: View disposal
 

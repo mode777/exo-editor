@@ -14,7 +14,7 @@ import {
   type PanelIntent,
   type PanelIntentOutcome,
 } from './frame-session'
-import { ViewSession, type ViewOpenedBy } from './view-session'
+import { ViewSession, type ActiveContentView, type ViewOpenedBy } from './view-session'
 import type { PluginSettingsStore } from './settings'
 
 export const MAX_CONTENT_VIEW_TABS = 10
@@ -92,6 +92,8 @@ export interface ViewPoolAttachOptions {
   host: ViewPoolHost
   workspaceName: string
   settings?: PluginSettingsStore
+  /** Current active content-view tab, filtered per plugin on mount. */
+  activeContentView?: () => ActiveContentView | null
 }
 
 export interface ViewPoolOptions {
@@ -606,6 +608,10 @@ export class ViewPool {
         ...(view.location === undefined ? {} : { location: view.location }),
         ...(view.payload === undefined ? {} : { payload: view.payload }),
         ...(view.openedBy === undefined ? {} : { openedBy: view.openedBy }),
+      },
+      activeContentView: () => {
+        const active = attached.activeContentView?.() ?? null
+        return active?.pluginId === record.plugin.pluginId ? active : null
       },
       session: attached.session,
       transport: this.transport,

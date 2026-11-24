@@ -590,10 +590,15 @@ They have no file block, dirty state or save path.
 shell/init (view) {
   mode: 'view',
   view: { kind: 'panel' | 'content', id, title, instanceId, location?, payload?, openedBy? },
+  activeContentView: { pluginId, viewId, instanceId, instanceKey } | null,
   capabilities, limits
 }
 ```
 
+- `activeContentView` describes the content-view tab that is active when the
+  frame starts, limited to the same plugin; it is `null` when another surface or
+  no tab is active. Later changes arrive as `view/active` events for frames with
+  `events:subscribe`.
 - A panel is a singleton frame, mounted on first reveal and retained hidden while
   another primary or secondary view is active. A never-revealed panel creates no
   iframe.

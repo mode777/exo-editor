@@ -37,7 +37,7 @@ function manifestFor(
       publisher: { name: 'Example' },
       engines: { exo: '*' },
       runtime: { entry: 'plugin.html' },
-      permissions: ['workspace:read'],
+      permissions: ['workspace:read', 'events:subscribe'],
       contributes: {
         fileEditors: [],
         ...(kind === 'panel'
@@ -276,6 +276,11 @@ describe('runtime view intents', () => {
           origin: ORIGIN_A,
         },
       },
+      activeContentView: {
+        pluginId: 'com.example.other',
+        viewId: 'tutorial',
+        instanceKey: 'chapter-2',
+      },
     })
     expect(
       useWorkbenchStore
@@ -345,6 +350,58 @@ describe('runtime view intents', () => {
     expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(true)
     runtime.closeTabs([tabs[1] as (typeof tabs)[number]])
     expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(false)
+    runtime.dispose()
+  })
+
+  it('publishes view/active when the active content tab changes', async () => {
+    const contentRecord = recordFor(
+      manifestFor(ORIGIN_B, 'com.example.other', 'content', 'inspector'),
+      IDENTITY_B,
+      0,
+    )
+    const { runtime, transport } = await createRuntime([contentRecord])
+    runtime.openContentView(IDENTITY_B, 'tutorial')
+    const frame = transport.frames[0]
+    if (!frame) throw new Error('Frame not found')
+    ready(frame, ORIGIN_B)
+    send(frame, ORIGIN_B, 'plugin/subscribe', 'sub', { topic: 'view/active' })
+    await flush()
+    const tab = useWorkbenchStore.getState().tabs.find((entry) => contentViewOf(entry))
+    if (!tab) throw new Error('Content tab not found')
+    const content = contentViewOf(tab)
+    if (!content) throw new Error('Content view metadata missing')
+
+    openFileTab('/notes.txt')
+    runtime.setActiveTab('/notes.txt')
+    await flush()
+    expect(
+      frame.posted
+        .map((entry) => entry.message as { type?: string; payload?: unknown })
+        .filter((message) => message.type === 'shell/event')
+        .at(-1)?.payload,
+    ).toMatchObject({
+      topic: 'view/active',
+      payload: { pluginId: 'com.example.other', active: false },
+    })
+
+    useWorkbenchStore.getState().activateTab(tab.id)
+    runtime.setActiveTab(tab.id)
+    await flush()
+    expect(
+      frame.posted
+        .map((entry) => entry.message as { type?: string; payload?: unknown })
+        .filter((message) => message.type === 'shell/event')
+        .at(-1)?.payload,
+    ).toMatchObject({
+      topic: 'view/active',
+      payload: {
+        pluginId: 'com.example.other',
+        active: true,
+        viewId: 'tutorial',
+        instanceId: content.key,
+        instanceKey: content.instanceKey,
+      },
+    })
     runtime.dispose()
   })
 

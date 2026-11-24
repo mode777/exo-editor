@@ -36,10 +36,20 @@ export interface ViewInitData {
   openedBy?: ViewOpenedBy
 }
 
+/** The content view whose tab is currently active, if it belongs to this plugin. */
+export interface ActiveContentView {
+  pluginId: string
+  viewId: string
+  instanceId: string
+  instanceKey: string
+}
+
 export interface ViewSessionOptions {
   plugin: FrameSessionPlugin
   entryUrl: string
   view: ViewInitData
+  /** Reads the active content view when the handshake is sent. */
+  activeContentView?: () => ActiveContentView | null
   session: WorkspaceSession
   transport: FrameTransport
   shellVersion: string
@@ -123,6 +133,7 @@ export class ViewSession extends FrameSession {
 
   protected buildModeInit(): Record<string, unknown> {
     const view = this.viewOptions.view
+    const active = this.viewOptions.activeContentView?.() ?? null
     return {
       view: {
         kind: view.kind,
@@ -133,6 +144,14 @@ export class ViewSession extends FrameSession {
         ...(view.payload === undefined ? {} : { payload: view.payload }),
         ...(view.openedBy === undefined ? {} : { openedBy: { ...view.openedBy } }),
       },
+      activeContentView: active
+        ? {
+            pluginId: active.pluginId,
+            viewId: active.viewId,
+            instanceId: active.instanceId,
+            instanceKey: active.instanceKey,
+          }
+        : null,
     }
   }
 

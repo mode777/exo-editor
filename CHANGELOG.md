@@ -3,6 +3,38 @@
 All notable changes to Exo Editor are recorded here. The version axes and the
 release process are in [`docs/releases.md`](./docs/releases.md).
 
+## [0.9.0] - 2026-11-24
+
+Additive post-release update: active content-view context for panels.
+
+### Added
+
+- `shell/init` for a view now carries `activeContentView` with the active
+  content view's `pluginId`, `viewId`, `instanceId` and `instanceKey`, or `null`
+  when another surface or no tab is active. The value is limited to the frame's
+  own plugin and evaluated when the handshake is sent.
+- The shell catalog adds the targeted `view/active` topic. It publishes
+  `{ pluginId, active: true, viewId, instanceId, instanceKey }` when a plugin's
+  active content-view tab changes, and `{ pluginId, active: false }` when no
+  content view of that plugin is active. Only that plugin's subscribed frames
+  receive it.
+- SDK `1.9.0` exposes `view.activeContentView` and types the new topic. A plugin
+  can keep a panel bound to the active content-view instance without inferring
+  tab state from iframe visibility or polling.
+
+### Compatibility
+
+- Shell: `0.9.0`
+- Protocol: `1`
+- Manifest schema: `1`
+- SDK: `1.9.0`
+
+### Breaking
+
+- None. Older shells omit the init field and reject the topic; SDK `1.9.0`
+  reports `activeContentView` as `null` and leaves the subscription error to the
+  shell's normal reply.
+
 ## [0.8.3] - 2026-11-24
 
 Additive shell behavior: a content-view companion follows the active tab.

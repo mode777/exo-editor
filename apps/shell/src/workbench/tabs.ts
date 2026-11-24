@@ -64,6 +64,7 @@ export interface ContentViewTabInfo {
   title: string
   pluginName: string
   identity: string
+  pluginId: string
   viewId: string
   instanceKey: string
   companionPanel?: string

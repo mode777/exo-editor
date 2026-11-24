@@ -99,12 +99,13 @@ interface ShellEvent<T> {
 
 ## 4. Topic catalog (v1)
 
-| Topic                    | Payload                                                                      | When                                                                                                     |
-| ------------------------ | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `theme/changed`          | `{ theme: 'dark' \| 'light' \| 'high-contrast' }`                            | The user changes the shell theme                                                                         |
-| `workspace/file-changed` | `{ path, kind: 'created' \| 'changed' \| 'deleted' \| 'renamed', version? }` | A file in the workspace changes, including saves from other tabs                                         |
-| `workspace/closed`       | `{ reason: 'switch' \| 'close' }`                                            | The workspace is being released; the last event a frame receives                                         |
-| `config/changed`         | `{ pluginId, values: Record<string, unknown> }`                              | A plugin's contributed settings change; only that plugin's subscribed handler and view frames receive it |
+| Topic                    | Payload                                                                                        | When                                                                                                     |
+| ------------------------ | ---------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `theme/changed`          | `{ theme: 'dark' \| 'light' \| 'high-contrast' }`                                              | The user changes the shell theme                                                                         |
+| `workspace/file-changed` | `{ path, kind: 'created' \| 'changed' \| 'deleted' \| 'renamed', version? }`                   | A file in the workspace changes, including saves from other tabs                                         |
+| `workspace/closed`       | `{ reason: 'switch' \| 'close' }`                                                              | The workspace is being released; the last event a frame receives                                         |
+| `config/changed`         | `{ pluginId, values: Record<string, unknown> }`                                                | A plugin's contributed settings change; only that plugin's subscribed handler and view frames receive it |
+| `view/active`            | `{ pluginId, active: false }` or `{ pluginId, active: true, viewId, instanceId, instanceKey }` | A plugin's active content-view tab changes or clears; only that plugin's subscribed frames receive it    |
 
 Topic names are `<namespace>/<event>`, lowercase, `[a-z0-9-]` segments, maximum
 64 characters. New topics are added by changing this contract and the OpenSpec
@@ -115,7 +116,8 @@ spec; a plugin must ignore topics it does not know.
 `local/<name>` is not part of the shell catalog. It exists only for the frames
 of one plugin and is governed by the local rules in section 2. A plugin cannot
 add a shell topic, cannot publish a shell topic, and cannot observe another
-plugin's local topic. `config/changed` remains the only targeted shell topic.
+plugin's local topic. `config/changed` and `view/active` are the targeted shell
+topics.
 
 `config/changed` carries the full new value map for the named plugin, not a
 delta. It requires `events:subscribe`, and the shell delivers it only to that
@@ -123,6 +125,13 @@ plugin's live handler and view frames. A plugin without the permission, or with
 no live frame, gets the current values from `shell/init` the next time a frame
 mounts. Settings are shell-owned; no other plugin can read them through this
 topic.
+
+`view/active` carries the plugin's active content-view instance. An active event
+includes `viewId`, `instanceId` and `instanceKey`; a clear event carries only
+`{ pluginId, active: false }`. It requires `events:subscribe`, is delivered only
+to that plugin's subscribed frames, and is published when the active tab changes.
+The current value at frame start is in `shell/init.activeContentView`; the event
+is a change notification, not a replay.
 
 ### `workspace/closed` ordering
 

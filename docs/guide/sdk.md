@@ -169,7 +169,9 @@ await view.openView({ viewId: 'tutorial', instanceKey: 'chapter-2', payload: { c
 
 `ViewClient` exposes reads, listings, the picker, events and the navigation
 helpers, and no save or dirty methods. `view.kind` is `panel` or `content`;
-`view.payload` and `view.openedBy` are one-shot data. A view must name a
+`view.payload` and `view.openedBy` are one-shot data. `view.activeContentView`
+reports the content-view tab that is active at frame start for the same plugin,
+or `null`; subscribe to `view/active` for later changes. A view must name a
 `/`-rooted path for `openFile`. Panels mount on first reveal; content views open a
 tab per instance key.
 

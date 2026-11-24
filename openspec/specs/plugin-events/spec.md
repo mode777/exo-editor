@@ -1,6 +1,7 @@
 # plugin-events Specification
 
 ## Purpose
+
 Defines how plugins learn about shell state changes: the subscription messages,
 the closed v1 topic catalog, ordering and coalescing rules, and the limits that
 keep one slow subscriber from affecting the shell or another plugin.
@@ -58,7 +59,7 @@ The shell SHALL deliver shell-catalog and local events to handler and view frame
 
 ### Requirement: V1 topic catalog
 
-The shell SHALL expose exactly `theme/changed` with `{ theme }`, `workspace/file-changed` with `{ path, kind, version? }`, `workspace/closed` with `{ reason }` and `config/changed` with `{ pluginId, values }`, and SHALL reject shell topic names outside the lowercase `<namespace>/<event>` form made of `[a-z0-9-]` segments and at most 64 characters. The `local/` namespace is reserved for plugin-authored topics and is governed by the plugin-local requirements. `config/changed` SHALL be produced when a plugin's contributed settings change and SHALL be delivered only to that plugin's subscribed handler frames.
+The shell SHALL expose exactly `theme/changed` with `{ theme }`, `workspace/file-changed` with `{ path, kind, version? }`, `workspace/closed` with `{ reason }`, `config/changed` with `{ pluginId, values }` and `view/active` with either `{ pluginId, active: false }` or `{ pluginId, active: true, viewId, instanceId, instanceKey }`, and SHALL reject shell topic names outside the lowercase `<namespace>/<event>` form made of `[a-z0-9-]` segments and at most 64 characters. The `local/` namespace is reserved for plugin-authored topics and is governed by the plugin-local requirements. `config/changed` SHALL be produced when a plugin's contributed settings change and SHALL be delivered only to that plugin's subscribed handler frames. `view/active` SHALL be produced when a plugin's active content-view tab changes or clears and SHALL be delivered only to that plugin's subscribed frames.
 
 #### Scenario: Theme payload
 
@@ -90,6 +91,11 @@ The shell SHALL expose exactly `theme/changed` with `{ theme }`, `workspace/file
 - **WHEN** two plugins have handler frames subscribed to `config/changed` and one plugin's settings change
 - **THEN** only the named plugin's frames receive the event
 
+#### Scenario: Active content view changes
+
+- **WHEN** a plugin's active content-view tab becomes active or the tab changes to a file or another plugin
+- **THEN** that plugin's subscribed frames receive `view/active` with the new content-view instance or `active: false`
+
 #### Scenario: Malformed topic name
 
 - **WHEN** a plugin subscribes to a shell topic containing uppercase letters, characters outside `[a-z0-9-]`, more than one slash or more than 64 characters
@@ -97,7 +103,7 @@ The shell SHALL expose exactly `theme/changed` with `{ theme }`, `workspace/file
 
 ### Requirement: Delivery semantics
 
-The shell SHALL sequence shell-catalog events per topic per workspace session and local events per plugin identity and topic, SHALL deliver at most once, SHALL deliver independently to each subscribed handler or view frame, and SHALL NOT replay history. `config/changed` SHALL be delivered only to the subscribed handler and view frames of the plugin named in the payload. A local event SHALL carry the publisher frame's opaque `exo-session` in `from` and SHALL be delivered only to subscribed frames of the publishing plugin.
+The shell SHALL sequence shell-catalog events per topic per workspace session and local events per plugin identity and topic, SHALL deliver at most once, SHALL deliver independently to each subscribed handler or view frame, and SHALL NOT replay history. `config/changed` and `view/active` SHALL be delivered only to the subscribed handler and view frames of the plugin named in the payload. A local event SHALL carry the publisher frame's opaque `exo-session` in `from` and SHALL be delivered only to subscribed frames of the publishing plugin.
 
 #### Scenario: Monotonic sequence
 
@@ -382,4 +388,3 @@ A handler or view frame SHALL send a correlated `plugin/publish` carrying a loca
 
 - **WHEN** the shell routes a local event
 - **THEN** it does not inspect, log or persist the payload and the event carries only the topic, sequence, `from` and payload
-

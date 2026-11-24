@@ -18,7 +18,7 @@ enough to ship a plugin.
 
 | Artifact                                            | Version | Packaging                                        |
 | --------------------------------------------------- | ------- | ------------------------------------------------ |
-| `packages/plugin-sdk` (`@exo/plugin-sdk`)           | `1.8.0` | Private workspace package; no runtime dependency |
+| `packages/plugin-sdk` (`@exo/plugin-sdk`)           | `1.9.0` | Private workspace package; no runtime dependency |
 | `packages/plugin-template` (`@exo/plugin-template`) | `0.1.0` | Private workspace package; built static assets   |
 
 - The SDK MAJOR equals the protocol major it speaks. `PROTOCOL_VERSION` and
@@ -30,8 +30,9 @@ enough to ship a plugin.
   `openFile()`, `openView()` and `requestPanel()` helpers, `1.6.0` adds
   command registration, `onCommand()` and the command support bit, `1.7.0`
   adds `requestNewFile()`, `registerNewFile()` and the creation/template support
-  bits, and `1.8.0` adds the DOM-only theme helper and the optional token
-  stylesheet, all without changing the protocol major.
+  bits, `1.8.0` adds the DOM-only theme helper and the optional token
+  stylesheet, and `1.9.0` exposes the active content view from `shell/init` and
+  the `view/active` event topic, all without changing the protocol major.
 - The packages are not published in v1 (D12). Consumers in this repository use
   the workspace copy. A future publication adds a built `dist` and does not
   change the message protocol.
@@ -222,6 +223,7 @@ and exposes no save or dirty methods.
 
 ```ts
 view.view // ViewInitData from shell/init: kind, id, title, instanceId, location?, payload?, openedBy?
+view.activeContentView // { pluginId, viewId, instanceId, instanceKey } | null
 view.capabilities // same shape as the editor capabilities
 view.limits // maxFileSize, maxRequestBytes
 view.settings // resolved shell settings
@@ -384,6 +386,9 @@ production build. Token names, values and usage rules are in
   plugin-page utilities, not wire features: an older shell still provides
   `shell/init.theme` and, with the permission, `theme/changed`, and a plugin that
   does not import them keeps its current behavior.
+- `activeContentView` and `view/active` are an additive minor (`1.9.0`). An older
+  shell omits the init field and rejects the topic; the SDK reports `null` and
+  leaves event subscription to the shell's error reply.
 - A deprecated SDK export remains functional for the rest of the current major,
   carries an `@deprecated` note with its replacement and is removed only at the
   next major.

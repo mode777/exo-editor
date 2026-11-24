@@ -67,6 +67,7 @@ import {
 import { pluginViewId } from '../workbench/plugin-views'
 import type { ViewPluginInfo } from '../plugins/view-pool'
 import { contentViewKey } from '../plugins/view-pool'
+import type { ActiveContentView } from '../plugins/view-session'
 import type { PluginManifest } from '../plugins/manifest'
 
 export type WorkspacePhase =
@@ -564,6 +565,38 @@ export class WorkspaceRuntime {
         panelId: nextCompanion.panelId,
       })
     }
+
+    if (previous && (!next || previous.identity !== next.identity)) {
+      this.events.publish(
+        'view/active',
+        { pluginId: previous.pluginId, active: false },
+        { target: previous.identity },
+      )
+    }
+    if (next) {
+      this.events.publish(
+        'view/active',
+        {
+          pluginId: next.pluginId,
+          active: true,
+          viewId: next.viewId,
+          instanceId: next.key,
+          instanceKey: next.instanceKey,
+        },
+        { target: next.identity },
+      )
+    }
+  }
+
+  private activeContentViewContext(): ActiveContentView | null {
+    const active = this.activeContent
+    if (!active) return null
+    return {
+      pluginId: active.pluginId,
+      viewId: active.viewId,
+      instanceId: active.key,
+      instanceKey: active.instanceKey,
+    }
   }
 
   private companionOf(content: ContentViewTabInfo): { identity: string; panelId: string } | null {
@@ -628,6 +661,7 @@ export class WorkspaceRuntime {
         title: view.title,
         pluginName: plugin.pluginName,
         identity: plugin.identity,
+        pluginId: plugin.pluginId,
         viewId: view.id,
         instanceKey,
         ...(view.companionPanel === undefined ? {} : { companionPanel: view.companionPanel }),
@@ -739,6 +773,7 @@ export class WorkspaceRuntime {
         title: view.title,
         pluginName: plugin.pluginName,
         identity: plugin.identity,
+        pluginId: plugin.pluginId,
         viewId: view.id,
         instanceKey,
         ...(view.companionPanel === undefined ? {} : { companionPanel: view.companionPanel }),
@@ -961,6 +996,7 @@ export class WorkspaceRuntime {
       host: this.pluginHost,
       workspaceName: handle.descriptor.name,
       settings: this.pluginSettings,
+      activeContentView: () => this.activeContentViewContext(),
     })
   }
 

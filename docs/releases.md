@@ -10,10 +10,10 @@ replace the contracts; the normative version rules are in
 
 | Axis              | Current | Where it lives                                                         | Meaning                                                                      |
 | ----------------- | ------- | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| Shell SemVer      | `0.8.3` | `apps/shell/package.json`, `SHELL_VERSION`, advertised in `shell/init` | The deployed shell release; independent of the protocol major                |
+| Shell SemVer      | `0.9.0` | `apps/shell/package.json`, `SHELL_VERSION`, advertised in `shell/init` | The deployed shell release; independent of the protocol major                |
 | Protocol major    | `1`     | Envelope `exo: 1`, `PROTOCOL_VERSION`, handshake                       | The wire compatibility axis; the shell accepts exactly one major per release |
 | Manifest schema   | `1`     | `manifest.schemaVersion` / `exo.json` `schemaVersion`                  | The manifest shape; a new version needs a validator and a consent re-prompt  |
-| SDK SemVer        | `1.8.0` | `packages/plugin-sdk/package.json`                                     | The client package; its MAJOR equals the protocol major it speaks            |
+| SDK SemVer        | `1.9.0` | `packages/plugin-sdk/package.json`                                     | The client package; its MAJOR equals the protocol major it speaks            |
 | Artifact versions | `0.1.0` | template and code-plugin packages                                      | Demo/reference artifacts; not a compatibility promise                        |
 
 Changing one axis does not imply a change to the others. The shell version
@@ -24,22 +24,23 @@ SDK version answers "which client API is this".
 ## Current release
 
 The first public release is shell `0.1.0`, protocol `1`, manifest schema `1`,
-SDK `1.1.0`, dated 2026-11-16. The current shell is `0.8.3`, protocol `1`,
-manifest schema `1` and SDK `1.8.0`, dated 2026-11-24; `0.8.3` makes a
-content-view companion follow the active tab, `0.8.2` reattaches the active
-content-view frame when switching content tabs, and `0.8.1` fixes sash drags
-across plugin frames, all without changing the protocol, manifest or SDK.
-Shell `0.8.0` adds command-scoped user activation for the picker and Save As dialog,
+SDK `1.1.0`, dated 2026-11-16. The current shell is `0.9.0`, protocol `1`,
+manifest schema `1` and SDK `1.9.0`, dated 2026-11-24; `0.9.0` exposes the
+active content-view tab in `shell/init` and the targeted `view/active` topic,
+`0.8.3` makes a content-view companion follow the active tab, `0.8.2` reattaches
+the active content-view frame when switching content tabs, and `0.8.1` fixes
+sash drags across plugin frames. Shell `0.8.0` adds command-scoped user activation for the picker and Save As dialog,
 also without changing the protocol, manifest or SDK. Shell `0.7.0` shipped the plugin styling
 guide and SDK theme helper without a shell runtime change, `0.6.0` added
 declarative content-view companion panels, `0.5.0` added plugin new-file
 creation and manifest templates, `0.4.0` added plugin commands, and `0.2.0`
 added plugin-local events; `0.3.0` added panels and content views. The current
-SDK minor is `1.8.0`; `1.2.0` added the file-picker helper, `1.3.0` added
+SDK minor is `1.9.0`; `1.2.0` added the file-picker helper, `1.3.0` added
 directory listing, `1.4.0` added local events, `1.5.0` added the view client and
 navigation helpers, `1.6.0` added command registration, `1.7.0` added new-file
-creation and templates, and `1.8.0` added the theme helper and token stylesheet,
-all without changing the protocol major. "v1" in the product documents is the
+creation and templates, `1.8.0` added the theme helper and token stylesheet, and
+`1.9.0` added the active-content-view init field and event, all without
+changing the protocol major. "v1" in the product documents is the
 first supported protocol major and release milestone, not a claim that the shell
 package is on SemVer `1.x`. A shell `1.0.0` is a separate decision governed by
 this plan; it is not made by the release-readiness change.
