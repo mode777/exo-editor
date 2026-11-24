@@ -175,6 +175,15 @@
     }
     state.instanceId =
       payload.editor && payload.editor.instanceId ? payload.editor.instanceId : null
+    if (fixtureMode === 'bound' && state.instanceId) {
+      // A handler is mounted for the active tab; seed the local view of the
+      // active editor so the fixture can gate before the first event arrives.
+      state.activeEditor = {
+        pluginId: payload.plugin && payload.plugin.id,
+        path: payload.file && payload.file.path,
+        instanceId: state.instanceId,
+      }
+    }
     if (fixtureMode === 'events') subscribeAll()
     if (fixtureMode === 'local-events') subscribeLocal()
     if (fixtureMode === 'bound') {
