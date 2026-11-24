@@ -288,3 +288,51 @@ performance records add the bottom surface.
 - The full local gate from `AGENTS.md`, `openspec validate --all` and the
   deployed fixture path are required before the change is archived. The deployed
   evidence is recorded here and in `ROADMAP.md` after the Pages deploy.
+
+## Deployed verification (2026-11-24)
+
+Run against deployed commit `0b33f35` (shell asset `index-cvcmiO3Q.js`, the same
+shell build as `782615a`) at `https://mode777.github.io/exo-editor/` with
+`chrome-headless-shell` 131.0.6778.264 at 1440x900. The workspace was an OPFS
+directory exposed through the `showDirectoryPicker` stub, containing `exo.json`
+with the deployed main and other fixture manifests, `a.bound.txt`,
+`b.bound.txt`, `notes.txt` and `other.local-other.txt`. The deployed fixture,
+manifest and pages were the real artifacts; no local dev server or local build
+was used.
+
+Passed:
+
+- Consent listed **Fixture Inspection** as a bottom panel tab.
+- The bottom frame init carried `view.location: "bottom"`,
+  `capabilities.editorContext: true` and `activeEditor: null` before any file
+  was open; the same-origin frame used `sandbox="allow-scripts"` only.
+- The bottom tab title named the plugin, and the secondary **Fixture Inspector**
+  panel appeared in its region.
+- The `*.bound.txt` editor init carried an `instanceId` and saw itself active;
+  the panel followed the active editor and a same-plugin tab switch, and the
+  inactive editor saw the new active instance rather than itself.
+- **Apply panel edit** reached only the active editor, marked it dirty and
+  appended the panel text; the panel received the applied snapshot and the
+  inactive editor ignored the edit. **Undo panel edit** restored the editor
+  buffer through its own history while staying dirty.
+- Ctrl/Cmd+S saved through the normal shell flow and the editor reported
+  `saveCount: 1`, `saveResult.ok: true` and a clean buffer.
+- Switching to `notes.txt` cleared the panel to `activeEditor: null`.
+- The other plugin's editor was observed with the main panel's `activeEditor`
+  still `null`; the verification script's final assertion was malformed (it
+  returned a string instead of a boolean), so the run exited before printing its
+  summary. The observation itself was the expected null context.
+- The local gate passed: lint, format, typecheck, 942 shell tests, 115 SDK tests,
+  template tests, build, bundle budget, CSP, custom elements, no-SDK,
+  no-Monaco, template/code builds and secret check. The measured bundle was
+  176,077 gzip js and 13,788 gzip css; the js limit was raised from 176,000 to
+  178,000 with that measurement.
+- `openspec validate editor-bound-panels --strict` and `openspec validate --all`
+  passed.
+
+Not recorded here: the deployed bottom-panel startup measurement. The
+verification host became unresponsive after the acceptance run, so the
+`docs/performance.md` bottom-tab measurement remains open rather than being
+filled with an unmeasured number. The existing 2,000 ms view-frame ceiling is the
+applicable budget.
+

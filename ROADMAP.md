@@ -956,8 +956,19 @@ and save flow, and a view frame still has no save path. SDK `1.10.0` exposes
 `view.activeEditor`, `EditorClient.instanceId` and the typed topic and accepts
 the bottom location; shell `0.10.0`, protocol `1` and manifest schema `1`. The
 deployed fixture adds **Fixture Inspection** and a `*.bound.txt` editor with
-snapshot, edit, undo and save observations. Deployed verification is recorded in
-the change design after the Pages deploy.
+snapshot, edit, undo and save observations. Verified against deployed commit
+`0b33f35` (asset `index-cvcmiO3Q.js`) on 2026-11-24 with `chrome-headless-shell`
+131: the bottom tab and secondary panel appeared, the panel followed two editor
+tabs and cleared for a shell text file, a panel edit marked only the active
+editor dirty, the inactive editor ignored it, undo restored the buffer through
+the editor's history, Ctrl/Cmd+S saved through the normal flow, and the other
+plugin's editor left the panel at `activeEditor: null` (the final script
+assertion was malformed and exited before its summary). The CI `verify` job and
+Pages deploy passed; the deploy needed a retry after removing the duplicate
+`github-pages` artifact. The bundle measured 176,077/178,000 js and
+13,788/14,000 css gzip bytes; the deployed bottom-panel startup measurement
+remains open because the verification host became unresponsive after the run.
+The deployed evidence is recorded in the change design.
 
 ---
 

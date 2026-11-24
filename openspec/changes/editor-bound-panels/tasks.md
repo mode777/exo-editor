@@ -48,8 +48,8 @@
 
 - [x] 6.1 Add a bottom panel and a `**/*.bound.txt` editor to `apps/shell/public/plugin-host-fixture/exo-manifest.json`, bump its `engines.exo` to `>=0.10.0` and update `fixture.test.ts` (including the new editor/panel lists and the shell version used to validate); verify the fixture manifest validates.
 - [x] 6.2 Register the new bottom panel in the fixture controller and update `apps/shell/public/plugin-host-fixture/README.md` with the bottom tab, active-editor and local-event observations; verify the controller page still registers every declared editor and the new panel.
-- [ ] 6.3 Add a fixture bottom-panel page that shows `activeEditor`, subscribes to `editor/active`, requests a snapshot and sends an edit request with the target instance id; verify it renders an empty state when the active tab is a shell text file or another plugin.
-- [ ] 6.4 Add the bound editor fixture mode: subscribe to `editor/active` and the local topic, check the target id, reply with a snapshot, apply an edit through a small history stack, support an undo request, report dirty and save with the normal marker; verify the deployed observation shows the edit, undo and save.
+- [x] 6.3 Add a fixture bottom-panel page that shows `activeEditor`, subscribes to `editor/active`, requests a snapshot and sends an edit request with the target instance id; verify it renders an empty state when the active tab is a shell text file or another plugin.
+- [x] 6.4 Add the bound editor fixture mode: subscribe to `editor/active` and the local topic, check the target id, reply with a snapshot, apply an edit through a small history stack, support an undo request, report dirty and save with the normal marker; verify the deployed observation shows the edit, undo and save.
 - [x] 6.5 Update `docs/guide/manifest.md` with a bottom panel example, the `engines.exo` requirement and the secondary-only companion rule; verify the guide quality test and the manifest example validation.
 - [x] 6.6 Update `docs/guide/sdk.md` and `docs/guide/protocol.md` with `view.activeEditor`, `EditorClient.instanceId`, the `editor/active` subscription, the local-event target/`from` pattern, the SDK `1.10.0` requirement for bottom panels and the existing active-and-visible gate for `plugin/request-panel`; verify every named API exists and the guide links resolve.
 - [x] 6.7 Add the editor-bound panel and bottom panel checks to `docs/guide/testing.md` and a new step to `docs/walkthrough.md`; verify the guide quality test and the walkthrough's relative links.
@@ -65,11 +65,11 @@
 
 ## 8. Integration verification and deploy
 
-- [ ] 8.1 Run the full local gate from `AGENTS.md`: lint, format check, typecheck, unit tests, shell build, budget, CSP, custom elements, no-SDK, no-Monaco, template build/copy, code build/copy and secret check.
-- [ ] 8.2 Run `openspec validate editor-bound-panels --strict` and `openspec validate --all`; verify every delta validates and the change has no zero-delta error.
-- [ ] 8.3 Measure the bundle after the feature and update `apps/shell/budget.json` only if the new measured size exceeds the current cap, recording the number and rationale in the design; verify `npm run budget` passes.
-- [ ] 8.4 Deploy `main`, confirm the CI `verify` job and Pages deploy pass, and verify on `https://mode777.github.io/exo-editor/` with the deployed fixture: secondary and bottom panels appear, two editor tabs update `editor/active`, a panel edit becomes undoable/dirty and saves, a shell text or other-plugin tab shows the empty state, and no cross-identity context leaks.
-- [ ] 8.5 Record the deployed commit, date, measured bundle and acceptance observations in `design.md` and `ROADMAP.md`; verify the recorded versions are `0.10.0`/`1`/`1`/`1.10.0`.
+- [x] 8.1 Run the full local gate from `AGENTS.md`: lint, format check, typecheck, unit tests, shell build, budget, CSP, custom elements, no-SDK, no-Monaco, template build/copy, code build/copy and secret check.
+- [x] 8.2 Run `openspec validate editor-bound-panels --strict` and `openspec validate --all`; verify every delta validates and the change has no zero-delta error.
+- [x] 8.3 Measure the bundle after the feature and update `apps/shell/budget.json` only if the new measured size exceeds the current cap, recording the number and rationale in the design; verify `npm run budget` passes.
+- [x] 8.4 Deploy `main`, confirm the CI `verify` job and Pages deploy pass, and verify on `https://mode777.github.io/exo-editor/` with the deployed fixture: secondary and bottom panels appear, two editor tabs update `editor/active`, a panel edit becomes undoable/dirty and saves, a shell text or other-plugin tab shows the empty state, and no cross-identity context leaks.
+- [x] 8.5 Record the deployed commit, date, measured bundle and acceptance observations in `design.md` and `ROADMAP.md`; verify the recorded versions are `0.10.0`/`1`/`1`/`1.10.0`.
 
 ## Workflow follow-up
 
