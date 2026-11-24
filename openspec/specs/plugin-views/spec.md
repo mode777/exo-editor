@@ -122,7 +122,7 @@ The shell SHALL accept `contributes.contentViews` entries with `id`, `title` and
 
 ### Requirement: Content-view companion panels
 
-The shell SHALL reveal a registered content view's declared `companionPanel` in the secondary side bar when the view opens or is focused, and SHALL hide it when the last open instance of that content view closes. Visibility SHALL be derived from the open content-view instances, an unregistered or missing companion SHALL be skipped without blocking the content view, and a manual hide SHALL remain until the next open or focus.
+The shell SHALL reveal a registered content view's declared `companionPanel` in the secondary side bar when the view opens or its tab becomes active, and SHALL hide it when the active tab moves to a file or a content view with a different (or no) companion, and when the last open instance of that content view closes. Visibility SHALL be derived from the active tab and the open content-view instances, an unregistered or missing companion SHALL be skipped without blocking the content view, and a manual hide SHALL remain until the next open or focus.
 
 #### Scenario: Opening a content view reveals its companion
 
@@ -134,10 +134,15 @@ The shell SHALL reveal a registered content view's declared `companionPanel` in 
 - **WHEN** a content view is opened again with the same instance key or its tab becomes active
 - **THEN** the shell reveals and activates its companion panel without creating a second panel frame
 
+#### Scenario: Active tab leaves the content view
+
+- **WHEN** the active tab moves from a content view with a companion to a file tab or a content view with a different companion
+- **THEN** the shell hides the previous content view's companion without disposing the panel frame
+
 #### Scenario: Multiple instances share a companion
 
-- **WHEN** two open content-view instances declare the same companion panel
-- **THEN** closing one instance leaves the companion panel visible while the other instance remains open
+- **WHEN** two open content-view instances declare the same companion panel and the user switches between their tabs
+- **THEN** the companion panel stays visible and follows the active instance
 
 #### Scenario: Last matching instance closes
 

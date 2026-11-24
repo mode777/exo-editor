@@ -66,6 +66,7 @@ export interface ContentViewTabInfo {
   identity: string
   viewId: string
   instanceKey: string
+  companionPanel?: string
 }
 
 export function contentViewOf(tab: WorkbenchTab): ContentViewTabInfo | undefined {

@@ -3,6 +3,31 @@
 All notable changes to Exo Editor are recorded here. The version axes and the
 release process are in [`docs/releases.md`](./docs/releases.md).
 
+## [0.8.3] - 2026-11-24
+
+Additive shell behavior: a content-view companion follows the active tab.
+
+### Added
+
+- The shell now reveals a content view's declared companion when its tab becomes
+  the active tab and hides it when the active tab moves to a file or a content
+  view with a different (or no) companion. A companion shared by several open
+  preview tabs stays visible while any matching tab is active; switching between
+  them does not hide it. Manual hide and a user-selected other secondary panel
+  keep their existing rules.
+
+### Compatibility
+
+- Shell: `0.8.3`
+- Protocol: `1`
+- Manifest schema: `1`
+- SDK: `1.8.0`
+
+### Breaking
+
+- None. No message, manifest field, permission, capability, consent fingerprint
+  input or SDK API changes.
+
 ## [0.8.2] - 2026-11-24
 
 Bug-fix shell release: switching content-view tabs reattaches the active frame.

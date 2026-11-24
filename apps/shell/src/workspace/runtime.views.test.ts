@@ -8,7 +8,12 @@ import type { PluginHost, PluginHostRecord, ViewLifecycle } from '../plugins/hos
 import { validateManifest, type PluginManifest } from '../plugins/manifest'
 import type { RegisteredContentView, RegisteredPanel } from '../plugins/registration'
 import { pluginViewId } from '../workbench/plugin-views'
-import { clearWorkspaceTabs, configurePresetStore, contentViewOf } from '../workbench/tabs'
+import {
+  clearWorkspaceTabs,
+  configurePresetStore,
+  contentViewOf,
+  openFileTab,
+} from '../workbench/tabs'
 
 const ORIGIN_A = 'https://plugins.example.com'
 const ORIGIN_B = 'https://other.example.com'
@@ -340,6 +345,33 @@ describe('runtime view intents', () => {
     expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(true)
     runtime.closeTabs([tabs[1] as (typeof tabs)[number]])
     expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(false)
+    runtime.dispose()
+  })
+
+  it('hides the companion when the active tab leaves its content view', async () => {
+    const contentRecord = recordFor(
+      manifestFor(ORIGIN_B, 'com.example.other', 'content', 'inspector'),
+      IDENTITY_B,
+      0,
+    )
+    const { runtime } = await createRuntime([contentRecord])
+    useWorkbenchStore.setState({ secondarySideBarVisible: false, activeSecondaryView: 'chat' })
+    const companion = pluginViewId(IDENTITY_B, 'inspector')
+
+    runtime.openContentView(IDENTITY_B, 'tutorial')
+    const tab = useWorkbenchStore.getState().tabs.find((entry) => contentViewOf(entry))
+    if (!tab) throw new Error('Content tab not found')
+    expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(true)
+    expect(useWorkbenchStore.getState().activeSecondaryView).toBe(companion)
+
+    openFileTab('/notes.txt')
+    runtime.setActiveTab('/notes.txt')
+    expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(false)
+
+    useWorkbenchStore.getState().activateTab(tab.id)
+    runtime.setActiveTab(tab.id)
+    expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(true)
+    expect(useWorkbenchStore.getState().activeSecondaryView).toBe(companion)
     runtime.dispose()
   })
 

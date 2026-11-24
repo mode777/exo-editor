@@ -85,11 +85,14 @@ the deployed URL below, not a local dev server or local build.
 16. **Check a content-view companion.** With the fixture active, open Fixture
     Tutorial from the palette. The right side bar reveals Fixture Inspector and
     the read-only tab renders. Hide the inspector: it stays hidden while the tab
-    remains active. Refocus the tab and it returns. Open Fixture Tutorial twice
-    from the palette, then close one tab: the inspector stays while the other tab
-    is open, and hides when the last tab closes. Select another secondary view
-    before closing the last tab: that other panel stays visible. No plugin
-    heartbeat, polling or extra lifecycle message is involved.
+    remains active. Refocus the tab and it returns. Switch to a file tab: the
+    inspector hides, and returning to the content tab reveals it again. Open
+    Fixture Tutorial twice from the palette, then switch between the two tabs:
+    the inspector stays visible and follows the active tab. Close one tab; the
+    companion hides if its tab is no longer active and returns when the remaining
+    tab becomes active. Select another secondary view before closing the last
+    tab: that other panel stays visible. No plugin heartbeat, polling or extra
+    lifecycle message is involved.
 
 ## Screenshots
 

@@ -61,6 +61,8 @@ import {
   setTabDirty,
   updateTabPath,
   activeDocumentPath,
+  contentViewOf,
+  type ContentViewTabInfo,
 } from '../workbench/tabs'
 import { pluginViewId } from '../workbench/plugin-views'
 import type { ViewPluginInfo } from '../plugins/view-pool'
@@ -164,6 +166,7 @@ export class WorkspaceRuntime {
   private disposed = false
   private generationCount = 0
   private contentInstance = 0
+  private activeContent: ContentViewTabInfo | null = null
   private remote: RemoteWorkspaceSummary | null = null
   private remoteError: RemoteErrorSummary | null = null
 
@@ -526,6 +529,50 @@ export class WorkspaceRuntime {
   }
 
   /**
+   * Follow the workbench's active tab. The companion belongs to the active
+   * content view, not to the set of open tabs, so switching to a file or a
+   * non-companion view hides it and returning reveals it again.
+   */
+  setActiveTab(tabId: string | null): void {
+    const store = useWorkbenchStore.getState()
+    const tab = tabId ? store.tabs.find((entry) => entry.id === tabId) : undefined
+    const next = tab ? (contentViewOf(tab) ?? null) : null
+    const previous = this.activeContent
+    if (previous?.key === next?.key) return
+
+    const previousCompanion = previous ? this.companionOf(previous) : null
+    const nextCompanion = next ? this.companionOf(next) : null
+    const sharedCompanion =
+      previousCompanion !== null &&
+      nextCompanion !== null &&
+      previousCompanion.identity === nextCompanion.identity &&
+      previousCompanion.panelId === nextCompanion.panelId
+
+    this.activeContent = next
+
+    if (previousCompanion && !sharedCompanion) {
+      this.applyCompanionChange({
+        action: 'hide',
+        identity: previousCompanion.identity,
+        panelId: previousCompanion.panelId,
+      })
+    }
+    if (nextCompanion) {
+      this.applyCompanionChange({
+        action: 'show',
+        identity: nextCompanion.identity,
+        panelId: nextCompanion.panelId,
+      })
+    }
+  }
+
+  private companionOf(content: ContentViewTabInfo): { identity: string; panelId: string } | null {
+    return content.companionPanel
+      ? { identity: content.identity, panelId: content.companionPanel }
+      : null
+  }
+
+  /**
    * Apply a content-view companion change through the ordinary secondary-panel
    * path. A show is skipped unless the panel is registered and secondary; a
    * hide only closes the region when the companion is the active, visible view,
@@ -583,8 +630,10 @@ export class WorkspaceRuntime {
         identity: plugin.identity,
         viewId: view.id,
         instanceKey,
+        ...(view.companionPanel === undefined ? {} : { companionPanel: view.companionPanel }),
       })
     }
+    this.setActiveTab(opened.key)
     return true
   }
 
@@ -692,8 +741,10 @@ export class WorkspaceRuntime {
         identity: plugin.identity,
         viewId: view.id,
         instanceKey,
+        ...(view.companionPanel === undefined ? {} : { companionPanel: view.companionPanel }),
       })
     }
+    this.setActiveTab(opened.key)
     return { ok: true }
   }
 
@@ -952,6 +1003,7 @@ export class WorkspaceRuntime {
     // Cancel in-flight saves and drop document state before the old session is
     // released, so no write can reach the previous workspace.
     this.documents.clear()
+    this.activeContent = null
     clearWorkspaceTabs()
     await previousSession?.dispose()
     previousProvider?.dispose()

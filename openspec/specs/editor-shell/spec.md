@@ -1,6 +1,7 @@
 # editor-shell Specification
 
 ## Purpose
+
 Defines the shell as the product: a static, backend-free workbench that composes
 the reused workbench kit, owns the workspace and plugin surfaces, and gives no
 editor privileged access.
@@ -989,7 +990,7 @@ The shell SHALL open a content view as a read-only tab in the document area, SHA
 
 ### Requirement: Content-view companion panels in the workbench
 
-The shell SHALL reveal a content view's declared companion panel in the secondary side bar when its tab opens or becomes the active tab, SHALL hide that panel when the last tab for the view closes, and SHALL keep a manual hide or a user-selected other secondary view until the next content-view open or focus. The behavior SHALL use the normal secondary-panel visibility path and SHALL NOT change `plugin/request-panel`.
+The shell SHALL reveal a content view's declared companion panel in the secondary side bar when its tab opens or becomes the active tab, SHALL hide that panel when the active tab moves to a file or a content view with a different (or no) companion, SHALL hide it when the last tab for the view closes, and SHALL keep a manual hide or a user-selected other secondary view until the next content-view open or focus. The behavior SHALL use the normal secondary-panel visibility path and SHALL NOT change `plugin/request-panel`.
 
 #### Scenario: Tab opens with a companion
 
@@ -1006,10 +1007,20 @@ The shell SHALL reveal a content view's declared companion panel in the secondar
 - **WHEN** the user closes the last content-view tab that uses a companion and no other open view uses it
 - **THEN** the shell hides the companion panel and leaves the panel frame mounted for its next reveal
 
-#### Scenario: Shared companion stays visible
+#### Scenario: Active file tab hides the companion
 
-- **WHEN** two content-view tabs use one companion and the user closes one
-- **THEN** the secondary side bar keeps showing the companion for the remaining tab
+- **WHEN** the user switches from a content-view tab to a file tab or to a content view with another companion
+- **THEN** the shell hides the previous content view's companion while leaving the panel frame mounted
+
+#### Scenario: Shared companion follows the active tab
+
+- **WHEN** two content-view tabs use one companion and the user switches between them
+- **THEN** the secondary side bar keeps showing the companion
+
+#### Scenario: Closing the active shared tab
+
+- **WHEN** two content-view tabs use one companion, the user closes the active tab and the remaining tab is not active
+- **THEN** the companion hides until that remaining tab becomes active
 
 #### Scenario: Manual hide wins until refocus
 

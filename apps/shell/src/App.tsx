@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   VSCodeWorkbench,
+  useWorkbenchStore,
   type FileIconResolver,
   type InitialWorkbenchSession,
   type WorkbenchCommand,
@@ -79,6 +80,7 @@ function Shell({ runtime }: { runtime: WorkspaceRuntime }) {
   const host = usePluginHost()
   const filePicker = useFilePicker()
   const newFile = useNewFile()
+  const activeTabId = useWorkbenchStore((state) => state.activeTabId)
   const pluginWorkbench = useMemo(() => derivePluginWorkbench(host), [host])
   const secondaryViews = useMemo(
     () =>
@@ -125,6 +127,10 @@ function Shell({ runtime }: { runtime: WorkspaceRuntime }) {
   useEffect(() => {
     void runtime.start()
   }, [runtime])
+
+  useEffect(() => {
+    runtime.setActiveTab(activeTabId)
+  }, [runtime, activeTabId])
 
   useEffect(() => {
     runtime.setReservedDocumentHandler(openPluginSettings)

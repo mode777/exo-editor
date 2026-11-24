@@ -325,12 +325,13 @@ entry, on the manifest origin, with no query, fragment or `..` segment.
 - A content view MAY declare one `companionPanel`. It MUST name a panel declared
   in the same manifest with `location: "secondary"`; an unknown id, a primary
   panel or an invalid id fails validation. The shell reveals that panel when the
-  content view opens or is focused, keeps it open while any content view with the
-  same companion remains open, and hides it after the last such view closes.
-  Multiple content views may share one companion. A manually hidden panel stays
-  hidden until the next content-view open or focus, and a manual picker choice is
-  ordinary panel behavior. No new message, permission or lifecycle event is
-  involved; `plugin/request-panel` is unchanged.
+  content view opens or becomes the active tab, and hides it when the active tab
+  moves to a file or a content view with a different (or no) companion. Multiple
+  content views may share one companion, and switching between them keeps it
+  visible. A manually hidden panel stays hidden until the next content-view open
+  or focus, and a manual picker choice is ordinary panel behavior. No new
+  message, permission or lifecycle event is involved; `plugin/request-panel` is
+  unchanged.
 - Up to 8 panels and 16 content views may be declared. The controller registers
   a subset by id; an undeclared id is rejected with `not-declared`, a duplicate
   collapses into one entry, and an id becomes active only after
