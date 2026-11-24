@@ -205,13 +205,15 @@
         if (state.activeEditor) requestSnapshot()
       }
       if (
-        data.payload.topic === 'local/fixture' &&
-        data.payload.payload &&
-        data.payload.payload.kind === 'snapshot'
+        (data.payload.topic === 'local/fixture' &&
+          data.payload.payload &&
+          data.payload.payload.kind === 'snapshot') ||
+        data.payload.payload.kind === 'applied'
       ) {
         state.snapshots.push({
           from: data.payload.from,
           instanceId: data.payload.payload.instanceId,
+          kind: data.payload.payload.kind,
           text: data.payload.payload.text,
         })
       }
