@@ -12,7 +12,10 @@ import { ContentViewSurface } from './ContentViewSurface'
 
 export function DocumentArea({ tab }: { tab: WorkbenchTab }) {
   const content = contentViewOf(tab)
-  if (content) return <ContentViewSurface content={content} />
+  // The workbench reuses this component when the active tab stays a content
+  // view. Keying by the instance remounts the surface so its placeholder ref
+  // detaches the old frame and attaches the newly active one.
+  if (content) return <ContentViewSurface key={content.key} content={content} />
   if (!tab.path || tab.kind !== 'file') {
     return <div className="exo-document-placeholder">No editor is available for {tab.title}.</div>
   }

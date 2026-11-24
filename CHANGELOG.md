@@ -3,6 +3,33 @@
 All notable changes to Exo Editor are recorded here. The version axes and the
 release process are in [`docs/releases.md`](./docs/releases.md).
 
+## [0.8.2] - 2026-11-24
+
+Bug-fix shell release: switching content-view tabs reattaches the active frame.
+
+### Fixed
+
+- Switching directly between two content-view tabs now remounts the shell-owned
+  content surface. The previous instance's frame is hidden and the newly active
+  instance's frame is shown. Previously the reused surface kept the first
+  frame attached, so a second content-view tab opened but stayed hidden, which
+  prevented plugins from showing more than one content-view instance.
+- The surface keeps its per-instance placeholder, frame attachment and
+  companion reveal behavior; tab close, reuse of an existing instance key and
+  file tabs are unchanged.
+
+### Compatibility
+
+- Shell: `0.8.2`
+- Protocol: `1`
+- Manifest schema: `1`
+- SDK: `1.8.0`
+
+### Breaking
+
+- None. No message, manifest field, permission, capability, consent fingerprint
+  input or SDK API changes.
+
 ## [0.8.1] - 2026-11-24
 
 Bug-fix shell release: sash drags stay with the shell across plugin frames.

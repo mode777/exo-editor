@@ -35,7 +35,8 @@ plugin new-file creation with manifest templates (`1.7.0`, shell `0.5.0`), the
 optional plugin styling helper and token sheet (`1.8.0`, shell `0.7.0`), and
 command-scoped user activation for the picker and Save As dialog (shell `0.8.0`,
 SDK unchanged). Shell `0.8.1` is a bug fix that keeps sash drags with the shell
-when the pointer crosses a visible plugin frame.
+when the pointer crosses a visible plugin frame; `0.8.2` fixes switching
+between content-view tabs so the newly active instance's frame is shown.
 Panels mount lazily and content views open as read-only tabs; both are
 user-invoked and excluded from the consent fingerprint.
 

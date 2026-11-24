@@ -13,6 +13,7 @@ import type { RegisteredContentView, RegisteredPanel } from '../plugins/registra
 import {
   clearWorkspaceTabs,
   configurePresetStore,
+  contentViewOf,
   type ContentViewTabInfo,
 } from '../workbench/tabs'
 import { pluginViewId } from '../workbench/plugin-views'
@@ -211,6 +212,54 @@ describe('content view surface', () => {
     expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(true)
     expect(useWorkbenchStore.getState().activeSecondaryView).toBe(companion)
     expect(transport.frames).toHaveLength(1)
+    runtime.dispose()
+  })
+
+  it('reattaches the active frame when switching between content-view tabs', async () => {
+    const transport = new FakeFrameTransport()
+    const runtime = new WorkspaceRuntime({
+      providerFactory: () => new MemoryWorkspaceProvider({ now: () => 1, initialFiles: {} }),
+      supportsFolder: () => true,
+      handleStore: new MemoryHandleStore(),
+      eventTarget: new EventTarget(),
+      now: () => 1,
+      pluginHost: host(record()),
+      viewTransport: transport,
+    })
+    await runtime.openFolder()
+    runtime.openContentView(IDENTITY, 'tutorial')
+    runtime.openContentView(IDENTITY, 'tutorial')
+    const tabs = useWorkbenchStore.getState().tabs
+    const first = tabs[0]
+    const second = tabs[1]
+    if (!first || !second) throw new Error('Expected two content tabs')
+    const firstKey = contentViewOf(first)?.key
+    const secondKey = contentViewOf(second)?.key
+    if (!firstKey || !secondKey) throw new Error('Expected two content views')
+
+    const attach = vi.spyOn(runtime.views, 'attachContentSurface')
+    container = document.createElement('div')
+    document.body.appendChild(container)
+    root = createRoot(container)
+
+    await act(async () =>
+      root?.render(
+        <WorkspaceRuntimeProvider runtime={runtime}>
+          <DocumentArea tab={second} />
+        </WorkspaceRuntimeProvider>,
+      ),
+    )
+    expect(attach).toHaveBeenCalledWith(secondKey, expect.any(HTMLElement))
+
+    attach.mockClear()
+    await act(async () =>
+      root?.render(
+        <WorkspaceRuntimeProvider runtime={runtime}>
+          <DocumentArea tab={first} />
+        </WorkspaceRuntimeProvider>,
+      ),
+    )
+    expect(attach).toHaveBeenCalledWith(firstKey, expect.any(HTMLElement))
     runtime.dispose()
   })
 
