@@ -58,7 +58,8 @@ longer freezes, jumps or stays active after release. Protocol `1`, manifest
 schema `1` and SDK `1.8.0` are unchanged. Shell `0.8.2` fixes switching between
 content-view tabs, `0.8.3` keeps a companion visible only while its tab is
 active, and `0.9.0` adds the active content-view context and `view/active`
-(SDK `1.9.0`). The post-layer-10 change `editor-bound-panels` adds the `bottom`
+(SDK `1.9.0`). The post-layer-10 change `editor-bound-panels` (archived as
+`2026-11-24-editor-bound-panels`) adds the `bottom`
 panel location, `activeEditor`, `editor.instanceId`, the targeted `editor/active`
 topic and SDK `1.10.0`; shell `0.10.0`, protocol `1` and manifest schema `1`.
 The parallel Stratofold provider track

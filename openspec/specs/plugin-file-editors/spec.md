@@ -72,14 +72,25 @@ registry, other documents or the persisted selection order.
 
 A handler frame SHALL complete the protocol handshake and receive `shell/init`
 with the document's path, name, directory, size, mtime, version, optional
-language hint, plugin capabilities, limits, theme, locale and workspace name, and
-SHALL receive no file text, bytes, blob or handle until it sends
+language hint, an `editor` block with an opaque shell-assigned `instanceId` for
+this handler frame, plugin capabilities, limits, theme, locale and workspace
+name, and SHALL receive no file text, bytes, blob or handle until it sends
 `plugin/request-file` with a live request id.
 
 #### Scenario: Init has no content
 
 - **WHEN** a handler frame receives `shell/init`
 - **THEN** the payload contains metadata and no file content
+
+#### Scenario: Instance id is per frame
+
+- **WHEN** a handler frame completes its handshake
+- **THEN** `editor.instanceId` is present, stable while that frame lives and different when the document is reopened, retried or moved to another matching editor
+
+#### Scenario: Instance id is the local-event source
+
+- **WHEN** the handler publishes a `local/*` event
+- **THEN** the shell sets `from` to the same value as `editor.instanceId`
 
 #### Scenario: Content requires a request
 

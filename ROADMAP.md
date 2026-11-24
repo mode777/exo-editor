@@ -968,7 +968,8 @@ Pages deploy passed; the deploy needed a retry after removing the duplicate
 `github-pages` artifact. The bundle measured 176,077/178,000 js and
 13,788/14,000 css gzip bytes; the bottom panel retained reveal measured 14 ms
 median and 18 ms maximum against the 2,000 ms ceiling. The deployed evidence is
-recorded in the change design.
+recorded in the change design, and the change is archived as
+`2026-11-24-editor-bound-panels` with its deltas synced into the main specs.
 
 ---
 

@@ -238,7 +238,7 @@ The plugin host SHALL NOT request workspace content, create a plugin-facing work
 
 ### Requirement: Panel and content-view registration
 
-The host SHALL record registered panel and content-view ids only after `plugin/register-complete`, SHALL expose them in the workspace-scoped snapshot with their resolved entry, placement and, for a content view, its optional declared companion panel, and SHALL remove them when the plugin stops.
+The host SHALL record registered panel and content-view ids only after `plugin/register-complete`, SHALL expose them in the workspace-scoped snapshot with their resolved entry and placement, including `primary`, `secondary` or `bottom`, and, for a content view, its optional declared companion panel, and SHALL remove them when the plugin stops.
 
 #### Scenario: Registration activates on completion
 
@@ -260,6 +260,11 @@ The host SHALL record registered panel and content-view ids only after `plugin/r
 - **WHEN** a plugin with a primary panel and a content view is active
 - **THEN** the host snapshot names the panel, its primary location and entry, and the content view, its title and entry, without page content
 
+#### Scenario: Snapshot preserves a bottom panel
+
+- **WHEN** a plugin registers a bottom panel
+- **THEN** the snapshot names the panel, its `bottom` location and its resolved entry, and the workbench can derive the bottom tab from it
+
 #### Scenario: Snapshot preserves a companion association
 
 - **WHEN** a registered content view declares a valid `companionPanel`
@@ -278,7 +283,7 @@ The host SHALL record registered panel and content-view ids only after `plugin/r
 #### Scenario: Registration order is stable
 
 - **WHEN** two plugins register panels at different times
-- **THEN** the snapshot and activity bar use declaration order and then registration order, independent of fetch or handshake timing
+- **THEN** the snapshot and activity bar or bottom tabs use declaration order and then registration order, independent of fetch or handshake timing
 
 ### Requirement: Host view status and log
 

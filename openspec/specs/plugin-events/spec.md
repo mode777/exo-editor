@@ -59,7 +59,7 @@ The shell SHALL deliver shell-catalog and local events to handler and view frame
 
 ### Requirement: V1 topic catalog
 
-The shell SHALL expose exactly `theme/changed` with `{ theme }`, `workspace/file-changed` with `{ path, kind, version? }`, `workspace/closed` with `{ reason }`, `config/changed` with `{ pluginId, values }` and `view/active` with either `{ pluginId, active: false }` or `{ pluginId, active: true, viewId, instanceId, instanceKey }`, and SHALL reject shell topic names outside the lowercase `<namespace>/<event>` form made of `[a-z0-9-]` segments and at most 64 characters. The `local/` namespace is reserved for plugin-authored topics and is governed by the plugin-local requirements. `config/changed` SHALL be produced when a plugin's contributed settings change and SHALL be delivered only to that plugin's subscribed handler frames. `view/active` SHALL be produced when a plugin's active content-view tab changes or clears and SHALL be delivered only to that plugin's subscribed frames.
+The shell SHALL expose exactly `theme/changed` with `{ theme }`, `workspace/file-changed` with `{ path, kind, version? }`, `workspace/closed` with `{ reason }`, `config/changed` with `{ pluginId, values }`, `view/active` with either `{ pluginId, active: false }` or `{ pluginId, active: true, viewId, instanceId, instanceKey }`, and `editor/active` with either `{ pluginId, active: false }` or `{ pluginId, active: true, path, instanceId }`, and SHALL reject shell topic names outside the lowercase `<namespace>/<event>` form made of `[a-z0-9-]` segments and at most 64 characters. The `local/` namespace is reserved for plugin-authored topics and is governed by the plugin-local requirements. `config/changed` SHALL be produced when a plugin's contributed settings change and SHALL be delivered only to that plugin's subscribed handler frames. `view/active` SHALL be produced when a plugin's active content-view tab changes or clears and SHALL be delivered only to that plugin's subscribed frames. `editor/active` SHALL be produced when a plugin's active file editor changes or clears and SHALL be delivered only to that plugin's subscribed frames.
 
 #### Scenario: Theme payload
 
@@ -96,6 +96,16 @@ The shell SHALL expose exactly `theme/changed` with `{ theme }`, `workspace/file
 - **WHEN** a plugin's active content-view tab becomes active or the tab changes to a file or another plugin
 - **THEN** that plugin's subscribed frames receive `view/active` with the new content-view instance or `active: false`
 
+#### Scenario: Active editor changes
+
+- **WHEN** a plugin's active file editor changes, is renamed or clears
+- **THEN** that plugin's subscribed frames receive `editor/active` with `active: true` and the new path and instance id, or `active: false`
+
+#### Scenario: Active editor is targeted
+
+- **WHEN** two plugins have subscribed frames and one plugin's active editor changes
+- **THEN** only that plugin's frames receive `editor/active` and the other plugin learns nothing about the editor
+
 #### Scenario: Malformed topic name
 
 - **WHEN** a plugin subscribes to a shell topic containing uppercase letters, characters outside `[a-z0-9-]`, more than one slash or more than 64 characters
@@ -103,7 +113,7 @@ The shell SHALL expose exactly `theme/changed` with `{ theme }`, `workspace/file
 
 ### Requirement: Delivery semantics
 
-The shell SHALL sequence shell-catalog events per topic per workspace session and local events per plugin identity and topic, SHALL deliver at most once, SHALL deliver independently to each subscribed handler or view frame, and SHALL NOT replay history. `config/changed` and `view/active` SHALL be delivered only to the subscribed handler and view frames of the plugin named in the payload. A local event SHALL carry the publisher frame's opaque `exo-session` in `from` and SHALL be delivered only to subscribed frames of the publishing plugin.
+The shell SHALL sequence shell-catalog events per topic per workspace session and local events per plugin identity and topic, SHALL deliver at most once, SHALL deliver independently to each subscribed handler or view frame, and SHALL NOT replay history. `config/changed`, `view/active` and `editor/active` SHALL be delivered only to the subscribed handler and view frames of the plugin named in the payload. A local event SHALL carry the publisher frame's opaque `exo-session` in `from` and SHALL be delivered only to subscribed frames of the publishing plugin. For an editor frame, that `from` value SHALL equal the `editor.instanceId` advertised in its initialization.
 
 #### Scenario: Monotonic sequence
 
@@ -133,7 +143,7 @@ The shell SHALL sequence shell-catalog events per topic per workspace session an
 #### Scenario: Initial state
 
 - **WHEN** a handler or view frame is initialized
-- **THEN** the init message already carries the current theme, workspace name and the plugin's settings values
+- **THEN** the init message already carries the current theme, workspace name, the plugin's settings values and, for a view, the active-editor context
 
 #### Scenario: Unrelated subscriber is skipped
 
@@ -144,6 +154,11 @@ The shell SHALL sequence shell-catalog events per topic per workspace session an
 
 - **WHEN** a frame subscribed to `local/state` publishes on `local/state`
 - **THEN** it receives its own event with `from` equal to its frame session id and can choose to ignore it
+
+#### Scenario: Editor instance id is the local source
+
+- **WHEN** an editor frame publishes a local event
+- **THEN** `from` equals the `editor.instanceId` in its init and the `instanceId` in the active-editor context for that frame
 
 #### Scenario: View frame receives a shell event
 
@@ -159,7 +174,9 @@ second watcher or polling loop. It SHALL publish `theme/changed` when the active
 theme value changes, and `workspace/closed` once before handler frames are
 disposed. It SHALL publish `config/changed` when a plugin setting changes, after
 the shell-owned store accepts the new value, and SHALL NOT publish it to another
-plugin.
+plugin. It SHALL publish `editor/active` when the active file tab's plugin editor
+changes or clears, after that handler frame is active, and SHALL NOT publish an
+active event for a handler that is merely mounted in a background tab.
 
 #### Scenario: External change is published
 
@@ -195,6 +212,41 @@ plugin.
 
 - **WHEN** the user changes a declared plugin setting and the shell store accepts it
 - **THEN** the plugin's subscribed handler frames receive one `config/changed` with the full new values
+
+#### Scenario: Active editor becomes ready
+
+- **WHEN** a plugin editor for the active file tab completes its handshake
+- **THEN** subscribed frames receive one `editor/active` with `active: true`, the path and the instance id, and no event is published while the handler is still mounting
+
+#### Scenario: Active editor clears
+
+- **WHEN** the active tab moves to a shell text file, a content view, another plugin's editor or no tab
+- **THEN** the previous plugin's subscribed frames receive one `editor/active` with `active: false`
+
+#### Scenario: Editor switch stays within one plugin
+
+- **WHEN** the active tab moves between two files handled by the same plugin and the new handler is active
+- **THEN** that plugin's subscribed frames receive `editor/active` with the new path and instance id, without a false event for the previous editor
+
+#### Scenario: New handler is still mounting
+
+- **WHEN** the active tab moves to a file of the same plugin whose handler has not completed its handshake
+- **THEN** the previous context clears with `active: false` and the new context is published when the handler becomes ready
+
+#### Scenario: Active editor rename is published
+
+- **WHEN** the active file handled by a plugin is renamed
+- **THEN** that plugin's subscribed frames receive `editor/active` with the new path and the same instance id
+
+#### Scenario: Background handler is not announced
+
+- **WHEN** a handler frame becomes active for a file tab that is not the active tab
+- **THEN** no `editor/active` event is published for it
+
+#### Scenario: Workspace switch resets the context
+
+- **WHEN** the workspace switches
+- **THEN** the event bus resets and no active-editor event from the previous workspace is delivered
 
 ### Requirement: Coalescing and ordering
 

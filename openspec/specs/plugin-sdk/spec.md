@@ -174,17 +174,28 @@ globs, accepted command ids and per-contribution rejection reasons from
 
 ### Requirement: Editor client
 
-The SDK SHALL expose the initialized file metadata, read files by path and
-encoding with correlated replies, report dirty state, request a shell save for the
-bound document, answer save requests with text or bytes, expose external-change
-and disposal notifications, and reject outstanding requests when the frame is
-disposed.
+The SDK SHALL expose the initialized file metadata, the opaque editor instance id,
+read files by path and encoding with correlated replies, report dirty state,
+request a shell save for the bound document, answer save requests with text or
+bytes, expose external-change and disposal notifications, and reject outstanding
+requests when the frame is disposed.
 
 #### Scenario: Metadata before content
 
 - **WHEN** an editor frame completes its handshake
 - **THEN** the SDK exposes the file metadata and no file content until the plugin
   calls the read method
+
+#### Scenario: Editor instance id
+
+- **WHEN** `shell/init` carries `editor.instanceId`
+- **THEN** the SDK exposes that value as `EditorClient.instanceId` and uses it only
+  as an opaque identifier for local-event targeting
+
+#### Scenario: Older shell omits the instance id
+
+- **WHEN** `shell/init` has no `editor` block
+- **THEN** the SDK exposes `instanceId` as `null` and keeps the editor usable
 
 #### Scenario: Read round trip
 
@@ -542,7 +553,7 @@ The SDK SHALL expose `EditorClient.publishLocal(topic, payload)` and `EditorClie
 
 ### Requirement: View connection and client
 
-The SDK SHALL accept `exo-mode=view` in the browser fragment, SHALL perform the same handshake and sender validation as editor mode, SHALL return a `{ mode: 'view' }` connection with the typed `ViewInit`, SHALL expose the initial `activeContentView` and type the `view/active` topic, and SHALL expose a `ViewClient` with mediated reads, listings, file picker, local events, navigation intents and panel requests.
+The SDK SHALL accept `exo-mode=view` in the browser fragment, SHALL perform the same handshake and sender validation as editor mode, SHALL return a `{ mode: 'view' }` connection with the typed `ViewInit`, SHALL expose the initial `activeContentView`, `activeEditor` and `view.location` (including `bottom`), SHALL type the `view/active` and `editor/active` topics, and SHALL expose a `ViewClient` with mediated reads, listings, file picker, local events, navigation intents and panel requests.
 
 #### Scenario: View mode is parsed
 
@@ -552,7 +563,12 @@ The SDK SHALL accept `exo-mode=view` in the browser fragment, SHALL perform the 
 #### Scenario: View handshake
 
 - **WHEN** the shell replies with `shell/init` carrying `mode: "view"` and the matching session id
-- **THEN** the SDK exposes the view block, plugin, shell, workspace, theme, permissions, settings, limits and capabilities
+- **THEN** the SDK exposes the view block, active content view, active editor, plugin, shell, workspace, theme, permissions, settings, limits and capabilities
+
+#### Scenario: Bottom panel view
+
+- **WHEN** `shell/init.view.location` is `"bottom"`
+- **THEN** the SDK accepts it and exposes the panel as a bottom view
 
 #### Scenario: View reads
 
@@ -573,6 +589,16 @@ The SDK SHALL accept `exo-mode=view` in the browser fragment, SHALL perform the 
 
 - **WHEN** `shell/init` carries `activeContentView` or a subscribed frame receives `view/active`
 - **THEN** the SDK exposes the validated content-view instance or `null` and leaves routing decisions to the plugin
+
+#### Scenario: Active editor context
+
+- **WHEN** `shell/init` carries `activeEditor` or a subscribed frame receives `editor/active`
+- **THEN** the SDK exposes the validated plugin id, path and instance id or `null` and leaves routing decisions to the plugin
+
+#### Scenario: Editor context is metadata
+
+- **WHEN** the SDK exposes `activeEditor`
+- **THEN** it contains no file content, bytes, handle or save method
 
 #### Scenario: View disposal
 
@@ -659,17 +685,22 @@ The SDK SHALL expose `openFile(path)`, `openView(options)` and `requestPanel(pan
 
 ### Requirement: View capability negotiation
 
-The SDK SHALL expose `capabilities.openFile`, `capabilities.openView`, `capabilities.requestPanel` and `capabilities.localEvents` as booleans, SHALL parse an absent bit as `false`, and SHALL NOT infer support from the shell version, another capability or the manifest permissions.
+The SDK SHALL expose `capabilities.openFile`, `capabilities.openView`, `capabilities.requestPanel`, `capabilities.localEvents` and `capabilities.editorContext` as booleans, SHALL parse an absent bit as `false`, and SHALL NOT infer support from the shell version, another capability or the manifest permissions.
 
 #### Scenario: New shell advertises view intents
 
 - **WHEN** `shell/init` carries the view intent support bits as true
 - **THEN** the SDK exposes them and allows the helpers after their permission checks
 
+#### Scenario: New shell advertises editor context
+
+- **WHEN** `shell/init` carries `capabilities.editorContext: true`
+- **THEN** the SDK exposes it and allows the plugin to read `instanceId`/`activeEditor` and subscribe to `editor/active`
+
 #### Scenario: Older shell omits support
 
 - **WHEN** a support bit is absent
-- **THEN** the SDK exposes `false` and the corresponding helper rejects locally
+- **THEN** the SDK exposes `false` and the corresponding helper or context rejects locally
 
 #### Scenario: Permission is separate
 
@@ -684,7 +715,7 @@ The SDK SHALL expose `capabilities.openFile`, `capabilities.openView`, `capabili
 #### Scenario: Additive minor
 
 - **WHEN** the view client and helpers ship
-- **THEN** the SDK takes an additive minor version `1.5.0`, the protocol major remains `1`, and existing editor methods keep their behavior
+- **THEN** the SDK takes an additive minor version, the protocol major remains `1`, and existing editor methods keep their behavior
 
 ### Requirement: Command handler client
 
@@ -910,3 +941,30 @@ and SHALL keep both additive within SDK major `1`.
 - **WHEN** a plugin repository copies `packages/plugin-sdk` as its vendored SDK
 - **THEN** the theme source, stylesheet and package exports are included and
   resolve without a build step or runtime dependency
+
+### Requirement: Bottom panel capability
+
+The SDK SHALL expose `capabilities.bottomPanel` on registration initializations,
+SHALL parse an absent bit as `false`, and SHALL NOT infer bottom-panel support
+from the shell version or another capability. The SDK SHALL also accept
+`view.location: "bottom"` in a view initialization.
+
+#### Scenario: Registration support
+
+- **WHEN** a registration frame receives `capabilities.bottomPanel: true`
+- **THEN** the SDK exposes the bit and the controller may register a declared bottom panel
+
+#### Scenario: Older shell omits support
+
+- **WHEN** a registration `shell/init` has no `capabilities.bottomPanel` field
+- **THEN** the SDK exposes `false` and does not infer support from the shell version
+
+#### Scenario: Bottom view initialization
+
+- **WHEN** a view frame receives `view.location: "bottom"`
+- **THEN** the SDK exposes the bottom location without rejecting the initialization
+
+#### Scenario: Older SDK location behavior is explicit
+
+- **WHEN** a plugin uses a bottom panel with an SDK that predates this location
+- **THEN** that SDK rejects the unknown location, so the plugin declares SDK `1.10.0` or a client that accepts it
