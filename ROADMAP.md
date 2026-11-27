@@ -1019,8 +1019,8 @@ the read-only workspace disabled install, missing/invalid feeds and invalid
 passed. Catalog first load measured 118 ms median / 138 ms maximum with two
 requests; the bundle measured 183,791/186,000 JS and 14,456/14,600 CSS gzip
 bytes. The deployed evidence is recorded in the change design; the change is
-ready to archive as `2026-11-27-plugin-marketplace` with its deltas synced into
-the main specs.
+archived as `2026-11-27-plugin-marketplace` with its deltas synced into the main
+specs.
 
 ---
 

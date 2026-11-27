@@ -11,8 +11,9 @@ maintain a plugin without reading shell source.
 
 The repository SHALL provide an author guide covering quickstart, manifest
 authoring, protocol flow, SDK usage, hosting and CORS, consent expectations,
-examples and troubleshooting, and SHALL link normative details to the owning
-contracts instead of restating values that could drift.
+marketplace listing authoring, examples and troubleshooting, and SHALL link
+normative details to the owning contracts instead of restating values that could
+drift.
 
 #### Scenario: Guide-only build
 
@@ -46,6 +47,16 @@ contracts instead of restating values that could drift.
 - **THEN** it covers HTTPS, CORS response headers, localhost development,
   same-origin child-path hosting and cross-origin hosting, and states the
   sandbox consequence of each
+
+#### Scenario: Marketplace listing page
+
+- **WHEN** an author wants their plugin to appear in a marketplace
+- **THEN** the guide explains the feed envelope, the required manifest URL, the optional display metadata, validation limits and the fact that feed metadata grants no capability and does not replace consent
+
+#### Scenario: Marketplace listing example validates
+
+- **WHEN** the marketplace example in the guide is validated with the marketplace schema
+- **THEN** it passes without modification and links to the authoritative feed for the deployed instance
 
 ### Requirement: Demo workspace exercises shipped editors
 
@@ -112,16 +123,15 @@ state.
 ### Requirement: Release versioning and communication
 
 The repository SHALL document independent version axes (shell SemVer, protocol
-major, manifest `schemaVersion`, SDK major), a release checklist, changelog
-policy, deprecation timeline and the upgrade note required for a breaking
-change, and SHALL keep a changelog with the current release entry.
+major, manifest `schemaVersion`, SDK major and marketplace feed `schemaVersion`),
+a release checklist, changelog policy, deprecation timeline and the upgrade note
+required for a breaking change, and SHALL keep a changelog with the current
+release entry.
 
 #### Scenario: Version axes stay independent
 
 - **WHEN** a release document states a version
-- **THEN** it names the axis (shell, protocol, manifest schema or SDK) and the
-  value matches its contract; changing one axis does not imply a change to the
-  others
+- **THEN** it names the axis (shell, protocol, manifest schema, SDK or marketplace feed schema) and the value matches its contract; changing one axis does not imply a change to the others
 
 #### Scenario: Release checklist is complete
 
@@ -144,9 +154,13 @@ change, and SHALL keep a changelog with the current release entry.
 
 #### Scenario: Changelog matches the release
 
-- **WHEN** the current package versions and shell version are read
-- **THEN** the newest changelog entry names those versions, the date and any
-  breaking change
+- **WHEN** the current package versions, shell version and marketplace feed schema version are read
+- **THEN** the newest changelog entry names those versions, the date and any breaking change
+
+#### Scenario: Marketplace feed schema is its own axis
+
+- **WHEN** the marketplace feed format changes
+- **THEN** the release documentation treats it as an independently versioned axis and does not infer a protocol, manifest or SDK major change
 
 ### Requirement: Styling coverage in the author handoff
 
