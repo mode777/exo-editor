@@ -43,10 +43,12 @@ the deployed URL below, not a local dev server or local build.
 9. **Change the theme.** Toggle the theme from the palette. Monaco follows to
    the other theme without reopening the file; the event reaches the subscribed
    handler.
-10. **Disable a plugin.** Open Settings, disable Exo Code, and open `hello.ts`.
-    The file falls back to the shell text surface and no visible plugin frame
-    remains. Re-enable it and confirm the Monaco surface returns on the next
-    open.
+10. **Disable a plugin.** Open Extensions, select Exo Code, choose Disable, and
+    open `hello.ts`. The file falls back to the shell text surface and no
+    visible plugin frame remains. Re-enable it and confirm the Monaco surface
+    returns on the next open. Open Settings and confirm the **Plugin debugging**
+    section keeps raw `exo.json`, status and the log without duplicating the
+    Extensions actions.
 11. **Check the unsupported folder state.** Open the shell in a browser without
     `showDirectoryPicker` (or emulate its absence). The explorer explains the
     limitation, does not show a mock tree, and still offers Connect Remote.
@@ -117,6 +119,24 @@ the deployed URL below, not a local dev server or local build.
     `notes.txt` or the other plugin's editor: the panel shows its empty state.
     Close and reopen the bottom region: the retained frame returns without a new
     handshake, and an inactive bottom tab creates no iframe.
+19. **Discover and install from the marketplace.** With the deployed shell and
+    no workspace, open Extensions (`Ctrl+Shift+X`). The Marketplace section
+    loads the official feed and lists Exo Code and Exo Template Plugin with
+    source **Exo Plugins**; the Installed section explains that a folder is
+    required. Type `template` in the search field and confirm only the template
+    listing remains, then clear it. Open a scratch folder with no `exo.json` and
+    open Extensions again. Choose Install on Exo Template Plugin: the details tab
+    opens, `exo.json` contains one enabled `manifest` entry and the normal
+    consent dialog names
+    `https://mode777.github.io/exo-editor/plugin-template/exo-manifest.json`.
+    Approve it; the details show the manifest name, publisher, origin,
+    permissions, contributions and declared settings. Disable, enable and remove
+    it from details and confirm the Installed section and `exo.json` follow.
+    Confirm the settings **Plugin debugging** section shows the same entry's
+    status and log but no install/remove/consent controls. Open Extensions in a
+    read-only workspace: install and manage actions are disabled and explained.
+    Point a scratch deployment at a missing or invalid source file and confirm
+    the error/Retry state while installed rows and install by URL still work.
 
 ## Screenshots
 

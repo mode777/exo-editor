@@ -8,6 +8,8 @@ import type { PluginSettingsSnapshot } from '../plugins/settings'
 import type { CommandControllerSnapshot } from '../plugins/commands'
 import type { FilePickerView } from '../plugins/file-picker'
 import type { NewFileView } from '../plugins/new-file'
+import type { PluginManagementSnapshot } from '../plugins/management'
+import type { MarketplaceSnapshot } from '../marketplace/store'
 import type { WorkspaceRuntime, WorkspaceSnapshot } from './runtime'
 
 const WorkspaceRuntimeContext = createContext<WorkspaceRuntime | null>(null)
@@ -89,6 +91,18 @@ export function useCommandNotices(): CommandControllerSnapshot {
 export function usePluginSettings(): PluginSettingsSnapshot {
   const runtime = useWorkspaceRuntime()
   const store = runtime.pluginSettings
+  return useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
+}
+
+export function useMarketplace(): MarketplaceSnapshot {
+  const runtime = useWorkspaceRuntime()
+  const store = runtime.marketplace
+  return useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
+}
+
+export function usePluginManagement(): PluginManagementSnapshot {
+  const runtime = useWorkspaceRuntime()
+  const store = runtime.pluginManagement
   return useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
 }
 

@@ -35,7 +35,7 @@ Location: workspace root, exact name, case-sensitive where the provider is.
 | `schemaVersion` | number | yes | Must be `1`. Unknown versions are reported, not guessed. |
 | `plugins` | array | yes | May be empty. Maximum 50 entries. |
 | `plugins[].manifest` | string | yes | Absolute `https` URL (or `http://localhost`). No credentials, no fragment. |
-| `plugins[].enabled` | boolean | no | Default `true`. A disabled plugin is listed in settings and never loaded. |
+| `plugins[].enabled` | boolean | no | Default `true`. A disabled plugin is listed in Extensions and never loaded. |
 
 Rules:
 
@@ -43,9 +43,9 @@ Rules:
   disable a plugin.
 - Duplicate manifest URLs are rejected. This is a semantic check across entries,
   not something the JSON Schema can express.
-- `exo.json` is shell-only. No plugin message can read or write it. The settings
-  UI rewrites it as canonical 2-space JSON; formatting and key order are not
-  preserved (D8).
+- `exo.json` is shell-only. No plugin message can read or write it. The
+  Extensions view and the settings raw editor rewrite it as canonical 2-space
+  JSON; formatting and key order are not preserved (D8).
 - `exo.json` is strict JSON. Comments and trailing commas are not valid and are
   reported as `invalid-json`; the shell does not strip them. A missing file means
   "no plugins", not an error. A malformed one is surfaced as a workspace problem
@@ -118,11 +118,12 @@ validation. The canonical form is 2-space JSON with:
 - `enabled` written explicitly, including `true`;
 - one trailing newline.
 
-The settings surface is the only writer. A rewrite of an already-canonical file
-changes only the entry or flag the user edited. A valid but non-canonical file is
-normalized on its first rewrite; the UI states that formatting and key order are
-not preserved. Writes use the loaded stat version as `ifVersion`, so a stale
-settings view fails with `conflict` rather than overwriting an external edit.
+The Extensions management surface and the Settings raw editor are the only
+writers. A rewrite of an already-canonical file changes only the entry or flag
+the user edited. A valid but non-canonical file is normalized on its first
+rewrite; the UI states that formatting and key order are not preserved. Writes
+use the loaded stat version as `ifVersion`, so a stale view fails with `conflict`
+rather than overwriting an external edit.
 
 ## 3. `exo-manifest.json`
 
@@ -258,7 +259,7 @@ Configuration declares values the user edits in shell-owned state. It is not a
 capability: it does not grant workspace, event or network access and it is
 **excluded from the consent fingerprint**. Values are stored by the shell keyed by
 workspace and plugin identity (D11); they are never written to `exo.json` or the
-workspace. The settings UI and delivery rules are in
+workspace. The extension-details settings UI and delivery rules are in
 [`plugin-settings`](../../openspec/specs/plugin-settings/spec.md) and
 [`plugin-protocol.md`](./plugin-protocol.md).
 

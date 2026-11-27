@@ -68,7 +68,14 @@ The post-layer-10 change `surface-companion-panels` adds
 legacy `companionPanel` alias normalized to the same list. The shell derives
 visibility from the active content view or active file-editor handler and sends
 no new message or event; shell `0.11.0`, protocol `1`, manifest schema `1` and
-SDK `1.10.0`. The parallel Stratofold provider track
+SDK `1.10.0`. The post-layer-10 change `plugin-marketplace` adds deployment-scoped
+marketplace discovery (`marketplace-sources.json` plus `marketplace.json` feeds),
+the **Extensions** activity-bar view, install by URL, a shell-owned details tab
+and the move of plugin management out of Settings into a **Plugin debugging**
+section. Install writes one manifest URL to `exo.json` and still follows the
+normal validation and consent path; shell `0.12.0`, marketplace feed schema `1`,
+protocol `1`, manifest schema `1` and SDK `1.10.0`. The authoritative feed is
+`https://mode777.github.io/exo-editor/marketplace.json`. The parallel Stratofold provider track
 (P1-P3) is archived and verified; it does not gate the numbered layers. The
 contracts are ratified, and the shell app (`apps/shell`) builds, tests and
 deploys to GitHub Pages through CI. Do not scaffold code ahead of the [roadmap](./ROADMAP.md) layer
@@ -84,7 +91,8 @@ exist yet.
 | [`docs/contracts/`](./docs/contracts/)                                   | Normative contracts; ratified by `define-core-contracts` and mirrored in `openspec/specs/` |
 | [`docs/contracts/plugin-sdk.md`](./docs/contracts/plugin-sdk.md)         | Typed plugin client, origin rules, compatibility policy and template                       |
 | [`docs/contracts/plugin-styling.md`](./docs/contracts/plugin-styling.md) | Optional theme helper, token sheet and the three palettes                                  |
-| [`docs/guide/`](./docs/guide/README.md)                                  | Author handoff: quickstart, manifest, protocol, SDK, styling, hosting, consent, testing    |
+| [`docs/contracts/marketplace.md`](./docs/contracts/marketplace.md)       | Feed and deploy-time source format, loading, installation and trust boundary               |
+| [`docs/guide/`](./docs/guide/README.md)                                  | Author handoff: quickstart, manifest, protocol, SDK, styling, hosting, consent, marketplace, testing |
 | [`docs/security-review.md`](./docs/security-review.md)                   | Trust-boundary control map, mutation evidence, findings                                    |
 | [`docs/accessibility.md`](./docs/accessibility.md)                       | A11y scope, automated checks, manual script, upstream exceptions                           |
 | [`docs/browser-support.md`](./docs/browser-support.md)                   | Supported, unsupported and unverified browser/provider combinations                        |
@@ -209,6 +217,8 @@ npm install        # npm ci in CI
 | Template deploy copy                | `npm run deploy:copy-template` (after the shell build and dist checks) |
 | Code plugin build                   | `npm run build:code`                                                   |
 | Code plugin deploy copy             | `npm run deploy:copy-code` (after the shell build and dist checks)     |
+| Marketplace deploy copy             | `npm run deploy:copy-marketplace` (after the shell and plugin copies)  |
+| Marketplace artifact check          | `npm run check:marketplace` (after the marketplace copy)                |
 
 Dev server: `npm run dev` serves `http://localhost:5173/exo-editor/`. It is a
 development aid, not a verification target.
@@ -276,6 +286,8 @@ npm run build:template
 npm run deploy:copy-template
 npm run build:code
 npm run deploy:copy-code
+npm run deploy:copy-marketplace
+npm run check:marketplace
 npm run check:dist-secrets
 ```
 
@@ -300,6 +312,8 @@ docs/performance.md     runtime budgets and measured results
 docs/walkthrough.md     recorded release acceptance path
 docs/releases.md        version axes, release checklist and communication
 schema/exo.schema.json  shared JSON Schema for exo.json and exo-manifest.json
+schema/marketplace.schema.json  marketplace sources and feed schema
+marketplace/            authoritative feed and default deploy-time source list
 CHANGELOG.md            release history
 apps/code-plugin/       Monaco reference plugin, child-path deploy
 examples/               example workspaces (code plugin and release demo)

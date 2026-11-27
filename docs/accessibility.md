@@ -12,7 +12,9 @@ Exo owns these surfaces and checks them:
 - document area (text editor, plugin frame surface, content-view chrome and placeholder, banners, actions)
 - plugin panels (side-bar header action, bottom tab strip and shell-owned placeholder)
 - secondary-view picker
-- settings dialog, including plugin settings, raw `exo.json` and the plugin log
+- extensions view (search, Installed and Marketplace sections, rows, install/manage actions, feed errors)
+- extension details tab (metadata, permissions, status, consent actions, contributed settings)
+- settings dialog, including raw `exo.json` and the plugin log
 - consent dialog
 - workspace file picker (shell-owned plugin selection dialog)
 - new-file Save As dialog
@@ -32,7 +34,8 @@ Run:
 npm test --workspace @exo/shell -- --run \
   src/a11y.test.tsx \
   src/accessibility-contrast.test.ts \
-  src/components/useModalDialog.test.tsx
+  src/components/useModalDialog.test.tsx \
+  src/extensions/ExtensionsView.test.tsx
 ```
 
 - `src/a11y.test.tsx` renders each Exo-owned surface and runs `axe-core` 4.14.1
@@ -55,6 +58,10 @@ npm test --workspace @exo/shell -- --run \
   label, folder navigation, reserved-folder filtering and the collision state.
 - `src/workbench/SecondaryViewPicker.test.tsx` covers the secondary-view picker's
   list, initial focus, Arrow Up/Down movement, Escape close and an axe scan.
+- `src/extensions/ExtensionsView.test.tsx` covers the labelled search, both
+  sections, catalog/installed rows, install-by-URL validation, the no-workspace
+  and read-only disabled states, failed-source isolation, the details tab, the
+  contributed settings fieldset and axe scans of both the view and details.
 - `src/document/ContentViewSurface.test.tsx` covers the content-view body, the
   absence of a second header or breadcrumb row, the placeholder accessible name
   and an axe scan of the shell-owned nodes.
@@ -135,6 +142,17 @@ Run against the deployed URL with the demo workspace from
     buttons with the keyboard; focus stays in the panel and the editor tab
     reports dirty. Close and reopen the region and confirm focus returns to a
     reachable control.
+12. Open Extensions from the activity bar or `Ctrl+Shift+X`. Focus reaches the
+    search field, the Installed and Marketplace section toggles report their
+    expanded state, and Tab moves through row title/manage/install actions
+    without entering an iframe. Type a query and confirm both sections filter
+    with a visible empty result. Open an installed extension's details; the tab
+    heading names the extension, the permissions and settings are readable, and
+    the Disable/Remove/Review actions are keyboard reachable. Repeat in both
+    themes and at a narrow width; focus rings remain visible and no control is
+    clipped. With a feed error, confirm the error is announced and the Retry
+    button is reachable while installed rows still work. With no workspace, the
+    install actions are disabled and the explanation is announced.
 
 ## Known limitations
 
@@ -187,6 +205,9 @@ surface checks below were repeated on 2026-11-20 against commit `3f69504`.
   Result: pass.
 - Settings dialog: focus enters the dialog, twelve Tab presses stay inside it,
   and Escape closes it. Result: pass.
+- Extensions view and details (added 2026-11-27): the automated axe scans pass;
+  the deployed keyboard, theme and feed-error checks are recorded with the
+  `plugin-marketplace` deployed verification after the next Pages deploy.
 - The automated axe and contrast suites above pass in the same run; the shell's
   keyboard navigation through the explorer, tabs, document area and status bar
   matched the script.

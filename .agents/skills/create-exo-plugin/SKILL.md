@@ -372,7 +372,7 @@ npm run dev --workspace plugin   # serves http://localhost:5175/ with CORS
 
 1. Open <https://mode777.github.io/exo-editor/> in Chrome or Edge and open a
    local folder as the workspace.
-2. Add the plugin through the shell's Plugins settings surface (or put this in
+2. Add the plugin through the shell's Extensions view or settings raw editor (or put this in
    the workspace root `exo.json`):
    `"manifest": "http://localhost:5175/exo-manifest.json"`. The deployed
    shell's CSP permits `http://localhost:*` frames for exactly this.

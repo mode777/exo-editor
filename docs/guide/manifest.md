@@ -26,9 +26,10 @@ plugin:
 ```
 
 The URL must be absolute, `https` (or `http://localhost` in development), with no
-credentials or fragment. The shell adds a valid entry through its settings
-surface; it does not need a hand-written file, and saving the settings surface
-rewrites the canonical form.
+credentials or fragment. The shell adds a valid entry through its Extensions
+view or the settings raw editor; it does not need a hand-written file, and
+saving rewrites the canonical form. To make the plugin discoverable without
+sharing the URL, add it to a [marketplace feed](./marketplace.md).
 
 ## A manifest
 

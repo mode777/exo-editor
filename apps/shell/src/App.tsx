@@ -38,6 +38,7 @@ import {
   useFilePicker,
   useNewFile,
   usePluginHost,
+  usePluginManagement,
   useWorkspaceSnapshot,
   WorkspaceRuntimeProvider,
 } from './workspace/context'
@@ -78,6 +79,7 @@ function Shell({ runtime }: { runtime: WorkspaceRuntime }) {
   const snapshot = useWorkspaceSnapshot()
   const dirty = useDirtyDocuments()
   const host = usePluginHost()
+  const pluginManagement = usePluginManagement()
   const filePicker = useFilePicker()
   const newFile = useNewFile()
   const activeTabId = useWorkbenchStore((state) => state.activeTabId)
@@ -123,6 +125,15 @@ function Shell({ runtime }: { runtime: WorkspaceRuntime }) {
     setSettingsSection('workspace')
     setSettingsOpen(true)
   }, [])
+
+  const focusExtensions = useCallback(() => {
+    runtime.showPanel('extensions', 'primary')
+  }, [runtime])
+
+  const refreshMarketplace = useCallback(() => {
+    runtime.showPanel('extensions', 'primary')
+    void runtime.marketplace.refresh()
+  }, [runtime])
 
   useEffect(() => {
     void runtime.start()
@@ -240,6 +251,8 @@ function Shell({ runtime }: { runtime: WorkspaceRuntime }) {
       openSettings,
       openPluginSettings,
       openWorkspaceSettings,
+      focusExtensions,
+      refreshMarketplace,
       openFolder,
       connectRemote: () => requestRemoteConnect(),
       disconnect: disconnectWorkspace,
@@ -256,10 +269,12 @@ function Shell({ runtime }: { runtime: WorkspaceRuntime }) {
     }),
     [
       disconnectWorkspace,
+      focusExtensions,
       openFolder,
       openPluginSettings,
       openSettings,
       openWorkspaceSettings,
+      refreshMarketplace,
       runtime,
     ],
   )
@@ -481,6 +496,15 @@ function Shell({ runtime }: { runtime: WorkspaceRuntime }) {
           onSave={() => void savePending()}
           onDiscard={discardPending}
           onCancel={cancelPending}
+        />
+      )}
+      {pluginManagement.pending && (
+        <ClosePromptDialog
+          paths={pluginManagement.pending.paths}
+          error={pluginManagement.pending.error}
+          onSave={() => void runtime.pluginManagement.savePending()}
+          onDiscard={() => void runtime.pluginManagement.discardPending()}
+          onCancel={() => runtime.pluginManagement.cancelPending()}
         />
       )}
       {snapshot.phase === 'failed' && snapshot.error && !settingsOpen && (

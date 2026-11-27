@@ -134,20 +134,21 @@ carries the full new map to subscribed frames of this plugin only.
     changing afterwards.
 11. Enable `readonly-manifest.json` instead: its events editor opens and every
     subscription is answered with `permission-denied` in `errors`.
-12. Open Settings > Plugins with the deployed manifest: the fixture entry shows
-    the string, boolean and enum controls with the manifest defaults and
-    descriptions.
-13. Open `events.events.txt`, change `fixture.greeting` in Settings > Plugins,
-    and confirm the frame records exactly one `config/changed` with
-    `{ pluginId, values }` for the full map. Open a new `.txt` document and
+12. Open Extensions with the deployed manifest and select the fixture in
+    Installed: its details tab shows the string, boolean and enum controls with
+    the manifest defaults and descriptions.
+13. Open `events.events.txt`, change `fixture.greeting` in the fixture's
+    extension details, and confirm the frame records exactly one `config/changed`
+    with `{ pluginId, values }` for the full map. Open a new `.txt` document and
     confirm its `shell/init.settings` already carries the new value.
-14. Reload the page with the same workspace: Settings and `shell/init` show the
-    changed value. Switch to a second workspace: the defaults are shown and the
-    first workspace's value is not delivered. Switch back: the value returns.
+14. Reload the page with the same workspace: the extension details and
+    `shell/init` show the changed value. Switch to a second workspace: the
+    defaults are shown and the first workspace's value is not delivered. Switch
+    back: the value returns.
 15. Seed an invalid stored value: in DevTools > Application > IndexedDB >
     `exo-plugin-settings` > `settings`, edit the record for the workspace and set
-    `values[<identity>]['fixture.size'] = 9`, then reload. The settings surface
-    warns for `fixture.size`, the fixture receives the default `1`, and the
+    `values[<identity>]['fixture.size'] = 9`, then reload. The extension details
+    tab warns for `fixture.size`, the fixture receives the default `1`, and the
     workspace stays usable.
 16. Confirm a setting change does not modify `exo.json`, create a workspace file
     or open a document tab.
@@ -299,7 +300,7 @@ include the count in the document title. Manual checks:
    names the plugin, can be dismissed, and disappears after eight seconds.
 5. Run **Timeout Fixture Command**, wait ten seconds, and confirm a timeout
    notice appears while the editor frame stays mounted.
-6. Disable the fixture in Settings. Every palette, explorer and action-row entry
+6. Disable the fixture in Extensions. Every palette, explorer and action-row entry
    disappears; a stale palette entry performs no delivery and appears in the
    plugin log as `stale`.
 

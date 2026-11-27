@@ -118,7 +118,8 @@ keeps the parsed declaration in a workspace-scoped store, and refreshes it after
 shell writes and on focus or visibility. The declaration is strict JSON, capped
 at 256 KiB, validated all-or-nothing, and resets on a workspace switch before the
 new declaration is read. A missing file means zero plugins. Plugin-originated
-access to the path stays denied; only the shell's settings surface writes it.
+access to the path stays denied; only the shell-owned Extensions management
+surface and settings raw editor write it.
 
 Global preferences - theme, region visibility, sash sizes - are not part of the
 workspace and survive the switch. This is decision D7 below.
@@ -261,6 +262,18 @@ client are documented in
 path out of D10's folder-only browser limitation, but it does not weaken D10 for
 folder-backed workspaces.
 
+Marketplace discovery follows D20. The deployed shell reads
+`marketplace-sources.json` from its own origin, then reads the fixed feed URLs it
+names. The source list is deployment configuration, not workspace state or a
+runtime setting. Feed content is untrusted display data: it can list a
+`https`/localhost manifest URL and optional text, but it cannot grant a
+capability, install automatically, mount a frame or change the consent
+fingerprint. Installing writes one `manifest` entry through the shell-owned
+configuration store; the plugin host then validates the manifest and asks for
+consent exactly as for a manually added URL. The official feed is a static asset
+deployed next to the shell, and `deploy:copy-marketplace` is the only step that
+puts it in the artifact.
+
 The controls in this section are enumerated with their enforcement points,
 regression tests, mutation checks and findings in
 [`security-review.md`](./security-review.md).
@@ -312,6 +325,9 @@ ROADMAP.md               layered OpenSpec change plan
 apps/
   shell/                 Exo editor shell (the deployable)
   code-plugin/           Monaco reference plugin (child-path deploy)
+marketplace/
+  marketplace.json       authoritative feed (deploy-time copy)
+  sources.json           default deploy-time feed list
 packages/
   plugin-sdk/            typed postMessage client, shared by plugins
   plugin-template/       starter plugin, published or copied
@@ -320,6 +336,7 @@ docs/
   contracts/             normative contracts, one file per surface
 schema/
   exo.schema.json        shared JSON Schema for exo.json and exo-manifest.json
+  marketplace.schema.json  marketplace sources and feed schema
 openspec/
   specs/                 ratified capabilities
   changes/               active changes
@@ -379,6 +396,7 @@ layer named in the last column.
 | D17 | Remote providers are opt-in workspace providers implementing the same session contract; credentials are shell-owned and never exposed to plugins or URLs; they are not a sync or cloud-storage feature | decided | P1 |
 | D18 | Handler frames are hidden by default; a manifest contribution with `rendering: "frame"` may be displayed in the active document area, with the same sandbox, no shell DOM access and shell chrome outside the frame | decided | layer 9 |
 | D19 | A plugin may ask the shell to save with an id-less intent; content and version still come only through the shell-initiated save round trip | decided | post-layer 9 |
+| D20 | Marketplace feeds are deployment-scoped discovery: the shell reads a fixed same-origin source list, treats feed content as untrusted display data, and installs only by writing a manifest URL to `exo.json` through the normal host and consent path | decided | post-layer 10 |
 
 ## 9. Release evidence
 

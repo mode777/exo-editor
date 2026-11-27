@@ -14,7 +14,10 @@ export const workbenchConfig: WorkbenchConfig = {
   },
   activityBar: {
     enabled: true,
-    items: [{ id: 'explorer', title: 'Explorer', icon: 'files' }],
+    items: [
+      { id: 'explorer', title: 'Explorer', icon: 'files' },
+      { id: 'extensions', title: 'Extensions', icon: 'extensions' },
+    ],
     bottomItems: [
       {
         id: 'settings',
@@ -29,7 +32,7 @@ export const workbenchConfig: WorkbenchConfig = {
     initialWidth: 300,
     minWidth: 200,
     maxWidth: 480,
-    views: ['explorer'],
+    views: ['explorer', 'extensions'],
   },
   secondarySideBar: {
     enabled: false,

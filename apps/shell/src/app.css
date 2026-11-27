@@ -1439,3 +1439,357 @@
   color: var(--vscode-descriptionForeground);
   font-size: 12px;
 }
+
+/* Extensions view and shell-owned extension details. */
+
+.exo-extensions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  padding: 8px;
+  color: var(--vscode-foreground);
+}
+
+.exo-extensions-search {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 4px 6px;
+  border: 1px solid var(--vscode-input-border, var(--vscode-widget-border));
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  font: inherit;
+  font-size: 12px;
+}
+
+.exo-extensions-search:focus-visible,
+.exo-extensions-install-row input:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+.exo-extensions-hint,
+.exo-extensions-empty {
+  margin: 0;
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
+}
+
+.exo-extensions-error {
+  padding: 6px;
+  border: 1px solid var(--vscode-inputValidation-errorBorder, var(--vscode-errorForeground));
+  background: var(--vscode-inputValidation-errorBackground, transparent);
+  font-size: 12px;
+}
+
+.exo-extensions-error p {
+  margin: 0 0 4px;
+}
+
+.exo-extensions-error button {
+  margin-top: 4px;
+}
+
+.exo-extensions-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.exo-extensions-section h3 {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--vscode-descriptionForeground);
+}
+
+.exo-extensions-section-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 3px 2px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: left;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.exo-extensions-section-toggle:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+}
+
+.exo-extensions-section-toggle:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+.exo-extensions-count {
+  margin-left: auto;
+  color: var(--vscode-badge-foreground);
+  background: var(--vscode-badge-background);
+  border-radius: 8px;
+  padding: 0 6px;
+  font-size: 10px;
+}
+
+.exo-extensions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.exo-extension-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 2px 0;
+  border-radius: 3px;
+}
+
+.exo-extension-row:hover {
+  background: var(--vscode-list-hoverBackground);
+}
+
+.exo-extension-open {
+  display: flex;
+  flex: 1;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+  padding: 4px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.exo-extension-open:focus-visible,
+.exo-extension-actions button:focus-visible,
+.exo-extensions-install button:focus-visible,
+.exo-extension-details-actions button:focus-visible,
+.exo-link-button:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+.exo-extension-icon {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 3px;
+  object-fit: contain;
+}
+
+.exo-extension-icon-fallback {
+  display: grid;
+  place-items: center;
+  color: var(--vscode-descriptionForeground);
+  font-size: 20px;
+}
+
+.exo-extension-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+
+.exo-extension-title {
+  overflow: hidden;
+  color: var(--vscode-foreground);
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.exo-extension-subtitle,
+.exo-extension-description,
+.exo-extension-source,
+.exo-extension-status {
+  overflow: hidden;
+  color: var(--vscode-descriptionForeground);
+  font-size: 11px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.exo-extension-description {
+  display: block;
+  max-width: 100%;
+}
+
+.exo-extension-status-awaiting-consent,
+.exo-extension-status-denied,
+.exo-extension-status-failed {
+  color: var(--vscode-errorForeground);
+}
+
+.exo-extension-actions {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 2px;
+}
+
+.exo-extension-actions button,
+.exo-extensions-install button,
+.exo-extension-details-actions button,
+.exo-extensions-error button {
+  border: 1px solid var(--vscode-button-border, transparent);
+  border-radius: 3px;
+  padding: 2px 6px;
+  background: var(--vscode-button-secondaryBackground, transparent);
+  color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.exo-extension-actions button:hover:not(:disabled),
+.exo-extensions-install button:hover:not(:disabled),
+.exo-extension-details-actions button:hover:not(:disabled),
+.exo-extensions-error button:hover:not(:disabled) {
+  background: var(--vscode-button-secondaryHoverBackground, var(--vscode-toolbar-hoverBackground));
+}
+
+.exo-extension-actions button:disabled,
+.exo-extensions-install button:disabled,
+.exo-extension-details-actions button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.exo-extensions-install {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--vscode-widget-border);
+  font-size: 12px;
+}
+
+.exo-extensions-install-row {
+  display: flex;
+  gap: 4px;
+}
+
+.exo-extensions-install-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 5px;
+  border: 1px solid var(--vscode-input-border, var(--vscode-widget-border));
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  font: inherit;
+  font-size: 12px;
+}
+
+.exo-extension-details {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 900px;
+  padding: 20px;
+  color: var(--vscode-foreground);
+}
+
+.exo-extension-details-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.exo-extension-details-icon {
+  flex: none;
+  width: 64px;
+  height: 64px;
+  border-radius: 6px;
+  object-fit: contain;
+}
+
+.exo-extension-details-title {
+  min-width: 0;
+}
+
+.exo-extension-details-title h2 {
+  margin: 0 0 4px;
+  font-size: 22px;
+  font-weight: 500;
+}
+
+.exo-extension-details-title p {
+  margin: 2px 0;
+  color: var(--vscode-descriptionForeground);
+  line-height: 1.45;
+}
+
+.exo-extension-details-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.exo-extension-details-actions .exo-extension-remove {
+  border-color: var(--vscode-inputValidation-errorBorder, var(--vscode-errorForeground));
+}
+
+.exo-extension-facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 4px 12px;
+  margin: 0;
+  font-size: 12px;
+}
+
+.exo-extension-facts dt {
+  color: var(--vscode-descriptionForeground);
+}
+
+.exo-extension-facts dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.exo-extension-facts code {
+  font-size: 11px;
+}
+
+.exo-extension-details-section h3 {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.exo-extension-facts-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.exo-link-button {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--vscode-textLink-foreground);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}

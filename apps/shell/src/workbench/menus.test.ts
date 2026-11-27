@@ -7,6 +7,8 @@ function createHandlers(): ExoCommandHandlers {
     openSettings: vi.fn(),
     openPluginSettings: vi.fn(),
     openWorkspaceSettings: vi.fn(),
+    focusExtensions: vi.fn(),
+    refreshMarketplace: vi.fn(),
     openFolder: vi.fn(),
     connectRemote: vi.fn(),
     disconnect: vi.fn(),
@@ -39,6 +41,20 @@ describe('workbench menus', () => {
       label: 'Connect Remote Workspace…',
       commandId: 'exo.workspace.connectRemote',
     })
+  })
+
+  it('offers Extensions and plugin debugging', () => {
+    const view = workbenchMenus.find((entry) => entry.id === 'view')
+    const preferences = workbenchMenus.find((entry) => entry.id === 'preferences')
+    expect(view?.entries.find((entry) => entry.commandId === 'exo.extensions.focus')).toMatchObject(
+      {
+        label: 'Extensions',
+        keybinding: 'Ctrl+Shift+X',
+      },
+    )
+    expect(
+      preferences?.entries.find((entry) => entry.commandId === 'exo.plugins.open')?.label,
+    ).toBe('Open Plugin Debugging')
   })
 
   it('references only commands the shell creates', () => {

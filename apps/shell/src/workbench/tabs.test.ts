@@ -11,8 +11,10 @@ import {
   isCloseGuardInstalled,
   openContentViewTab,
   openFileTab,
+  openShellViewTab,
   removeTabsUnder,
   setTabDirty,
+  shellViewOf,
   type CloseRequest,
 } from './tabs'
 
@@ -198,6 +200,35 @@ describe('dirty close guard', () => {
 
     useWorkbenchStore.getState().closeTab('/a.txt')
 
+    expect(useWorkbenchStore.getState().tabs).toEqual([])
+  })
+})
+
+describe('shell-owned extension details tabs', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    configurePresetStore()
+    clearWorkspaceTabs()
+  })
+
+  it('opens and focuses one details tab per manifest URL', () => {
+    clearWorkspaceTabs()
+    const manifest = 'https://plugins.example.com/exo-manifest.json'
+    openShellViewTab(manifest, 'Example')
+    openShellViewTab(manifest, 'Example')
+    const state = useWorkbenchStore.getState()
+    expect(state.tabs).toHaveLength(1)
+    const tab = state.tabs[0]
+    if (!tab) throw new Error('Details tab missing')
+    expect(shellViewOf(tab)).toEqual({ kind: 'extension', manifestUrl: manifest })
+    expect(tab.path).toBeUndefined()
+    expect(tab.dirty).toBeFalsy()
+    expect(activeDocumentPath()).toBeNull()
+  })
+
+  it('clears the details tab with the workspace', () => {
+    openShellViewTab('https://plugins.example.com/exo-manifest.json')
+    clearWorkspaceTabs()
     expect(useWorkbenchStore.getState().tabs).toEqual([])
   })
 })

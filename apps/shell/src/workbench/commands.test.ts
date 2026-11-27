@@ -17,6 +17,8 @@ function setup(context: CommandContext = NO_WORKSPACE) {
     openSettings: vi.fn(),
     openPluginSettings: vi.fn(),
     openWorkspaceSettings: vi.fn(),
+    focusExtensions: vi.fn(),
+    refreshMarketplace: vi.fn(),
     openFolder: vi.fn(),
     connectRemote: vi.fn(),
     disconnect: vi.fn(),
@@ -298,12 +300,28 @@ describe('exo command registry', () => {
     expect(handlers.openSettings).toHaveBeenCalledTimes(1)
   })
 
-  it('opens plugin configuration without a workspace', () => {
+  it('opens plugin debugging without a workspace', () => {
     const { registry, handlers } = setup()
 
     expect(registry.list().map((command) => command.id)).toContain('exo.plugins.open')
+    expect(registry.list().find((command) => command.id === 'exo.plugins.open')?.title).toBe(
+      'Open Plugin Debugging',
+    )
     expect(registry.run('exo.plugins.open')).toBe(true)
     expect(handlers.openPluginSettings).toHaveBeenCalledTimes(1)
+  })
+
+  it('focuses and refreshes Extensions without a workspace', () => {
+    const { registry, handlers } = setup()
+
+    expect(registry.run('exo.extensions.focus')).toBe(true)
+    expect(handlers.focusExtensions).toHaveBeenCalledTimes(1)
+    expect(registry.run('exo.extensions.refresh')).toBe(true)
+    expect(handlers.refreshMarketplace).toHaveBeenCalledTimes(1)
+    expect(registry.list().find((command) => command.id === 'exo.extensions.focus')).toMatchObject({
+      title: 'Focus Extensions View',
+      keybinding: 'Ctrl+Shift+X',
+    })
   })
 
   it('toggles the theme immediately', () => {

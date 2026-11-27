@@ -52,6 +52,8 @@ export interface ExoCommandHandlers {
   openSettings: () => void
   openPluginSettings: () => void
   openWorkspaceSettings: () => void
+  focusExtensions: () => void
+  refreshMarketplace: () => void
   openFolder: () => void
   connectRemote: () => void
   disconnect: () => void
@@ -157,8 +159,21 @@ export function createExoCommands(handlers: ExoCommandHandlers): WorkbenchComman
       run: () => useWorkbenchStore.getState().toggleTheme(),
     },
     {
+      id: 'exo.extensions.focus',
+      title: 'Focus Extensions View',
+      category: 'View',
+      keybinding: 'Ctrl+Shift+X',
+      run: handlers.focusExtensions,
+    },
+    {
+      id: 'exo.extensions.refresh',
+      title: 'Refresh Marketplace',
+      category: 'Extensions',
+      run: handlers.refreshMarketplace,
+    },
+    {
       id: 'exo.plugins.open',
-      title: 'Open Plugin Configuration',
+      title: 'Open Plugin Debugging',
       category: 'Preferences',
       run: handlers.openPluginSettings,
     },

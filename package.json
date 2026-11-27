@@ -31,6 +31,8 @@
     "build:template": "npm run build --workspace @exo/plugin-template",
     "deploy:copy-template": "node apps/shell/scripts/copy-template.mjs",
     "build:code": "npm run build --workspace @exo/code-plugin",
-    "deploy:copy-code": "node apps/shell/scripts/copy-code-plugin.mjs"
+    "deploy:copy-code": "node apps/shell/scripts/copy-code-plugin.mjs",
+    "deploy:copy-marketplace": "node apps/shell/scripts/deploy-marketplace.mjs",
+    "check:marketplace": "node apps/shell/scripts/check-marketplace.mjs"
   }
 }

@@ -12,7 +12,7 @@ npm run dev            # http://localhost:5173/exo-editor/
 ```
 
 Add `http://localhost:5175/exo-manifest.json` to the workspace `exo.json` (or
-use the shell's Plugins settings). Approve the same-origin/cross-origin consent
+install it by URL from the shell's Extensions view). Approve the same-origin/cross-origin consent
 state, create a `*.template.txt` file and open it. The template editor should
 read the file, report dirty, save `[template save 1]` and dispose without a
 protocol error.
@@ -75,6 +75,28 @@ plus the shell text surface. The recorded acceptance path is
   save or write method.
 - A panel of another plugin, including one with the same manifest id on another
   origin, receives `activeEditor: null` and no `editor/active` event.
+
+## Marketplace and installation
+
+- Open Extensions from the activity bar or `Ctrl+Shift+X`. The Installed section
+  reads the active workspace's `exo.json`; the Marketplace section reads the
+  deployment's fixed `marketplace-sources.json` and its feeds.
+- Install a catalog entry. One enabled `manifest` entry is appended to
+  `exo.json`, the details tab opens, and the normal consent dialog names the
+  manifest origin and capabilities. No iframe exists before approval.
+- Install by URL from the same view. The field accepts the same absolute HTTPS
+  or `http://localhost` URL as `exo.json`; invalid, duplicate, read-only and
+  no-workspace cases explain the failure without writing.
+- Disable, enable and remove from the details tab. With a dirty document the
+  save/discard/cancel prompt appears first.
+- A feed failure shows its error and Retry while installed rows and the URL form
+  keep working. A missing source file shows the explicit empty state.
+- Serve a feed whose display fields contain HTML or script text: it appears as
+  literal text in the catalog and details, and no frame or script runs. A feed
+  cannot install by itself; only a user action writes `exo.json`.
+- Open Settings and confirm the plugin debug section still shows raw
+  `exo.json`, validation issues, runtime status and the plugin log, without
+  duplicating install or consent controls.
 
 ## Troubleshooting
 

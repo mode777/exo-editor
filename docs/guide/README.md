@@ -20,6 +20,8 @@ A plugin is a directory served over HTTPS with:
 The starter is [`packages/plugin-template`](../../packages/plugin-template/README.md).
 The Monaco reference editor is [`apps/code-plugin`](../../apps/code-plugin/README.md).
 Both are built only on the SDK and deployed as child paths of the shell site.
+Once hosted, the manifest URL can be added by URL or listed in a marketplace
+feed; see [marketplace listing](./marketplace.md).
 
 ## Quickstart
 
@@ -68,6 +70,8 @@ this repository in v1; see the compatibility section of
 5. [Hosting](./hosting.md): HTTPS, CORS, same-origin versus cross-origin framing
    and the plugin root rule.
 6. [Consent](./consent.md): what the user sees and when the shell asks again.
+7. [Marketplace listing](./marketplace.md): publish a feed entry, understand the
+   deploy-time source list and check discovery without changing the shell.
 
 ## Check your plugin
 

@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "id": "exo-official",
+  "name": "Exo Plugins",
+  "description": "Plugins published by the Exo Editor project.",
+  "owner": {
+    "name": "Exo Editor",
+    "url": "https://github.com/mode777/exo-editor"
+  },
+  "homepage": "https://mode777.github.io/exo-editor/",
+  "plugins": [
+    {
+      "name": "Exo Code",
+      "manifest": "https://mode777.github.io/exo-editor/code-plugin/exo-manifest.json",
+      "description": "Monaco-based reference code editor built with @exo/plugin-sdk.",
+      "version": "0.1.0",
+      "publisher": {
+        "name": "Exo"
+      },
+      "homepage": "https://mode777.github.io/exo-editor/",
+      "license": "MIT",
+      "keywords": ["code", "monaco", "typescript", "markdown"],
+      "category": "Editors"
+    },
+    {
+      "name": "Exo Template Plugin",
+      "manifest": "https://mode777.github.io/exo-editor/plugin-template/exo-manifest.json",
+      "description": "Starter plugin built only with @exo/plugin-sdk.",
+      "version": "0.1.0",
+      "publisher": {
+        "name": "Exo"
+      },
+      "homepage": "https://mode777.github.io/exo-editor/",
+      "license": "MIT",
+      "keywords": ["template", "starter", "example"],
+      "category": "Examples"
+    }
+  ]
+}

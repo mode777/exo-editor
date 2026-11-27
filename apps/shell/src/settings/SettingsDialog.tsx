@@ -94,7 +94,7 @@ export function SettingsDialog({
           onDisconnect={onDisconnect}
           onRemoveRemote={onRemoveRemote}
         />
-        <PluginSettings />
+        <PluginSettings onClose={onClose} />
       </div>
     </div>
   )

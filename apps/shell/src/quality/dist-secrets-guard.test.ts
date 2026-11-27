@@ -63,6 +63,17 @@ describe('deployed artifact secret guard', () => {
     ])
   })
 
+  it('scans marketplace assets', () => {
+    const dist = makeDist()
+    writeFileSync(
+      join(dist, 'marketplace.json'),
+      `{"plugins":[{"manifest":"https://example.com/exo-manifest.json","token":"ghp_${'e'.repeat(36)}"}]}`,
+    )
+    expect(scanDistForSecrets(dist, {})).toEqual([
+      { path: join(dist, 'marketplace.json'), pattern: 'github-token' },
+    ])
+  })
+
   it('reports a secret environment value without printing it', () => {
     const dist = makeDist()
     writeFileSync(join(dist, 'assets', 'config.js'), 'const hidden = "super-secret-value-123"')

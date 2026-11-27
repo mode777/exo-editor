@@ -155,12 +155,16 @@ describe('derived plugin workbench', () => {
     const inspectionId = pluginViewId(IDENTITY, 'inspection')
     const validationId = pluginViewId(IDENTITY, 'validation')
 
-    expect(derived.config.activityBar.items.map((item) => item.id)).toEqual(['explorer', primaryId])
-    expect(derived.config.activityBar.items[1]).toMatchObject({
+    expect(derived.config.activityBar.items.map((item) => item.id)).toEqual([
+      'explorer',
+      'extensions',
+      primaryId,
+    ])
+    expect(derived.config.activityBar.items[2]).toMatchObject({
       title: 'Outline — Viewer',
       icon: 'list-tree',
     })
-    expect(derived.config.primarySideBar.views).toEqual(['explorer', primaryId])
+    expect(derived.config.primarySideBar.views).toEqual(['explorer', 'extensions', primaryId])
     expect(derived.config.secondarySideBar).toMatchObject({
       enabled: true,
       views: [secondaryId],
@@ -190,8 +194,11 @@ describe('derived plugin workbench', () => {
 
   it('keeps the shell composition when no panel is active', () => {
     const derived = derivePluginWorkbench(snapshot([record(false)]))
-    expect(derived.config.activityBar.items.map((item) => item.id)).toEqual(['explorer'])
-    expect(derived.config.primarySideBar.views).toEqual(['explorer'])
+    expect(derived.config.activityBar.items.map((item) => item.id)).toEqual([
+      'explorer',
+      'extensions',
+    ])
+    expect(derived.config.primarySideBar.views).toEqual(['explorer', 'extensions'])
     expect(derived.config.secondarySideBar.enabled).toBe(false)
     expect(derived.config.bottomPanel.enabled).toBe(false)
     expect(derived.config.bottomPanel.views).toEqual([])

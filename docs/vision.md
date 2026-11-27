@@ -81,9 +81,11 @@ small enough to remain a product of its own.
 
 1. Open a local folder in Chromium, browse it in the explorer, open a text file,
    edit and save it, with unsaved-change protection.
-2. Add a plugin by manifest URL; the consent dialog names the exact origin and
-   the requested capabilities; consent survives reload and is re-requested when
-   the capability surface widens.
+2. Discover a plugin in the Extensions marketplace or add it by manifest URL;
+   the consent dialog names the exact origin and the requested capabilities;
+   consent survives reload and is re-requested when the capability surface
+   widens. Installing a catalog entry only writes its manifest URL to the
+   workspace; it never bypasses consent.
 3. A plugin built from the template registers a glob pattern and edits and saves
    a matching file without the shell knowing what the editor is.
 4. The Monaco plugin runs against the deployed shell with no shell-side changes.
@@ -99,7 +101,9 @@ small enough to remain a product of its own.
 - A language server protocol client, completion, diagnostics or refactoring.
 - A Git client, terminal, task runner or debugger.
 - Multi-user editing, presence, sharing or sync.
-- A plugin marketplace, ratings or automatic updates.
+- Ratings, reviews, recommendations, paid listings or automatic updates. A
+  deployment-scoped feed for discovery is in scope, but it grants no capability,
+  cannot install without a user action and never bypasses consent.
 - A backend service of any kind, including telemetry.
 - Full parity with VS Code: the layout language is borrowed, the product is not
   a VS Code clone and must not adopt its branding.

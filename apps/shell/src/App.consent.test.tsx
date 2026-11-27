@@ -164,7 +164,9 @@ describe('app consent flow', () => {
         expect(app.container.querySelector('#exo-settings-plugins')).not.toBeNull(),
       )
       expect(app.container.textContent).toContain('Registering…')
-      expect(button(app.container, 'Revoke consent')).not.toBeNull()
+      // Consent management moved to the extension details tab; the settings
+      // debug surface reports status only.
+      expect(button(app.container, 'Revoke consent')).toBeNull()
 
       await act(async () => readyAndComplete(app))
       await vi.waitFor(() => expect(app.container.textContent).toContain('Active — Text'))

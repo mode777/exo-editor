@@ -34,6 +34,8 @@ import { NewFileController } from '../plugins/new-file'
 import type { FrameTransport } from '../plugins/frame'
 import { PluginSettingsStore, type PluginSettingsStorage } from '../plugins/settings'
 import { PluginCommandController, type CommandTargetSession } from '../plugins/commands'
+import { PluginManagement } from '../plugins/management'
+import { MarketplaceStore } from '../marketplace/store'
 import { EventBus, FileChangeCoalescer, SelfWriteEcho, type ThemeName } from '../plugins/events'
 import { FolderWorkspaceProvider } from './providers/folder/provider'
 import { IndexedDbHandleStore, type HandleStore } from './providers/folder/handle-store'
@@ -124,6 +126,10 @@ export interface WorkspaceRuntimeOptions {
   pluginHost?: PluginHost
   handlerPool?: HandlerPool
   viewPool?: ViewPool
+  /** Deployment-scoped marketplace catalog; tests inject a fake fetch. */
+  marketplace?: MarketplaceStore
+  /** Shell-owned plugin mutation controller; tests may inject a fake. */
+  pluginManagement?: PluginManagement
   /** Frame transport for the default view pool; tests inject a fake. */
   viewTransport?: FrameTransport
 }
@@ -155,6 +161,9 @@ export class WorkspaceRuntime {
   readonly newFiles: NewFileController
   readonly pluginSettings: PluginSettingsStore
   readonly commands: PluginCommandController
+  readonly pluginManagement: PluginManagement
+  /** Catalog and feed state belong to the deployment, not one workspace. */
+  readonly marketplace: MarketplaceStore
 
   private readonly fileChanges: FileChangeCoalescer
   private readonly echoes: SelfWriteEcho
@@ -196,6 +205,7 @@ export class WorkspaceRuntime {
       isVisible: options.isVisible,
     })
     this.pluginHost = options.pluginHost ?? new PluginHost()
+    this.marketplace = options.marketplace ?? new MarketplaceStore()
     this.filePicker = new FilePickerController()
     this.newFiles = new NewFileController({
       onCreated: (path, kind) => {
@@ -281,6 +291,13 @@ export class WorkspaceRuntime {
       editors: this.handlers,
     })
     this.documentSubscription = this.documents.subscribeAny(() => this.syncActiveEditor())
+    this.pluginManagement =
+      options.pluginManagement ??
+      new PluginManagement({
+        config: this.pluginConfig,
+        host: this.pluginHost,
+        documents: this.documents,
+      })
   }
 
   subscribe = (listener: () => void): (() => void) => {
@@ -957,6 +974,7 @@ export class WorkspaceRuntime {
     this.reservedDocumentHandler = null
     this.commands.reset()
     this.pluginHost.dispose()
+    this.marketplace.dispose()
     this.handlers.disposeTransport()
     this.views.disposeTransport()
     this.pluginSettings.detach()
@@ -1150,6 +1168,7 @@ export class WorkspaceRuntime {
     this.newFiles.reset()
     this.filePicker.reset()
     this.commands.reset()
+    this.pluginManagement.reset()
     this.hideCompanions(this.activeCompanions)
     this.activeCompanions = []
     this.companionSurfaceKey = null

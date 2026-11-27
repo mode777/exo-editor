@@ -42,7 +42,10 @@ between content-view tabs so the newly active instance's frame is shown; and
 targeted `view/active` event (SDK `1.9.0`); `0.10.0` adds editor-bound panels,
 the bottom panel location and the targeted `editor/active` event (SDK `1.10.0`);
 `0.11.0` adds surface companion panels for file editors and content views in
-primary, secondary and bottom regions (SDK unchanged).
+primary, secondary and bottom regions (SDK unchanged); `0.12.0` adds
+deployment-scoped marketplace discovery, the Extensions activity-bar view,
+install-by-URL and a shell-owned extension details tab, with plugin management
+moved out of Settings (SDK unchanged).
 Panels mount lazily and content views open as read-only tabs; both are
 user-invoked and excluded from the consent fingerprint.
 
@@ -70,6 +73,13 @@ user-invoked and excluded from the consent fingerprint.
   document area while the tab, breadcrumbs and Save action stay shell-owned. The shell
   bundle contains no Monaco. The dev server runs at `http://localhost:5176/`
   (`npm run dev:code`), and `examples/code-plugin-workspace/` is a ready workspace.
+- **Marketplace** - the deployed shell reads a fixed
+  `marketplace-sources.json`, then the feeds it names. The authoritative feed is
+  [`marketplace/marketplace.json`](./marketplace/marketplace.json), deployed at
+  `https://mode777.github.io/exo-editor/marketplace.json`. The **Extensions**
+  view shows Installed and Marketplace entries, installs by manifest URL and
+  opens shell-owned details; installation writes only to the workspace
+  `exo.json` and still requires the normal manifest validation and consent.
 - **Guide and demo** - [`docs/guide/`](./docs/guide/README.md) is the author
   handoff, and [`examples/demo-workspace/`](./examples/demo-workspace/README.md)
   declares both deployed plugins so the release walkthrough can exercise the
@@ -88,8 +98,10 @@ user-invoked and excluded from the consent fingerprint.
 | [Events contract](./docs/contracts/events.md)                 | Topics, ordering, limits                                                                                                                                                                                               |
 | [Plugin SDK contract](./docs/contracts/plugin-sdk.md)         | Typed client, origin rules, compatibility policy, template                                                                                                                                                             |
 | [Plugin styling contract](./docs/contracts/plugin-styling.md) | Theme helper, token sheet and the three palettes                                                                                                                                                                       |
+| [Marketplace contract](./docs/contracts/marketplace.md)       | Feed and deploy-time source format, loading, installation and trust boundary                                                                                                                                           |
 | [Manifest schema](./schema/exo.schema.json)                   | Shared JSON Schema for `exo.json` and `exo-manifest.json`                                                                                                                                                              |
-| [Plugin author guide](./docs/guide/README.md)                 | Quickstart, manifest, protocol, SDK, styling, hosting, consent, testing                                                                                                                                                |
+| [Marketplace schema](./schema/marketplace.schema.json)        | JSON Schema for `marketplace.json` and `marketplace-sources.json`                                                                                                                                                      |
+| [Plugin author guide](./docs/guide/README.md)                 | Quickstart, manifest, protocol, SDK, styling, hosting, consent, marketplace, testing                                                                                                                                   |
 | [Agent skill](./.agents/skills/create-exo-plugin/SKILL.md)    | Single-file skill for assistants building an Exo plugin and hosting it on GitHub Pages; installable by [raw link](https://raw.githubusercontent.com/mode777/exo-editor/main/.agents/skills/create-exo-plugin/SKILL.md) |
 | [Demo workspace](./examples/demo-workspace/README.md)         | Shipped code and template plugins in one workspace                                                                                                                                                                     |
 | [Walkthrough](./docs/walkthrough.md)                          | Recorded acceptance path with screenshots                                                                                                                                                                              |

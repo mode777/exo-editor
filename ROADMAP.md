@@ -996,14 +996,30 @@ css gzip bytes. The deployed evidence is recorded in the change design; the
 change is ready to archive as `2026-11-27-surface-companion-panels` with its
 deltas synced into the main specs.
 
+**Follow-up (2026-11-27):** the post-layer-10 change `plugin-marketplace` adds
+deployment-scoped marketplace discovery. A same-origin `marketplace-sources.json`
+fixes the feed list for one deployed instance; each `marketplace.json` feed lists
+manifest URLs and non-authoritative display metadata. The new **Extensions**
+activity-bar view has search, Installed and Marketplace sections, install by
+URL and a shell-owned details tab with permissions, status, consent actions and
+contributed settings. Installing writes one manifest URL to `exo.json` and then
+follows the normal host validation and consent path; a feed cannot auto-install,
+grant a capability or mount a frame. Plugin management moves out of Settings,
+which keeps a **Plugin debugging** section for raw `exo.json`, issues, status
+and the log. The official feed is
+`https://mode777.github.io/exo-editor/marketplace.json`; shell `0.12.0`,
+protocol `1`, manifest schema `1`, marketplace feed schema `1` and SDK
+`1.10.0`. Deployed verification is recorded in the archived change.
+
 ---
 
 ## Deferred beyond v1
 
 Multi-root workspaces, additional providers beyond the P1 Stratofold track
 (OPFS, other remote stores, read-only bundles), background plugin frames,
-plugin-to-plugin messaging, marketplace/updates, signature verification, LSP,
-terminal, Git, collaboration, Firefox/Safari folder support.
+plugin-to-plugin messaging, automatic updates, ratings/recommendations,
+signature verification, LSP, terminal, Git, collaboration, Firefox/Safari
+folder support.
 
 The P1 Stratofold provider is a parallel track that can start after layer 3 and
 land independently of the numbered layers. It is not part of the v1 release gate

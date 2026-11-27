@@ -3,6 +3,49 @@
 All notable changes to Exo Editor are recorded here. The version axes and the
 release process are in [`docs/releases.md`](./docs/releases.md).
 
+## [0.12.0] - 2026-11-27
+
+Additive post-release update: marketplace discovery and the Extensions view.
+
+### Added
+
+- Deployment-scoped `marketplace-sources.json` and the versioned
+  `marketplace.json` feed format, with strict validation, byte/time limits,
+  lazy loading and one failing feed isolated from the others.
+- The official feed at `https://mode777.github.io/exo-editor/marketplace.json`,
+  listing the deployed code and template plugins, plus the deploy-time copy and
+  check scripts.
+- An **Extensions** activity-bar view (also `Ctrl+Shift+X`) with search,
+  **Installed** and **Marketplace** sections, feed source labels, install and
+  manage actions, install by manifest URL, and explicit no-workspace,
+  read-only, invalid-declaration, missing-feed and failed-feed states.
+- A shell-owned extension details tab with manifest metadata, permissions,
+  contributions, runtime status, consent review/revoke, contributed settings and
+  homepage/license links.
+- Installation writes one enabled manifest URL to the workspace `exo.json` and
+  then follows the normal host fetch, validation and consent path; a feed cannot
+  auto-install, mount a frame or grant a capability.
+- The settings plugin section becomes **Plugin debugging**: raw `exo.json`,
+  validation issues, runtime status and the plugin log. Install, enable,
+  disable, remove, consent and contributed settings move to Extensions.
+- A marketplace author guide, contract, schema, security control and
+  accessibility/axe coverage.
+
+### Compatibility
+
+- Shell: `0.12.0`
+- Protocol: `1`
+- Manifest schema: `1`
+- Marketplace feed schema: `1`
+- SDK: `1.10.0`
+
+### Breaking
+
+- None for plugin authors. No protocol message, manifest field, permission,
+  capability bit, consent-fingerprint input or SDK API changes. The Settings
+  plugin controls are removed in favour of Extensions; the underlying
+  `exo.json` and shell-owned settings data are unchanged.
+
 ## [0.11.0] - 2026-11-27
 
 Additive post-release update: surface companion panels.

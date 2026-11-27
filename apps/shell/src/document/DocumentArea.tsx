@@ -7,10 +7,13 @@ import {
   useWorkspaceRuntime,
   useWorkspaceSnapshot,
 } from '../workspace/context'
-import { contentViewOf } from '../workbench/tabs'
+import { contentViewOf, shellViewOf } from '../workbench/tabs'
+import { ExtensionDetails } from '../extensions/ExtensionDetails'
 import { ContentViewSurface } from './ContentViewSurface'
 
 export function DocumentArea({ tab }: { tab: WorkbenchTab }) {
+  const shellView = shellViewOf(tab)
+  if (shellView) return <ExtensionDetails manifestUrl={shellView.manifestUrl} />
   const content = contentViewOf(tab)
   // The workbench reuses this component when the active tab stays a content
   // view. Keying by the instance remounts the surface so its placeholder ref

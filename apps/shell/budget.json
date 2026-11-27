@@ -1,7 +1,7 @@
 {
-  "comment": "Gzip byte budgets for everything under dist/, including copied vendor assets such as codicons. Measured by scripts/check-bundle-budget.mjs.",
+  "comment": "Gzip byte budgets for everything under dist/, including copied vendor assets such as codicons. Measured by scripts/check-bundle-budget.mjs. 0.12.0 raises the limits for the marketplace parser, Extensions view, extension details and management UI: measured 183,791 js / 14,456 css, with headroom for small copy or token changes.",
   "limits": {
-    "js": 178000,
-    "css": 14000
+    "js": 186000,
+    "css": 14600
   }
 }

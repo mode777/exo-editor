@@ -10,9 +10,10 @@ replace the contracts; the normative version rules are in
 
 | Axis              | Current | Where it lives                                                         | Meaning                                                                      |
 | ----------------- | ------- | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| Shell SemVer      | `0.11.0` | `apps/shell/package.json`, `SHELL_VERSION`, advertised in `shell/init` | The deployed shell release; independent of the protocol major                |
+| Shell SemVer      | `0.12.0` | `apps/shell/package.json`, `SHELL_VERSION`, advertised in `shell/init` | The deployed shell release; independent of the protocol major                |
 | Protocol major    | `1`     | Envelope `exo: 1`, `PROTOCOL_VERSION`, handshake                       | The wire compatibility axis; the shell accepts exactly one major per release |
 | Manifest schema   | `1`     | `manifest.schemaVersion` / `exo.json` `schemaVersion`                  | The manifest shape; a new version needs a validator and a consent re-prompt  |
+| Marketplace feed  | `1`     | `marketplace.json` `schemaVersion` and `marketplace-sources.json`      | Discovery shape; independent of protocol and manifest versions               |
 | SDK SemVer        | `1.10.0` | `packages/plugin-sdk/package.json`                                     | The client package; its MAJOR equals the protocol major it speaks            |
 | Artifact versions | `0.1.0` | template and code-plugin packages                                      | Demo/reference artifacts; not a compatibility promise                        |
 
@@ -24,9 +25,12 @@ SDK version answers "which client API is this".
 ## Current release
 
 The first public release is shell `0.1.0`, protocol `1`, manifest schema `1`,
-SDK `1.1.0`, dated 2026-11-16. The current shell is `0.11.0`, protocol `1`,
-manifest schema `1` and SDK `1.10.0`, dated 2026-11-27; `0.11.0` adds surface
-companion panels for file editors and content views across all three regions,
+SDK `1.1.0`, dated 2026-11-16. The current shell is `0.12.0`, protocol `1`,
+manifest schema `1`, marketplace feed schema `1` and SDK `1.10.0`, dated
+2026-11-27; `0.12.0` adds deployment-scoped marketplace discovery, the
+Extensions view, extension details and the move of plugin management out of
+Settings. `0.11.0` adds surface companion panels for file editors and content
+views across all three regions,
 `0.10.0` adds editor-bound
 panels and the bottom panel location, `0.9.0` exposes the active content-view tab
 in `shell/init` and the targeted `view/active` topic,
@@ -58,7 +62,9 @@ The matching entry is in [`CHANGELOG.md`](../CHANGELOG.md).
    tests, build, bundle budget, CSP, custom elements, no-SDK, no-Monaco,
    `check:dist-secrets`, template/code builds and deploy copies.
 3. Deploy `main`; confirm the CI `verify` job is green and the Pages artifact
-   contains the shell plus the template and code-plugin child paths.
+   contains the shell, the template and code-plugin child paths, and the
+   `marketplace.json` / `marketplace-sources.json` assets. Confirm the source
+   file is the intended deployment configuration and the feed validates.
 4. Verify the release criteria against the deployed URL, never a local dev server
    or local build: security review evidence, accessibility manual script,
    browser matrix states, performance measurements, demo workspace and

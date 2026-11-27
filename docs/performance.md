@@ -12,11 +12,12 @@ checklist item performed manually against the deployed site.
 | Plugin frame startup | 2,000 ms | Open a matching file in the demo workspace, measure until the reference code plugin's Monaco surface is visible and focusable |
 | Plugin panel or content-view startup | 2,000 ms | Reveal a registered panel or open a content-view tab, measure from the user action until the view frame is visible over its placeholder |
 | Plugin bottom-panel startup | 2,000 ms | Reveal a registered bottom tab (first mount and a retained re-reveal), measure from the tab selection until the view frame is visible over its placeholder |
+| Marketplace catalog first load | 3,000 ms | Open Extensions with no loaded catalog and measure until the official feed rows are painted (source fetch plus feed fetches; no startup request) |
 | 10k-entry directory listing | 3,000 ms total, 1,000 ms longest task | Expand a directory with 10,000 entries and measure until every row is painted |
 | 1 MiB file open | 1,000 ms | Shell text surface and reference code plugin, from activating the file to the editable surface |
 | 1 MiB file save | 1,000 ms | Shell text surface and reference code plugin, from Save to the shell's success state |
-| Shell bundle (JS) | 176,000 gzip bytes | `npm run budget` / CI `Bundle budget` |
-| Shell bundle (CSS) | 14,000 gzip bytes | `npm run budget` / CI `Bundle budget` |
+| Shell bundle (JS) | 186,000 gzip bytes | `npm run budget` / CI `Bundle budget` |
+| Shell bundle (CSS) | 14,600 gzip bytes | `npm run budget` / CI `Bundle budget` |
 
 These are release ceilings, not product SLOs. They are intentionally generous
 for software rendering on a shared verification host.
@@ -126,6 +127,15 @@ paths, the Save As dialog, the explorer template menu, the new-file request
 controller and the SDK helpers. The budget was raised by 5,000 bytes, leaving
 roughly 1,260 bytes of headroom; no dependency or vendored asset was added, and
 the new-file path performs no content transformation.
+
+### Marketplace first load (pending 0.12.0 deployment)
+
+Measured after the `plugin-marketplace` deploy: open Extensions with an empty
+catalog, record the source and feed request count and the time until the
+official rows are painted, five runs after a warm-up. The shell bundle measured
+183,791 JS and 14,456 CSS gzip bytes locally before the plugin copies, against
+the 186,000/14,600 budget. The deployed measurement is recorded here after
+task 8.3.
 
 ### Editor-bound panels and bottom panel (2026-11-24)
 

@@ -74,6 +74,27 @@ export function contentViewOf(tab: WorkbenchTab): ContentViewTabInfo | undefined
   return (tab as WorkbenchTab & { contentView?: ContentViewTabInfo }).contentView
 }
 
+export interface ShellViewTabInfo {
+  kind: 'extension'
+  manifestUrl: string
+}
+
+export function shellViewOf(tab: WorkbenchTab): ShellViewTabInfo | undefined {
+  return (tab as WorkbenchTab & { shellView?: ShellViewTabInfo }).shellView
+}
+
+/** A shell-owned details tab; it has no path, dirty state or plugin frame. */
+export function openShellViewTab(manifestUrl: string, title = 'Extension'): void {
+  const id = `shell:extension:${encodeURIComponent(manifestUrl)}`
+  const tab = {
+    id,
+    title,
+    kind: 'content',
+    shellView: { kind: 'extension', manifestUrl },
+  } as unknown as WorkbenchTab
+  useWorkbenchStore.getState().openTab(tab)
+}
+
 /** A content view is a shell-owned tab; the kit's closed kind is adapted here. */
 export function openContentViewTab(info: ContentViewTabInfo): void {
   const tab = {

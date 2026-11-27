@@ -73,6 +73,12 @@ jobs:
       - name: Copy reference code plugin into the site
         run: npm run deploy:copy-code
 
+      - name: Copy marketplace feed and sources into the site
+        run: npm run deploy:copy-marketplace
+
+      - name: Check marketplace artifacts
+        run: npm run check:marketplace
+
       - name: No credentials in the deployed artifact
         run: npm run check:dist-secrets
 

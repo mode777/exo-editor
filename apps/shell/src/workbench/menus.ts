@@ -29,6 +29,12 @@ export const workbenchMenus: MenuDefinition[] = [
       { label: 'Go to File…', commandId: 'view.quickOpen' },
       { separator: true },
       {
+        label: 'Extensions',
+        commandId: 'exo.extensions.focus',
+        keybinding: 'Ctrl+Shift+X',
+      },
+      { separator: true },
+      {
         label: 'Refresh Explorer',
         commandId: 'exo.explorer.refresh',
       },
@@ -59,7 +65,7 @@ export const workbenchMenus: MenuDefinition[] = [
     label: 'Preferences',
     entries: [
       { label: 'Open Settings', commandId: 'exo.settings.open' },
-      { label: 'Open Plugin Configuration', commandId: 'exo.plugins.open' },
+      { label: 'Open Plugin Debugging', commandId: 'exo.plugins.open' },
       { label: 'Toggle Theme', commandId: 'exo.theme.toggle' },
     ],
   },

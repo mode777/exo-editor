@@ -34,6 +34,7 @@ reverting. Findings are recorded in [Findings](#findings).
 | 14 | Plugin command surface | `plugin-commands` - Command contribution semantics; Command registration activation; Command invocation; Command results and failures; Command runtime limits; Command attribution and isolation; Command teardown | `plugins/commands.ts` (registry, single controller, target resolution, timers, limits, notices), `plugins/frame-session.ts` (`shell/command` delivery, active-phase result routing, init support bit), `plugins/registration.ts` (subset, dedupe, `target-not-registered`), `workbench/commands.ts` (synthetic palette ids), `explorer/ExplorerView.tsx`, `document/DocumentArea.tsx` | `commands.test.ts`, `registration.test.ts`, `host.test.ts`, `commands.test.ts` (palette), `ExplorerView.commands.test.tsx`, `DocumentArea.commands.test.tsx`, `CommandNotices.test.tsx` |
 | 15 | New-file creation | `plugin-file-creation` all requirements; `workspace-access` - Create-only writes; Create-only provider parity; `plugin-protocol` - New-file creation request; New-file capability negotiation; Limits; `editor-shell` - Explorer new-file templates; New-file Save As dialog; `plugin-host` - New-file template registration | `plugins/new-file.ts` (single dialog, create-only write, cancellation, reset), `plugins/frame-session.ts` (shape, permission, focus, size and rate gates, correlated result), `plugins/manifest.ts` (decoded limits, reserved names), `plugins/registration.ts` (declared id, `workspace:write`), `workspace/providers/*` (`createOnly`), `document/NewFileDialog.tsx`, `explorer/ExplorerView.tsx` | `new-file.test.ts`, `handler.test.ts`, `NewFileDialog.test.tsx`, `manifest.test.ts`, `registration.test.ts`, `host.test.ts`, `conformance.ts`, `consent.test.ts`, `ExplorerView.commands.test.tsx`, `new-file.test.ts` (SDK) |
 | 16 | Editor-bound panels | `plugin-views` - Active editor context; Panel contributions; Panel registration and lazy mounting; `plugin-events` - V1 topic catalog; Delivery semantics; Change producers; `plugin-protocol` - View frame initialization; View and intent capability negotiation; Bottom panel capability negotiation; `editor-shell` - Plugin bottom panels; Active editor tracking in the workbench | `plugins/view-pool.ts` (identity filter, bottom location), `plugins/view-session.ts` (activeEditor init), `workspace/runtime.ts` (active editor derivation and targeted publish), `plugins/frame-session.ts` (editorContext bit), `plugins/handler.ts` (instanceId), `workbench/plugin-views.tsx` (active-tab-only bottom placeholder), `plugins/consent.ts` (fingerprint unchanged) | `runtime.editor-context.test.ts`, `view-pool.test.ts`, `view-session.test.ts`, `handler.test.ts`, `events.test.ts`, `plugin-views.test.tsx`, `sdk-conformance.test.ts`, `consent.test.ts`, `manifest.test.ts` |
+| 17 | Marketplace catalog and installation | `plugin-marketplace` all requirements; `editor-shell` - Plugin configuration settings surface; `plugin-manifest` - Canonical configuration rewrite | `marketplace/feed.ts` (strict parser, URL normalization, limits), `marketplace/store.ts` (credentials omitted, no referrer, timeout, byte caps, no persistence), `extensions/ExtensionsView.tsx` (escaped text, user action, disabled states), `plugins/management.ts` (URL lookup, dirty guard, config store only), `plugins/host.ts` (normal manifest and consent path), `scripts/deploy-marketplace.mjs`, `scripts/check-marketplace.mjs` | `feed.test.ts`, `store.test.ts`, `management.test.ts`, `management.integration.test.ts`, `ExtensionsView.test.tsx`, `marketplace.test.ts`, `dist-secrets-guard.test.ts`, `check:marketplace` |
 
 ## Control details
 
@@ -110,7 +111,8 @@ reverting. Findings are recorded in [Findings](#findings).
   configuration is shell-only".
 - Enforcement: `Session` denies every plugin operation whose path is
   `isReservedPath`, and filters reserved entries from plugin listings; shell
-  actors keep access so the settings surface can read and rewrite `exo.json`.
+  actors keep access so the Extensions management surface and the settings raw
+  editor can read and rewrite `exo.json`.
 - Tests: `paths.test.ts` "reserves the configuration file and metadata
   directory", "filters reserved entries out of listings"; `session.test.ts`
   "lets the shell read reserved paths while a plugin facade is denied", "denies
@@ -420,6 +422,41 @@ reverting. Findings are recorded in [Findings](#findings).
   the handler init test fails. Remove the `shown` guard in `PanelSurface`:
   `plugin-views.test.tsx` creates two frames for two tabs and fails.
 
+### 17. Marketplace catalog and installation
+
+- Requirements: `plugin-marketplace` "Deployment-scoped marketplace sources",
+  "Marketplace feed format", "Feed loading and failure isolation", "Catalog
+  discovery", "Install and manage in the current workspace", "Marketplace trust
+  boundary" and "Official feed and deployment"; `editor-shell` "Plugin
+  configuration settings surface"; `plugin-manifest` "Canonical configuration
+  rewrite".
+- Enforcement: `validateMarketplaceSources` and `validateMarketplaceFeed` reject
+  unknown fields, invalid or credentialed URLs, duplicate manifests, future
+  versions and every limit; the store fetches with `credentials: 'omit'`,
+  `referrerPolicy: 'no-referrer'`, a 10-second timeout and bounded body reads,
+  never creates a frame and never touches a workspace session. `ExtensionsView`
+  renders feed strings as React text, validates install targets through the
+  existing config store and requires an explicit click. `PluginManagement`
+  writes only through `PluginConfigStore.addEntry`/`setEnabled`/`removeEntry`
+  and maps by normalized manifest URL; the host's normal manifest validation and
+  consent queue run after the write. No feed field reaches
+  `fingerprintInput`, an iframe `src`, a shell command or `exo.json`.
+- Tests: `feed.test.ts` covers unknown fields, future versions, URL and
+  duplicate rejection, limits and hostile text; `store.test.ts` covers lazy
+  loading, credentials/referrer, timeout, byte caps, CORS/network isolation,
+  dedupe and dispose; `management.integration.test.ts` asserts one canonical
+  write, no write in read-only/no-workspace/invalid/conflict cases and no frame
+  before approval; `ExtensionsView.test.tsx` covers install, no-workspace and
+  read-only disabled states, failed-source isolation, details, settings and
+  axe; `marketplace.test.ts` keeps the official feed in sync with the shipped
+  manifests; `dist-secrets-guard.test.ts` scans marketplace JSON.
+- Mutation: remove `credentials: 'omit'` from the store fetch: the store test's
+  request-options assertion fails. Remove the `canManage` disabled guard from
+  the install actions: the no-workspace/read-only tests find enabled install
+  buttons and fail. Make the feed parser accept unknown fields: `feed.test.ts`
+  fails. Bypass `PluginConfigStore` in the install path: the integration test's
+  canonical-file, conflict and consent-order assertions fail.
+
 ## Findings
 
 | ID | Severity | Finding | Disposition |
@@ -432,6 +469,7 @@ reverting. Findings are recorded in [Findings](#findings).
 | F6 | low | Panels and content views are excluded from the consent fingerprint, so an already-approved plugin can add an activity-bar item, a side panel or a content-view tab without a new prompt. | Accepted by design: the surfaces are user-invoked, grant no autonomous data or file access, and every shell chrome surface names the plugin so a new surface cannot impersonate the shell. The first-grant prompt lists them and the security review tracks the mitigation; adding them to the fingerprint is a one-change follow-up with a single re-prompt if required later. |
 | F7 | low | Commands are excluded from the consent fingerprint and a misleading title could imitate shell chrome or describe an action broadly. | Accepted by design: commands are user-invoked, run only in frames the user already approved with their existing permissions, grant no autonomous access and cannot use a shell command id. Every palette entry, explorer entry and editor action names the contributing plugin, the first-grant prompt lists each command with its target and placements, and the plugin log attributes every invocation. A future fingerprint inclusion is a one-change follow-up with a single re-prompt. |
 | F8 | low | New-file templates are excluded from the consent fingerprint, so an approved plugin can change what a template writes without a new prompt. | Accepted by design: a template only writes content the user confirms in a shell-owned dialog, after seeing the size and a bounded preview; it grants no autonomous access. The first-grant prompt lists each label and default name, the plugin name is in the dialog, and content changes remain visible and editable. The residual folder and Stratofold check-to-write race requires an external writer and is documented in the provider notes. |
+| F9 | low | A marketplace feed can display a misleading name, publisher, icon or description that differs from the manifest. | Accepted by design: the source list is deployment-controlled, the manifest value replaces feed metadata in installed and consent surfaces, the manifest URL and origin are always shown in details, and a feed cannot install or grant anything without a user action and consent. The catalog is discovery-only; no signature or reputation system is claimed. |
 
 No open finding above accepted severity. There is no server, secret, account or
 first-party API in the deployed artifact. The dependency audit result is part of

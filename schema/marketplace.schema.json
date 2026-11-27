@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:exo:marketplace:v1",
+  "title": "Exo marketplace sources and feed (v1)",
+  "description": "Shape for the deploy-time marketplace-sources.json list and a marketplace.json feed. Semantic rules that JSON Schema cannot express - duplicate normalized URLs, all-or-nothing feed validation and the display-versus-manifest authority rule - are enforced by the shell validator and specified in docs/contracts/marketplace.md.",
+  "oneOf": [{ "$ref": "#/$defs/marketplaceSources" }, { "$ref": "#/$defs/marketplaceFeed" }],
+  "$defs": {
+    "marketplaceUrl": {
+      "type": "string",
+      "format": "uri",
+      "minLength": 1,
+      "maxLength": 2048,
+      "pattern": "^(?:https://[^\\s@#]+|http://localhost(?::[0-9]{1,5})?(?:/[^\\s@#]*)?)$"
+    },
+    "httpsUrl": {
+      "type": "string",
+      "format": "uri",
+      "minLength": 1,
+      "maxLength": 2048,
+      "pattern": "^https://[^\\s@#]+$"
+    },
+    "displayName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "license": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 40
+    },
+    "category": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 40
+    },
+    "keyword": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 32
+    },
+    "publisher": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": { "$ref": "#/$defs/displayName" },
+        "url": { "$ref": "#/$defs/httpsUrl" }
+      }
+    },
+    "owner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": { "$ref": "#/$defs/displayName" },
+        "url": { "$ref": "#/$defs/httpsUrl" }
+      }
+    },
+    "feedPlugin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "manifest"],
+      "properties": {
+        "name": { "$ref": "#/$defs/displayName" },
+        "manifest": { "$ref": "#/$defs/marketplaceUrl" },
+        "description": { "$ref": "#/$defs/description" },
+        "version": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-((?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\\+([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?$"
+        },
+        "publisher": { "$ref": "#/$defs/publisher" },
+        "homepage": { "$ref": "#/$defs/httpsUrl" },
+        "repository": { "$ref": "#/$defs/httpsUrl" },
+        "license": { "$ref": "#/$defs/license" },
+        "icon": { "$ref": "#/$defs/httpsUrl" },
+        "keywords": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 10,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/keyword" }
+        },
+        "category": { "$ref": "#/$defs/category" }
+      }
+    },
+    "marketplaceSources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "feeds"],
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "feeds": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 10,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/marketplaceUrl" }
+        }
+      }
+    },
+    "marketplaceFeed": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "id", "name", "owner", "plugins"],
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]{1,63}$"
+        },
+        "name": { "$ref": "#/$defs/displayName" },
+        "description": { "$ref": "#/$defs/description" },
+        "owner": { "$ref": "#/$defs/owner" },
+        "homepage": { "$ref": "#/$defs/httpsUrl" },
+        "plugins": {
+          "type": "array",
+          "maxItems": 500,
+          "items": { "$ref": "#/$defs/feedPlugin" }
+        }
+      }
+    }
+  }
+}
