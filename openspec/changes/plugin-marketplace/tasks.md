@@ -27,9 +27,9 @@
 
 ## 4. Management controller
 
-- [ ] 4.1 Implement `apps/shell/src/plugins/management.ts` with normalized-URL lookup, install, set-enabled, remove, consent review/revoke and the save/discard/cancel dirty guard; cover every result and workspace state in `management.test.ts`.
-- [ ] 4.2 Add integration tests that install writes one canonical enabled entry, first install creates `exo.json`, duplicate/invalid/read-only/invalid-config/no-workspace cases write nothing, and conflict preserves the external file; verify the tests fail when the guard is removed.
-- [ ] 4.3 Add the consent invariant test: after a catalog install, the host fetches the manifest and mounts no frame until approval, and the consent store is consulted; verify the test fails if the install path calls registration directly.
+- [x] 4.1 Implement `apps/shell/src/plugins/management.ts` with normalized-URL lookup, install, set-enabled, remove, consent review/revoke and the save/discard/cancel dirty guard; cover every result and workspace state in `management.test.ts`.
+- [x] 4.2 Add integration tests that install writes one canonical enabled entry, first install creates `exo.json`, duplicate/invalid/read-only/invalid-config/no-workspace cases write nothing, and conflict preserves the external file; verify the tests fail when the guard is removed.
+- [x] 4.3 Add the consent invariant test: after a catalog install, the host fetches the manifest and mounts no frame until approval, and the consent store is consulted; verify the test fails if the install path calls registration directly.
 - [x] 4.4 Refactor the current Settings plugin actions onto `PluginManagementController` and extract the reusable status, setting-control and issue components for the details tab; verify the existing settings tests are updated rather than duplicated and all management operations still pass.
 - [x] 4.5 Update `docs/contracts/plugin-manifest.md` §2.3 and every guide/spec sentence that says only the settings surface writes `exo.json` to name the Extensions management surface; verify a repository search finds no stale "settings surface is the only writer" claim.
 - [x] 4.6 Add security-review control #17 "Marketplace catalog and installation" with requirement, enforcement, regression tests and mutation evidence for feed validation, no auto-install, consent gating and the `exo.json` write; verify the recorded mutation failures are accurate.
@@ -40,7 +40,7 @@
 - [x] 5.2 Implement `apps/shell/src/extensions/ExtensionsView.tsx` with the labelled search, Installed section and count, Marketplace section, row layout, refresh action, feed loading/error/empty/offline states, no-workspace state and install/manage disabled explanations; add axe coverage and keyboard/focus tests.
 - [x] 5.3 Add the "Install from URL" form to the same view using the shared URL validator and management controller; cover success, invalid URL, duplicate, invalid/read-only workspace and inline issue display.
 - [x] 5.4 Merge installed entries from `exo.json` with host records by normalized manifest URL, show feed metadata until the manifest arrives and manifest metadata afterwards, dedupe catalog rows across feeds and preserve declaration/feed order; verify with mixed installed-only, duplicate and failed-plugin fixtures.
-- [ ] 5.5 Add VS Code-like styles in `app.css` using the workbench tokens for search, sections, rows, icons, actions, status text, errors and the details layout; verify both themes, high contrast, narrow widths and visible focus, and record the checks in `docs/accessibility.md`.
+- [x] 5.5 Add VS Code-like styles in `app.css` using the workbench tokens for search, sections, rows, icons, actions, status text, errors and the details layout; verify both themes, high contrast, narrow widths and visible focus, and record the checks in `docs/accessibility.md`.
 
 ## 6. Extension details and Settings debug surface
 
@@ -58,16 +58,16 @@
 - [x] 7.3 Update `docs/releases.md` with the marketplace feed schema axis, the deploy-time source override and the release checklist additions; verify the version/changelog consistency test and every stated version.
 - [x] 7.4 Update `docs/walkthrough.md` with an Extensions acceptance path (catalog load, install, consent, settings, disable/remove, settings debug) and record the expected observations; verify every named URL and control exists on the deployed site.
 - [x] 7.5 Re-measure the shell bundle after the UI lands, update `apps/shell/budget.json` only with the measured value and rationale, and verify `npm run build && node apps/shell/scripts/check-bundle-budget.mjs apps/shell/dist apps/shell/budget.json` passes before plugin copies.
-- [ ] 7.6 Update `docs/performance.md` with the Extensions first-load measurement (source + feed requests, time to catalog, no startup request) and the deployed reference environment; verify the numbers come from the deployed URL, not a local dev server.
+- [x] 7.6 Update `docs/performance.md` with the Extensions first-load measurement (source + feed requests, time to catalog, no startup request) and the deployed reference environment; verify the numbers come from the deployed URL, not a local dev server.
 
 ## 8. Integration and deployment
 
 - [x] 8.1 Run the full local `verify` gate as a development aid: lint, format check, typecheck, tests, build, budget, CSP, custom elements, no-SDK, no-Monaco, template/code builds and copies, `deploy:copy-marketplace`, `check:marketplace` and the secrets scan; resolve every failure before pushing.
-- [ ] 8.2 Push `main`, confirm the CI `verify` job and Pages deploy succeed, and confirm `https://mode777.github.io/exo-editor/marketplace.json` and `marketplace-sources.json` return the committed content; record the deployed commit and asset filenames.
-- [ ] 8.3 Verify on the deployed URL with no workspace: Extensions loads the official feed, search filters, details open, install is disabled with the folder explanation and Settings shows plugin debugging.
-- [ ] 8.4 Verify on the deployed URL with a writable workspace: install an official entry, `exo.json` gets one canonical entry, consent names the manifest origin and capabilities, the plugin activates, details show settings and status, disable/enable/remove work, dirty documents prompt correctly and a feed error leaves installed management usable.
-- [ ] 8.5 Verify a read-only workspace, an invalid `exo.json`, a missing feed and an invalid feed each produce the specified explanation and no write, and verify no console error, frame mount or workspace request occurs during catalog loading.
-- [ ] 8.6 Record the deployed commit, date, feed URLs, observed states and bundle measurement in the design's Deployed Verification section, update the `ROADMAP.md` follow-up, and verify `openspec validate --all` passes.
+- [x] 8.2 Push `main`, confirm the CI `verify` job and Pages deploy succeed, and confirm `https://mode777.github.io/exo-editor/marketplace.json` and `marketplace-sources.json` return the committed content; record the deployed commit and asset filenames.
+- [x] 8.3 Verify on the deployed URL with no workspace: Extensions loads the official feed, search filters, details open, install is disabled with the folder explanation and Settings shows plugin debugging.
+- [x] 8.4 Verify on the deployed URL with a writable workspace: install an official entry, `exo.json` gets one canonical entry, consent names the manifest origin and capabilities, the plugin activates, details show settings and status, disable/enable/remove work, dirty documents prompt correctly and a feed error leaves installed management usable.
+- [x] 8.5 Verify a read-only workspace, an invalid `exo.json`, a missing feed and an invalid feed each produce the specified explanation and no write, and verify no console error, frame mount or workspace request occurs during catalog loading.
+- [x] 8.6 Record the deployed commit, date, feed URLs, observed states and bundle measurement in the design's Deployed Verification section, update the `ROADMAP.md` follow-up, and verify `openspec validate --all` passes.
 
 ## Workflow follow-up
 

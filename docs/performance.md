@@ -128,14 +128,27 @@ controller and the SDK helpers. The budget was raised by 5,000 bytes, leaving
 roughly 1,260 bytes of headroom; no dependency or vendored asset was added, and
 the new-file path performs no content transformation.
 
-### Marketplace first load (pending 0.12.0 deployment)
+### Marketplace first load (2026-11-27)
 
-Measured after the `plugin-marketplace` deploy: open Extensions with an empty
-catalog, record the source and feed request count and the time until the
-official rows are painted, five runs after a warm-up. The shell bundle measured
-183,791 JS and 14,456 CSS gzip bytes locally before the plugin copies, against
-the 186,000/14,600 budget. The deployed measurement is recorded here after
-task 8.3.
+Measured against deployed commit `badc141`
+(`https://mode777.github.io/exo-editor/`) with the reference environment, five
+fresh page loads. Each run opened Extensions and stopped when the official Exo
+Code row was painted. Every run made exactly two marketplace requests
+(`marketplace-sources.json` and `marketplace.json`) and no marketplace request
+before the view opened.
+
+| Run | Time |
+| --- | --- |
+| 1 | 118 ms |
+| 2 | 137 ms |
+| 3 | 138 ms |
+| 4 | 117 ms |
+| 5 | 108 ms |
+| Median | 118 ms |
+| Maximum | 138 ms |
+
+The shell bundle measured 183,791 JS and 14,456 CSS gzip bytes before the plugin
+copies, against the 186,000/14,600 budget.
 
 ### Editor-bound panels and bottom panel (2026-11-24)
 

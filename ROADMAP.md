@@ -1009,7 +1009,18 @@ which keeps a **Plugin debugging** section for raw `exo.json`, issues, status
 and the log. The official feed is
 `https://mode777.github.io/exo-editor/marketplace.json`; shell `0.12.0`,
 protocol `1`, manifest schema `1`, marketplace feed schema `1` and SDK
-`1.10.0`. Deployed verification is recorded in the archived change.
+`1.10.0`. Verified against deployed commit `badc141` (asset `index-BzTsJ4_t.js`)
+on 2026-11-27 with `chrome-headless-shell` 131: the official feed and source
+list returned 200, Extensions loaded without a workspace, search and details
+worked, install wrote one canonical entry and opened the consent dialog,
+approval activated the plugin, disable/remove rewrote only the declaration,
+the read-only workspace disabled install, missing/invalid feeds and invalid
+`exo.json` showed their explicit states, and dark/light plus 900x700 rendering
+passed. Catalog first load measured 118 ms median / 138 ms maximum with two
+requests; the bundle measured 183,791/186,000 JS and 14,456/14,600 CSS gzip
+bytes. The deployed evidence is recorded in the change design; the change is
+ready to archive as `2026-11-27-plugin-marketplace` with its deltas synced into
+the main specs.
 
 ---
 

@@ -569,6 +569,36 @@ name, publisher, description and keywords; it does not reorder results.
 
 ## Deployed Verification
 
-Pending implementation. Record the deployed commit, date, official feed URL,
-source file URL and the observed catalog/install/consent/remove path here, plus
-the CI `verify` result and bundle measurement, before archiving.
+Verified on 2026-11-27 against deployed commit `badc141` (asset
+`index-BzTsJ4_t.js`) at `https://mode777.github.io/exo-editor/` with
+`chrome-headless-shell` 131.0.6778.264 at 1280x800 and an OPFS workspace opened
+through a `showDirectoryPicker` stub. The feed is
+`https://mode777.github.io/exo-editor/marketplace.json` and the source list is
+`https://mode777.github.io/exo-editor/marketplace-sources.json`; both returned
+200 with the committed content. CI `verify` passed and Pages deployed after one
+retry that removed duplicate `github-pages` artifacts.
+
+Observed path:
+
+- No workspace: Extensions loaded the official feed, showed Exo Code and Exo
+  Template Plugin with source **Exo Plugins**, search filtered the catalog,
+  details opened with feed metadata and the manifest URL, and install actions
+  were disabled with the folder explanation.
+- Writable workspace: install wrote one canonical enabled `exo.json` entry, the
+  consent dialog named the manifest origin and capabilities, approval activated
+  the plugin, details showed `workspace:read`, Disable rewrote only the enabled
+  flag, Remove deleted the entry, and Settings showed **Plugin debugging** with
+  raw `exo.json` and no install/remove/promote controls.
+- Read-only workspace: restored after denying permission, showed the read-only
+  state, disabled the template Install action and install-by-URL, and kept
+  details reachable.
+- Missing source, invalid feed and invalid `exo.json`: each produced the
+  specified error/issue state with Retry where applicable; no write occurred,
+  and the URL form stayed available when the workspace was writable.
+- Theme and width: Extensions rendered in dark and light with different computed
+  title colors and remained usable at 900x700 without horizontal body scroll.
+- Catalog first load: 108-138 ms (median 118 ms) after opening Extensions, two
+  requests (source and feed), no marketplace request before the view opened.
+  No page errors or unexpected console errors were recorded.
+- Bundle: 183,791 JS / 14,456 CSS gzip bytes before the plugin copies, against
+  the 186,000/14,600 budget.

@@ -205,9 +205,15 @@ surface checks below were repeated on 2026-11-20 against commit `3f69504`.
   Result: pass.
 - Settings dialog: focus enters the dialog, twelve Tab presses stay inside it,
   and Escape closes it. Result: pass.
-- Extensions view and details (added 2026-11-27): the automated axe scans pass;
-  the deployed keyboard, theme and feed-error checks are recorded with the
-  `plugin-marketplace` deployed verification after the next Pages deploy.
+- Extensions view and details (added 2026-11-27 at commit `badc141`): the
+  automated axe scans pass; the deployed checks opened the view from the
+  activity bar, filtered both sections, opened and read details, installed and
+  approved a plugin, disabled and removed it, and confirmed the settings debug
+  surface. The view rendered in dark and light and remained usable at 900x700
+  with no horizontal body scroll. Missing-source, invalid-feed and invalid
+  `exo.json` states announced their errors and kept the applicable actions
+  reachable. Result: pass. A full screen-reader pass remains a human checklist
+  item, as with the rest of the shell.
 - The automated axe and contrast suites above pass in the same run; the shell's
   keyboard navigation through the explorer, tabs, document area and status bar
   matched the script.
