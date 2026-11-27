@@ -981,9 +981,20 @@ normalize to one list. The shell removes the separate view-pool companion
 callback and content-surface effect, uses no new protocol message or event, and
 keeps `plugin/request-panel` unchanged. The fixture adds **Fixture Gallery** and
 a `*.companion.txt` editor with companions in all three regions; shell `0.11.0`,
-protocol `1`, manifest schema `1` and SDK `1.10.0`. Deployed verification is
-recorded in the change design; the change is archived as
-`2026-11-27-surface-companion-panels` with its deltas synced into the main specs.
+protocol `1`, manifest schema `1` and SDK `1.10.0`. Verified against deployed
+commit `153ae29` (asset `index-DesB5Poj.js`) on 2026-11-27 with
+`chrome-headless-shell` 131: the file editor revealed primary, secondary and
+bottom companions after the handler activated; a text tab hid all three and
+returning revealed them; a manual secondary hide survived same-surface updates
+and returned on refocus; a same-contribution switch kept the panels and a
+different contribution hid the undeclared ones; Fixture Gallery revealed all
+three and switched the secondary companion back to Inspector 2 on return; the
+legacy Fixture Tutorial alias still worked; a second OPFS workspace cleared the
+tabs and companions; and removing the fixture hid every companion. The browser
+console was empty and the bundle measured 176,361/178,000 js and 13,788/14,000
+css gzip bytes. The deployed evidence is recorded in the change design; the
+change is ready to archive as `2026-11-27-surface-companion-panels` with its
+deltas synced into the main specs.
 
 ---
 

@@ -29,8 +29,8 @@
 ## 5. Integration and deployment
 
 - [x] 5.1 Run the full `verify` gate locally as a development aid: lint, format check, typecheck, unit tests, build, budget, CSP/elements/no-sdk/no-monaco checks, template/code builds and copies, secrets check; resolve every failure before pushing.
-- [ ] 5.2 Push `main`, wait for the CI `verify` job and Pages deploy, then verify on `https://mode777.github.io/exo-editor/` with the deployed fixture: content view and file-editor companions in all regions, hide on surface change, shared panels, manual hide until refocus, other-panel preservation, plugin removal and workspace switch, no console errors and bundle budget.
-- [ ] 5.3 Record the deployed commit, date, fixture URL and observations in the change design's Deployed Verification section; verify `openspec validate --all` passes.
+- [x] 5.2 Push `main`, wait for the CI `verify` job and Pages deploy, then verify on `https://mode777.github.io/exo-editor/` with the deployed fixture: content view and file-editor companions in all regions, hide on surface change, shared panels, manual hide until refocus, other-panel preservation, plugin removal and workspace switch, no console errors and bundle budget.
+- [x] 5.3 Record the deployed commit, date, fixture URL and observations in the change design's Deployed Verification section; verify `openspec validate --all` passes.
 
 ## Workflow follow-up
 

@@ -170,9 +170,45 @@ The investigation of a unified event concluded against a protocol change:
 5. Bump shell/package versions, run the full CI `verify` gate, push `main`, and record the deployed commit, date and observations here.
 6. Rollback is a normal revert. A manifest that used the new field on a `0.11.0` shell must keep a matching `engines.exo` range if the shell is rolled back.
 
-## Deployed Verification
+## Deployed Verification (2026-11-27)
 
-Pending. After the CI `verify` job deploys, record the deployed commit and date, the fixture URL, and observations for: content view with multiple companions; file editor companions after handler activation; primary, secondary and bottom regions; switch to a shell text file hiding all; same-contribution switch keeping companions; manual hide until refocus; user-selected other panel preserved; plugin removal and workspace switch; no console errors; bundle budget.
+Run against deployed commit `153ae29` (shell asset `index-DesB5Poj.js`) at
+`https://mode777.github.io/exo-editor/` with `chrome-headless-shell`
+131.0.6778.264 at 1440x900. The deployed fixture manifest
+`https://mode777.github.io/exo-editor/plugin-host-fixture/exo-manifest.json`
+(version `1.4.0`, `engines.exo >=0.11.0`) was the real artifact. The workspace was
+an OPFS directory exposed through a `showDirectoryPicker` stub, containing
+`exo.json`, `notes.txt`, `other.bound.txt`, `demo.companion.txt` and
+`second.companion.txt`; a second stub workspace supplied the switch. No local dev
+server or local build was used.
+
+Passed:
+
+- Opening `demo.companion.txt` revealed the primary **Fixture Panel**, secondary
+  **Fixture Inspector 2** and bottom **Fixture Inspection** only after the
+  handler was active. The regions were closed before the file opened.
+- Clicking the `notes.txt` tab hid all three companions; returning to the editor
+  revealed them again.
+- Hiding **Fixture Inspector 2** manually kept it hidden through a same-surface
+  update; leaving and returning to the tab revealed it again.
+- Opening `second.companion.txt` kept the same companions for the shared
+  contribution. Opening `other.bound.txt` hid the secondary and bottom
+  companions and left the user-selected Explorer primary view alone.
+- **Fixture Gallery** revealed the primary, secondary and bottom companions from
+  its `companionPanels` list; returning to the editor switched the secondary
+  companion from **Fixture Inspector** to **Fixture Inspector 2**.
+- The legacy **Fixture Tutorial** `companionPanel` alias still revealed
+  **Fixture Inspector**.
+- Switching to a second OPFS workspace cleared the tabs and left all companion
+  regions hidden. Removing the fixture through **Plugin configuration → Remove**
+  hid every companion while the remaining editor tab was still open.
+- Browser console and page errors were empty. Screenshots
+  `~/exo-verify/surface-editor-companions.png`,
+  `surface-gallery-companions.png`, `surface-workspace-switch.png` and
+  `surface-plugin-removed.png`, plus the JSON report
+  `~/exo-verify/surface-report.json`, are on the verification host.
+- The CI `verify` job and Pages deploy passed. The bundle measured
+  176,361/178,000 gzip js and 13,788/14,000 gzip css.
 
 ## Open Questions
 
