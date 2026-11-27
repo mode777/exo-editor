@@ -75,7 +75,7 @@ npm run check:marketplace
 
 copies the committed [`marketplace/marketplace.json`](../../marketplace/marketplace.json)
 and [`marketplace/sources.json`](../../marketplace/sources.json) into
-`apps/shell/dist/`. An operator can override either input:
+the shell build output. An operator can override either input:
 
 ```bash
 EXO_MARKETPLACE_SOURCES=/path/sources.json \
