@@ -9,7 +9,7 @@
 ## 2. Registration and surface metadata
 
 - [x] 2.1 Carry `companionPanels` through `RegisteredEditor`, `RegisteredContentView`, `RegistrationOutcome` and the host snapshot in `apps/shell/src/plugins/registration.ts` and `host.ts`; verify host tests expose the list for both contribution types and drop it on stop.
-- [ ] 2.2 Add the matched contribution's companions to `EditorCandidate`, `DocumentEditor` and the document open path in `apps/shell/src/workspace/documents.ts`; verify a document opened with a plugin candidate exposes its companions and a text-surface document exposes none.
+- [x] 2.2 Add the matched contribution's companions to `EditorCandidate`, `DocumentEditor` and the document open path in `apps/shell/src/workspace/documents.ts`; verify a document opened with a plugin candidate exposes its companions and a text-surface document exposes none.
 - [x] 2.3 Add `companionPanels` to `ContentViewTabInfo`, `ContentViewInput` and the `ViewPool` content path in `apps/shell/src/workbench/tabs.ts` and `plugins/view-pool.ts`; verify view-pool tests open a content view with multiple companions and preserve the list in its handle.
 
 ## 3. One runtime companion path
