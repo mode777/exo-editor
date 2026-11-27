@@ -86,6 +86,10 @@ Ask before scaffolding:
 - Hidden handler (default, headless transform) or a visible editor surface
   (`rendering: "frame"` - the iframe is displayed in the document area, while
   tabs, breadcrumbs, Save and notices stay shell-owned).
+- Optional companion panels. A file editor or content view can bind one panel
+  per `primary`, `secondary` and `bottom` region with `companionPanels`; the
+  shell reveals and hides them with the active surface. This needs no extra
+  message, permission or SDK API. Use `engines.exo` at or above `0.11.0`.
 - GitHub repository name (it becomes the Pages child path) and whether the site
   is a project page (`https://<owner>.github.io/<repo>/`) or a user-site root
   (`https://<owner>.github.io/`).
@@ -445,7 +449,12 @@ Then:
       in both dark and light, and the editor library's own theme follows.
 - [ ] Closing the tab disposes the frame; a late save does not recreate the
       file.
-- [ ] Disabling the plugin falls back to the shell text surface.
+- [ ] A declared companion reveals on the active tab (after the handler is
+      active for a file editor), hides when another surface becomes active, and
+      stays hidden after a manual hide until the surface is opened or focused
+      again.
+- [ ] Disabling the plugin falls back to the shell text surface and hides and
+      disposes its companion panels.
 
 ## Troubleshooting
 

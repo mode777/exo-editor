@@ -217,11 +217,11 @@ No secrets, backend or build step are involved.
 
 The manifest also declares a primary panel (`fixture-panel`), two secondary
 panels (`fixture-inspector`, `fixture-inspector-2`), a bottom panel
-(`fixture-inspection`) and a content view (`fixture-tutorial`). The controller
-registers all of them. The pages are dependency-free views that perform the
-`exo-mode=view` handshake and mirror `{ view, capabilities, activeEditor,
-settings, subscriptions, events, snapshots, results, errors }` into
-`#observation` and the title.
+(`fixture-inspection`) and three content views (`fixture-tutorial`,
+`fixture-generator`, `fixture-gallery`). The controller registers all of them.
+The pages are dependency-free views that perform the `exo-mode=view` handshake
+and mirror `{ view, capabilities, activeEditor, settings, subscriptions, events,
+snapshots, results, errors }` into `#observation` and the title.
 
 - `view-primary.html` is the hub: Publish local event, Subscribe theme, Open
   `/notes.txt`, Toggle secondary panel, Open fixture content view and Open the
@@ -231,16 +231,13 @@ settings, subscriptions, events, snapshots, results, errors }` into
   `openedBy` fields in `#observation` distinguish a panel open, a shell palette
   open and a cross-plugin open.
 
-`fixture-tutorial` declares `companionPanel: "fixture-inspector"`. Opening the
-content view from the shell palette or from `view-primary.html` reveals the
-secondary **Fixture Inspector** panel. Opening the view again focuses the same
-instance and reveals the panel again. Opening it twice from the shell palette
-creates two instances; closing one keeps the inspector until the last tab
-closes. A manual hide of the inspector stays hidden until the content view is
-opened or focused again, and selecting another secondary panel does not make a
-later content-view close dismiss that panel.
+`fixture-tutorial` keeps the legacy `companionPanel: "fixture-inspector"`
+declaration. `fixture-gallery` uses `companionPanels` with all three regions:
+`fixture-panel` (primary), `fixture-inspector` (secondary) and
+`fixture-inspection` (bottom). The `**/*.companion.txt` editor declares the same
+three regions with `fixture-inspector-2` as its secondary panel.
 
-Manual companion checks:
+Manual content-view companion checks:
 
 1. Open **Fixture Tutorial** from the shell palette. The right side bar shows
    **Fixture Inspector** and the content tab renders.
@@ -251,6 +248,23 @@ Manual companion checks:
    and it hides.
 4. Select another secondary view, then close the content tab. The other panel
    stays visible and the right side bar does not close.
+5. Open **Fixture Gallery**. The primary **Fixture Panel**, secondary
+   **Fixture Inspector** and bottom **Fixture Inspection** all reveal; switching
+   to a plain file hides the regions, and switching back reveals them again.
+
+Manual file-editor companion checks:
+
+1. Create or open `/demo.companion.txt`. The **Fixture Companion Editor** tab
+   reveals the primary **Fixture Panel**, secondary **Fixture Inspector 2** and
+   bottom **Fixture Inspection** once its handler is active. The panels do not
+   appear while the handler is still mounting.
+2. Switch to a shell text file such as `/notes.txt`: all three companions hide.
+   Return to `/demo.companion.txt`: they reveal again.
+3. Hide **Fixture Inspector 2** and stay on the editor tab. It stays hidden
+   through unrelated updates; leave and return to the tab and it reveals again.
+4. Open a second `*.companion.txt` file. The companions stay visible while the
+   same contribution remains active. Open a file handled by another fixture
+   editor and the panels that editor does not declare hide.
 
 The other fixture manifest declares `other-tutorial` and uses
 `other-plugin.html` as its controller, so the cross-plugin open has a real target

@@ -14,6 +14,7 @@ import {
   clearWorkspaceTabs,
   configurePresetStore,
   contentViewOf,
+  openFileTab,
   type ContentViewTabInfo,
 } from '../workbench/tabs'
 import { pluginViewId } from '../workbench/plugin-views'
@@ -25,7 +26,13 @@ const IDENTITY = `${ORIGIN}::com.example.other`
 
 configurePresetStore()
 
-function manifest(companionPanel?: string): PluginManifest {
+function manifest(companionPanels?: string | string[]): PluginManifest {
+  const companions =
+    companionPanels === undefined
+      ? []
+      : Array.isArray(companionPanels)
+        ? companionPanels
+        : [companionPanels]
   const result = validateManifest(
     {
       schemaVersion: 1,
@@ -38,24 +45,22 @@ function manifest(companionPanel?: string): PluginManifest {
       permissions: ['workspace:read'],
       contributes: {
         fileEditors: [],
-        ...(companionPanel === undefined
+        ...(companions.length === 0
           ? {}
           : {
-              panels: [
-                {
-                  id: companionPanel,
-                  title: 'Inspector',
-                  location: 'secondary',
-                  entry: 'views/inspector.html',
-                },
-              ],
+              panels: companions.map((panelId) => ({
+                id: panelId,
+                title: 'Inspector',
+                location: 'secondary',
+                entry: 'views/inspector.html',
+              })),
             }),
         contentViews: [
           {
             id: 'tutorial',
             title: 'Tutorial',
             entry: 'views/tutorial.html',
-            ...(companionPanel === undefined ? {} : { companionPanel }),
+            ...(companions.length === 0 ? {} : { companionPanels: companions }),
           },
         ],
       },
@@ -67,8 +72,8 @@ function manifest(companionPanel?: string): PluginManifest {
   return result.manifest
 }
 
-function record(companionPanel?: string): PluginHostRecord {
-  const value = manifest(companionPanel)
+function record(companionPanels?: string | string[]): PluginHostRecord {
+  const value = manifest(companionPanels)
   return {
     manifestUrl: value.manifestUrl,
     entryIndex: 0,
@@ -198,6 +203,9 @@ describe('content view surface', () => {
 
     const tab = useWorkbenchStore.getState().tabs[0]
     if (!tab) throw new Error('No tab')
+    openFileTab('/notes.txt')
+    runtime.setActiveTab('/notes.txt')
+    runtime.setActiveTab(tab.id)
     container = document.createElement('div')
     document.body.appendChild(container)
     root = createRoot(container)

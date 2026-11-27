@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useRef } from 'react'
 import { usePluginHost, useViewPoolSnapshot, useWorkspaceRuntime } from '../workspace/context'
 import type { ContentViewTabInfo } from '../workbench/tabs'
 
@@ -16,10 +16,6 @@ export function ContentViewSurface({ content }: { content: ContentViewTabInfo })
   const view = record?.contentViews.find((entry) => entry.id === content.viewId)
   const current = useRef({ content })
   current.current = { content }
-
-  useEffect(() => {
-    runtime.views.revealCompanion(content.key)
-  }, [content.key, runtime])
 
   const attach = useCallback(
     (element: HTMLDivElement | null) => {

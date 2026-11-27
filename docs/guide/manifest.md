@@ -124,7 +124,7 @@ read-only content-view tabs:
       "id": "tutorial",
       "title": "Tutorial",
       "entry": "views/tutorial.html",
-      "companionPanel": "asset-params"
+      "companionPanels": ["outline", "asset-params", "inspection"]
     }
   ]
 }
@@ -139,20 +139,31 @@ content views. The controller registers a subset by id with
 `registerPanel(id)` / `registerContentView(id)`. Panels mount on first reveal and
 stay hidden without disposal; content frames are created when their tab opens.
 
-A content view can declare one optional `companionPanel`. It must name a
-`secondary` panel declared in the same manifest; a primary or bottom panel is
-rejected. The shell reveals it when the content view opens or is focused, keeps
-it open while another open content view shares it, and hides it after the last
-such view closes. If the panel is not registered, the content view still opens.
+A file editor or content view can declare up to three `companionPanels`. Each id
+must name a panel declared in the same manifest, and a contribution can bind at
+most one panel per `primary`, `secondary` or `bottom` location. The shell reveals
+a content view's companions when the view opens or its tab becomes active. A
+file editor's companions reveal only after that editor's tab is active and its
+handler has completed the handshake, so a mounting or failed handler shows
+nothing. The shell hides a companion when the active surface does not declare it,
+when the handler clears, or when the last open content view closes, and keeps a
+panel that the old and new surfaces share. If a panel is not registered, the
+surface still opens.
+
 The shell owns this lifecycle; you do not send a message, poll or add a
-heartbeat. A hide by the user stays until the next content-view open or focus,
-and `plugin/request-panel` keeps its existing behavior.
+heartbeat. A hide by the user stays until the surface is opened or focused again,
+a user-selected panel in another region is left alone, and
+`plugin/request-panel` keeps its existing behavior. `companionPanel` (singular)
+is still accepted on a content view as a one-panel compatibility alias; it cannot
+be combined with `companionPanels`.
 
 Panels and content views are excluded from the consent fingerprint because they
 are user-invoked. A manifest that adds them should set `engines.exo` to a range
 that includes `0.3.0`, so older shells fail closed instead of rejecting the
-unknown field. A manifest that uses `companionPanel` must include `0.6.0`, and
-one that uses the bottom location must include `0.10.0`. See the
+unknown field. A manifest that uses `companionPanel` must include `0.6.0`, one
+that uses the bottom location must include `0.10.0`, and one that uses
+`companionPanels` or binds a companion to a primary or bottom panel must include
+`0.11.0`. See the
 [manifest contract](../contracts/plugin-manifest.md#32-panels-and-content-views).
 
 ## Commands

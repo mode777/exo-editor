@@ -82,7 +82,7 @@ the deployed URL below, not a local dev server or local build.
     template and confirm the dialog shows a byte size and no preview. Invoke a
     content view that asks the shell to create a file; it gets the path and
     version, the shell does not open a tab, and Escape cancels without a write.
-16. **Check a content-view companion.** With the fixture active, open Fixture
+16. **Check content-view companions.** With the fixture active, open Fixture
     Tutorial from the palette. The right side bar reveals Fixture Inspector and
     the read-only tab renders. Hide the inspector: it stays hidden while the tab
     remains active. Refocus the tab and it returns. Switch to a file tab: the
@@ -91,9 +91,21 @@ the deployed URL below, not a local dev server or local build.
     the inspector stays visible and follows the active tab. Close one tab; the
     companion hides if its tab is no longer active and returns when the remaining
     tab becomes active. Select another secondary view before closing the last
-    tab: that other panel stays visible. No plugin heartbeat, polling or extra
-    lifecycle message is involved.
-17. **Follow the active editor from a bottom panel.** With the fixture active,
+    tab: that other panel stays visible. Open Fixture Gallery: the primary,
+    secondary and bottom companions reveal together, and switching to a plain
+    file hides those regions. No plugin heartbeat, polling or extra lifecycle
+    message is involved.
+17. **Check file-editor companions.** With the fixture active, create or open
+    `demo.companion.txt`. Once its handler is active, the primary Fixture Panel,
+    secondary Fixture Inspector 2 and bottom Fixture Inspection reveal. Switch
+    to `notes.txt`: all three hide. Return to the editor: they reveal again.
+    Hide Fixture Inspector 2 and stay on the tab: unrelated updates do not reopen
+    it; leave and return and it comes back. Open a second `*.companion.txt` file:
+    the companions stay visible for the same contribution. Open a file handled
+    by another fixture editor: the panels that contribution does not declare
+    hide. Disable the fixture: the companions hide and their frames are disposed
+    with the plugin.
+18. **Follow the active editor from a bottom panel.** With the fixture active,
     open a `*.bound.txt` file. The bottom region shows Fixture Inspection and the
     panel records the active path and instance id. Open a second `*.bound.txt`
     file and switch tabs: the panel follows the active tab and the inactive

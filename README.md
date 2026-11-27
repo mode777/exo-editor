@@ -40,7 +40,9 @@ between content-view tabs so the newly active instance's frame is shown; and
 `0.8.3` keeps a content-view companion visible only while its tab is active;
 `0.9.0` exposes the active content-view instance in `shell/init` and through the
 targeted `view/active` event (SDK `1.9.0`); `0.10.0` adds editor-bound panels,
-the bottom panel location and the targeted `editor/active` event (SDK `1.10.0`).
+the bottom panel location and the targeted `editor/active` event (SDK `1.10.0`);
+`0.11.0` adds surface companion panels for file editors and content views in
+primary, secondary and bottom regions (SDK unchanged).
 Panels mount lazily and content views open as read-only tabs; both are
 user-invoked and excluded from the consent fingerprint.
 

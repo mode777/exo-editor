@@ -281,6 +281,36 @@ describe('registration session', () => {
     })
   })
 
+  it('carries declared companion panels on registered editors', () => {
+    const context = start({
+      manifest: manifest({
+        fileEditors: [
+          {
+            glob: '**/*.ts',
+            entry: 'editors/code.html',
+            entryUrl: 'https://plugins.example.com/monaco/editors/code.html',
+            label: 'Code',
+            priority: 10,
+            companionPanels: ['outline', 'problems'],
+          },
+        ],
+      }),
+    })
+    ready(context)
+    register(context, [{ glob: '**/*.ts', entry: 'editors/code.html' }])
+    complete(context)
+    const outcome = context.outcomes[0]
+    expect(outcome).toMatchObject({
+      kind: 'active',
+      editors: [
+        {
+          glob: '**/*.ts',
+          companionPanels: ['outline', 'problems'],
+        },
+      ],
+    })
+  })
+
   it('collects indexed rejections and keeps valid siblings', () => {
     const context = start()
     ready(context)

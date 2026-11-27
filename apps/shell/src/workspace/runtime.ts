@@ -19,7 +19,7 @@ import { isReservedPath, normalizePath } from './paths'
 import { PluginConfigStore } from '../plugins/store'
 import { PluginHost } from '../plugins/host'
 import { HandlerPool } from '../plugins/handlers'
-import { ViewPool, type CompanionPanelChange } from '../plugins/view-pool'
+import { ViewPool } from '../plugins/view-pool'
 import type {
   IntentOutcome,
   IntentSource,
@@ -137,6 +137,12 @@ const INITIAL_SNAPSHOT: WorkspaceSnapshot = {
   explorerRevision: 0,
 }
 
+interface SurfaceCompanion {
+  identity: string
+  panelId: string
+  location: 'primary' | 'secondary' | 'bottom'
+}
+
 export class WorkspaceRuntime {
   readonly documents: DocumentStore
   readonly pluginConfig: PluginConfigStore
@@ -169,6 +175,8 @@ export class WorkspaceRuntime {
   private contentInstance = 0
   private activeContent: ContentViewTabInfo | null = null
   private activeEditor: ActiveEditor | null = null
+  private activeCompanions: SurfaceCompanion[] = []
+  private companionSurfaceKey: string | null = null
   private readonly documentSubscription: () => void
   private remote: RemoteWorkspaceSummary | null = null
   private remoteError: RemoteErrorSummary | null = null
@@ -237,7 +245,6 @@ export class WorkspaceRuntime {
         onOpenFile: (request, source) => this.openFileIntent(request, source),
         onOpenView: (request, source) => this.openViewIntent(request, source),
         onRequestPanel: (request, source) => this.requestPanelIntent(request, source),
-        onCompanionPanel: (change) => this.applyCompanionChange(change),
       })
     this.pluginSettings = new PluginSettingsStore({
       storage: options.pluginSettingsStorage,
@@ -529,6 +536,7 @@ export class WorkspaceRuntime {
       if (tab.path) paths.push(tab.path)
     }
     if (paths.length > 0) this.closeDocuments(paths)
+    this.setActiveTab(useWorkbenchStore.getState().activeTabId)
   }
 
   /** Show a plugin panel from the palette or a view picker. */
@@ -540,9 +548,9 @@ export class WorkspaceRuntime {
   }
 
   /**
-   * Follow the workbench's active tab. The companion belongs to the active
-   * content view, not to the set of open tabs, so switching to a file or a
-   * non-companion view hides it and returning reveals it again.
+   * Follow the workbench's active tab. Content-view companions and file-editor
+   * companions are both derived after this and after `syncActiveEditor`, so a
+   * tab switch updates the panel regions from one state.
    */
   setActiveTab(tabId: string | null): void {
     const store = useWorkbenchStore.getState()
@@ -550,31 +558,7 @@ export class WorkspaceRuntime {
     const next = tab ? (contentViewOf(tab) ?? null) : null
     const previous = this.activeContent
     if (previous?.key !== next?.key) {
-      const previousCompanion = previous ? this.companionOf(previous) : null
-      const nextCompanion = next ? this.companionOf(next) : null
-      const sharedCompanion =
-        previousCompanion !== null &&
-        nextCompanion !== null &&
-        previousCompanion.identity === nextCompanion.identity &&
-        previousCompanion.panelId === nextCompanion.panelId
-
       this.activeContent = next
-
-      if (previousCompanion && !sharedCompanion) {
-        this.applyCompanionChange({
-          action: 'hide',
-          identity: previousCompanion.identity,
-          panelId: previousCompanion.panelId,
-        })
-      }
-      if (nextCompanion) {
-        this.applyCompanionChange({
-          action: 'show',
-          identity: nextCompanion.identity,
-          panelId: nextCompanion.panelId,
-        })
-      }
-
       if (previous && (!next || previous.identity !== next.identity)) {
         this.events.publish(
           'view/active',
@@ -618,6 +602,7 @@ export class WorkspaceRuntime {
   private syncActiveEditor(): void {
     if (!this.session) {
       this.activeEditor = null
+      this.syncCompanions()
       return
     }
     const path = activeDocumentPath()
@@ -642,6 +627,7 @@ export class WorkspaceRuntime {
       previous?.path === next?.path &&
       previous?.instanceId === next?.instanceId
     ) {
+      this.syncCompanions()
       return
     }
     this.activeEditor = next
@@ -659,39 +645,96 @@ export class WorkspaceRuntime {
         { target: next.identity },
       )
     }
+    this.syncCompanions()
   }
 
   private activeEditorContext(): ActiveEditor | null {
     return this.activeEditor ? { ...this.activeEditor } : null
   }
 
-  private companionOf(content: ContentViewTabInfo): { identity: string; panelId: string } | null {
-    return content.companionPanel
-      ? { identity: content.identity, panelId: content.companionPanel }
-      : null
+  private resolveCompanion(identity: string, panelId: string): SurfaceCompanion | null {
+    const record = this.pluginHost
+      .getSnapshot()
+      .records.find((entry) => entry.identity === identity && entry.phase === 'active')
+    const panel = record?.panels.find((entry) => entry.id === panelId)
+    return panel ? { identity, panelId, location: panel.location } : null
+  }
+
+  /** The active surface and the companions it currently declares. */
+  private currentSurface(): { key: string; companions: SurfaceCompanion[] } | null {
+    if (this.activeContent) {
+      const content = this.activeContent
+      return {
+        key: `content:${content.identity}:${content.viewId}:${content.instanceKey}`,
+        companions: (content.companionPanels ?? [])
+          .map((panelId) => this.resolveCompanion(content.identity, panelId))
+          .filter((entry): entry is SurfaceCompanion => entry !== null),
+      }
+    }
+    if (!this.activeEditor) return null
+    const document = this.documents.get(this.activeEditor.path)
+    const editor = document?.editor
+    if (!editor || editor.identity !== this.activeEditor.identity) return null
+    return {
+      key: `editor:${editor.identity}:${this.activeEditor.path}:${this.activeEditor.instanceId}`,
+      companions: (editor.companionPanels ?? [])
+        .map((panelId) => this.resolveCompanion(editor.identity, panelId))
+        .filter((entry): entry is SurfaceCompanion => entry !== null),
+    }
   }
 
   /**
-   * Apply a content-view companion change through the ordinary secondary-panel
-   * path. A show is skipped unless the panel is registered and secondary; a
-   * hide only closes the region when the companion is the active, visible view,
-   * so a manual hide or another selected panel is respected.
+   * Reconcile the declarations of the active surface with the regions. The
+   * surface key guard keeps a manual hide in place until the surface changes;
+   * an explicit open forces the show step for an already-active surface.
    */
-  private applyCompanionChange(change: CompanionPanelChange): void {
-    const panelViewId = pluginViewId(change.identity, change.panelId)
-    if (change.action === 'show') {
-      const record = this.pluginHost
-        .getSnapshot()
-        .records.find((entry) => entry.identity === change.identity && entry.phase === 'active')
-      const panel = record?.panels.find((entry) => entry.id === change.panelId)
-      if (!panel || panel.location !== 'secondary') return
-      this.showPanel(panelViewId, 'secondary')
-      return
+  private syncCompanions(force = false): void {
+    const surface = this.session ? this.currentSurface() : null
+    const key = surface?.key ?? null
+    if (!force && key === this.companionSurfaceKey) return
+    const next = surface?.companions ?? []
+    const previous = this.activeCompanions
+    this.activeCompanions = next
+    this.companionSurfaceKey = key
+    for (const companion of previous) {
+      const shared = next.some(
+        (entry) => entry.identity === companion.identity && entry.panelId === companion.panelId,
+      )
+      if (!shared) this.hideCompanion(companion)
     }
+    for (const companion of next) this.showCompanion(companion)
+  }
+
+  private showCompanion(companion: SurfaceCompanion): void {
+    this.showPanel(pluginViewId(companion.identity, companion.panelId), companion.location)
+  }
+
+  private hideCompanion(companion: SurfaceCompanion): void {
     const store = useWorkbenchStore.getState()
-    if (store.secondarySideBarVisible && store.activeSecondaryView === panelViewId) {
-      store.toggleSecondarySideBar(panelViewId)
+    const viewId = pluginViewId(companion.identity, companion.panelId)
+    if (
+      companion.location === 'primary' &&
+      store.primarySideBarVisible &&
+      store.activePrimaryView === viewId
+    ) {
+      store.togglePrimarySideBar(viewId)
+    } else if (
+      companion.location === 'secondary' &&
+      store.secondarySideBarVisible &&
+      store.activeSecondaryView === viewId
+    ) {
+      store.toggleSecondarySideBar(viewId)
+    } else if (
+      companion.location === 'bottom' &&
+      store.bottomPanelVisible &&
+      store.activePanelView === viewId
+    ) {
+      store.toggleBottomPanel()
     }
+  }
+
+  private hideCompanions(companions: SurfaceCompanion[]): void {
+    for (const companion of companions) this.hideCompanion(companion)
   }
 
   /** Open a content view from the shell palette or a "Show View" entry. */
@@ -714,7 +757,9 @@ export class WorkspaceRuntime {
         id: view.id,
         title: view.title,
         entryUrl: view.entryUrl,
-        ...(view.companionPanel === undefined ? {} : { companionPanel: view.companionPanel }),
+        ...(view.companionPanels === undefined
+          ? {}
+          : { companionPanels: [...view.companionPanels] }),
       },
       instanceKey,
     })
@@ -730,10 +775,13 @@ export class WorkspaceRuntime {
         pluginId: plugin.pluginId,
         viewId: view.id,
         instanceKey,
-        ...(view.companionPanel === undefined ? {} : { companionPanel: view.companionPanel }),
+        ...(view.companionPanels === undefined
+          ? {}
+          : { companionPanels: [...view.companionPanels] }),
       })
     }
     this.setActiveTab(opened.key)
+    this.syncCompanions(true)
     return true
   }
 
@@ -820,7 +868,9 @@ export class WorkspaceRuntime {
         id: view.id,
         title: view.title,
         entryUrl: view.entryUrl,
-        ...(view.companionPanel === undefined ? {} : { companionPanel: view.companionPanel }),
+        ...(view.companionPanels === undefined
+          ? {}
+          : { companionPanels: [...view.companionPanels] }),
       },
       instanceKey,
       ...(request.payload === undefined ? {} : { payload: request.payload }),
@@ -842,10 +892,13 @@ export class WorkspaceRuntime {
         pluginId: plugin.pluginId,
         viewId: view.id,
         instanceKey,
-        ...(view.companionPanel === undefined ? {} : { companionPanel: view.companionPanel }),
+        ...(view.companionPanels === undefined
+          ? {}
+          : { companionPanels: [...view.companionPanels] }),
       })
     }
     this.setActiveTab(opened.key)
+    this.syncCompanions(true)
     return { ok: true }
   }
 
@@ -887,6 +940,9 @@ export class WorkspaceRuntime {
   }
 
   private closeViewsFor(identity: string): void {
+    this.hideCompanions(this.activeCompanions.filter((entry) => entry.identity === identity))
+    this.activeCompanions = this.activeCompanions.filter((entry) => entry.identity !== identity)
+    this.companionSurfaceKey = null
     this.views.closeFor(identity, 'plugin-removed')
     closeContentTabsFor(identity)
   }
@@ -1094,6 +1150,9 @@ export class WorkspaceRuntime {
     this.newFiles.reset()
     this.filePicker.reset()
     this.commands.reset()
+    this.hideCompanions(this.activeCompanions)
+    this.activeCompanions = []
+    this.companionSurfaceKey = null
     this.handlers.publishWorkspaceClosed(reason)
     await this.handlers.detach()
     await this.views.detach()

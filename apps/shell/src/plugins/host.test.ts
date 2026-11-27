@@ -341,7 +341,14 @@ describe('plugin host', () => {
       jsonResponse(
         manifestJson({
           contributes: {
-            fileEditors: [],
+            fileEditors: [
+              {
+                glob: '**/*.txt',
+                entry: 'editors/text.html',
+                label: 'Text',
+                companionPanels: ['inspector', 'inspection'],
+              },
+            ],
             panels: [
               {
                 id: 'outline',
@@ -368,7 +375,7 @@ describe('plugin host', () => {
                 id: 'tutorial',
                 title: 'Tutorial',
                 entry: 'views/tutorial.html',
-                companionPanel: 'inspector',
+                companionPanels: ['outline', 'inspector', 'inspection'],
               },
             ],
           },
@@ -390,7 +397,11 @@ describe('plugin host', () => {
       {
         exo: 1,
         type: 'plugin/register',
-        payload: { panels: ['outline', 'inspector', 'inspection'], contentViews: ['tutorial'] },
+        payload: {
+          fileEditors: [{ glob: '**/*.txt', entry: 'editors/text.html' }],
+          panels: ['outline', 'inspector', 'inspection'],
+          contentViews: ['tutorial'],
+        },
       },
       'https://plugins.example.com',
     )
@@ -409,7 +420,7 @@ describe('plugin host', () => {
         location: 'primary',
         entry: 'views/outline.html',
         entryUrl: 'https://plugins.example.com/monaco/views/outline.html',
-        registrationOrder: 0,
+        registrationOrder: 1,
       },
       {
         id: 'inspector',
@@ -417,7 +428,7 @@ describe('plugin host', () => {
         location: 'secondary',
         entry: 'views/inspector.html',
         entryUrl: 'https://plugins.example.com/monaco/views/inspector.html',
-        registrationOrder: 1,
+        registrationOrder: 2,
       },
       {
         id: 'inspection',
@@ -425,7 +436,19 @@ describe('plugin host', () => {
         location: 'bottom',
         entry: 'views/inspection.html',
         entryUrl: 'https://plugins.example.com/monaco/views/inspection.html',
-        registrationOrder: 2,
+        registrationOrder: 3,
+      },
+    ])
+    expect(record?.registrations).toEqual([
+      {
+        glob: '**/*.txt',
+        entry: 'editors/text.html',
+        entryUrl: 'https://plugins.example.com/monaco/editors/text.html',
+        label: 'Text',
+        priority: 0,
+        rendering: 'hidden',
+        companionPanels: ['inspector', 'inspection'],
+        registrationOrder: 0,
       },
     ])
     expect(record?.contentViews).toEqual([
@@ -434,13 +457,14 @@ describe('plugin host', () => {
         title: 'Tutorial',
         entry: 'views/tutorial.html',
         entryUrl: 'https://plugins.example.com/monaco/views/tutorial.html',
-        companionPanel: 'inspector',
-        registrationOrder: 3,
+        companionPanels: ['outline', 'inspector', 'inspection'],
+        registrationOrder: 4,
       },
     ])
 
     config.setEntries([{ index: 0, manifest: MANIFEST_URL, enabled: false }])
     await waitForRecord(host, MANIFEST_URL, 'disabled')
+    expect(host.getSnapshot().records[0]?.registrations).toEqual([])
     expect(host.getSnapshot().records[0]?.panels).toEqual([])
     expect(host.getSnapshot().records[0]?.contentViews).toEqual([])
 

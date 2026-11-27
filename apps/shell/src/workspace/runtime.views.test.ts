@@ -27,8 +27,16 @@ function manifestFor(
   origin: string,
   id: string,
   kind: 'panel' | 'content',
-  companionPanel?: string,
+  companionPanels?: string | string[],
 ): PluginManifest {
+  const companions =
+    companionPanels === undefined
+      ? []
+      : Array.isArray(companionPanels)
+        ? companionPanels
+        : [companionPanels]
+  const companionLocation = (panelId: string) =>
+    panelId === 'outline' ? 'primary' : panelId === 'inspection' ? 'bottom' : 'secondary'
   const result = validateManifest(
     {
       schemaVersion: 1,
@@ -68,24 +76,22 @@ function manifestFor(
           : {}),
         ...(kind === 'content'
           ? {
-              ...(companionPanel === undefined
+              ...(companions.length === 0
                 ? {}
                 : {
-                    panels: [
-                      {
-                        id: companionPanel,
-                        title: 'Inspector',
-                        location: 'secondary',
-                        entry: 'views/inspector.html',
-                      },
-                    ],
+                    panels: companions.map((panelId) => ({
+                      id: panelId,
+                      title: panelId,
+                      location: companionLocation(panelId),
+                      entry: `views/${panelId}.html`,
+                    })),
                   }),
               contentViews: [
                 {
                   id: 'tutorial',
                   title: 'Tutorial',
                   entry: 'views/tutorial.html',
-                  ...(companionPanel === undefined ? {} : { companionPanel }),
+                  ...(companions.length === 0 ? {} : { companionPanels: companions }),
                 },
               ],
             }
@@ -458,8 +464,60 @@ describe('runtime view intents', () => {
       .getState()
       .tabs.find((entry) => (entry as { contentView?: unknown }).contentView)
     if (!tab) throw new Error('Content tab not found')
+    useWorkbenchStore.getState().closeTab(tab.id)
     runtime.closeTabs([tab])
     expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(false)
+    runtime.dispose()
+  })
+
+  it('reveals content-view companions in every region and hides them on a text tab', async () => {
+    const contentRecord = recordFor(
+      manifestFor(ORIGIN_B, 'com.example.other', 'content', ['outline', 'inspector', 'inspection']),
+      IDENTITY_B,
+      0,
+    )
+    const { runtime } = await createRuntime([contentRecord])
+    useWorkbenchStore.setState({
+      primarySideBarVisible: false,
+      secondarySideBarVisible: false,
+      bottomPanelVisible: false,
+    })
+
+    runtime.openContentView(IDENTITY_B, 'tutorial')
+    const state = useWorkbenchStore.getState()
+    expect(state.primarySideBarVisible).toBe(true)
+    expect(state.activePrimaryView).toBe(pluginViewId(IDENTITY_B, 'outline'))
+    expect(state.secondarySideBarVisible).toBe(true)
+    expect(state.activeSecondaryView).toBe(pluginViewId(IDENTITY_B, 'inspector'))
+    expect(state.bottomPanelVisible).toBe(true)
+    expect(state.activePanelView).toBe(pluginViewId(IDENTITY_B, 'inspection'))
+
+    openFileTab('/notes.txt')
+    runtime.setActiveTab('/notes.txt')
+    expect(useWorkbenchStore.getState().primarySideBarVisible).toBe(false)
+    expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(false)
+    expect(useWorkbenchStore.getState().bottomPanelVisible).toBe(false)
+    runtime.dispose()
+  })
+
+  it('skips an unregistered companion without blocking the content view', async () => {
+    const contentRecord = recordFor(
+      manifestFor(ORIGIN_B, 'com.example.other', 'content', 'inspector'),
+      IDENTITY_B,
+      0,
+    )
+    contentRecord.panels = []
+    const { runtime } = await createRuntime([contentRecord])
+    useWorkbenchStore.setState({ secondarySideBarVisible: false, activeSecondaryView: 'chat' })
+
+    runtime.openContentView(IDENTITY_B, 'tutorial')
+    expect(
+      useWorkbenchStore
+        .getState()
+        .tabs.some((tab) => (tab as { contentView?: unknown }).contentView),
+    ).toBe(true)
+    expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(false)
+    expect(useWorkbenchStore.getState().activeSecondaryView).toBe('chat')
     runtime.dispose()
   })
 
@@ -480,8 +538,10 @@ describe('runtime view intents', () => {
     expect(tabs).toHaveLength(2)
     expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(true)
 
+    useWorkbenchStore.getState().closeTab((tabs[0] as (typeof tabs)[number]).id)
     runtime.closeTabs([tabs[0] as (typeof tabs)[number]])
     expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(true)
+    useWorkbenchStore.getState().closeTab((tabs[1] as (typeof tabs)[number]).id)
     runtime.closeTabs([tabs[1] as (typeof tabs)[number]])
     expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(false)
     runtime.dispose()
@@ -600,12 +660,13 @@ describe('runtime view intents', () => {
     expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(false)
 
     const tab = useWorkbenchStore.getState().tabs.find((entry) => contentViewOf(entry))
-    const content = tab ? contentViewOf(tab) : undefined
-    if (!tab || !content) throw new Error('Content tab not found')
-    runtime.views.revealCompanion(content.key)
+    if (!tab) throw new Error('Content tab not found')
+    runtime.setActiveTab('/notes.txt')
+    runtime.setActiveTab(tab.id)
     expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(true)
     expect(useWorkbenchStore.getState().activeSecondaryView).toBe(companion)
 
+    useWorkbenchStore.getState().closeTab(tab.id)
     runtime.closeTabs([tab])
     expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(false)
     runtime.dispose()
@@ -626,6 +687,7 @@ describe('runtime view intents', () => {
       .getState()
       .tabs.find((entry) => (entry as { contentView?: unknown }).contentView)
     if (!tab) throw new Error('Content tab not found')
+    useWorkbenchStore.getState().closeTab(tab.id)
     runtime.closeTabs([tab])
     expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(true)
     expect(useWorkbenchStore.getState().activeSecondaryView).toBe('other-panel')

@@ -13,6 +13,7 @@ import {
   MANIFEST_MAX_NEW_FILE_TOTAL_BYTES,
   MANIFEST_NEW_FILE_ENCODINGS,
   MANIFEST_MAX_COMMAND_TITLE,
+  MANIFEST_MAX_COMPANIONS,
   MANIFEST_MAX_CONTENT_VIEWS,
   MANIFEST_MAX_EDITORS,
   MANIFEST_MAX_PANELS,
@@ -673,7 +674,7 @@ describe('manifest validation', () => {
         title: 'Tutorial',
         entry: 'views/tutorial.html',
         entryUrl: 'https://plugins.example.com/monaco/views/tutorial.html',
-        companionPanel: 'inspector',
+        companionPanels: ['inspector'],
       },
     ])
   })
@@ -773,6 +774,7 @@ describe('manifest validation', () => {
   it('validates content-view companion panels', () => {
     const panels = [
       { id: 'asset-params', title: 'Parameters', location: 'secondary', entry: 'params.html' },
+      { id: 'asset-extra', title: 'Extra', location: 'secondary', entry: 'extra.html' },
       { id: 'outline', title: 'Outline', location: 'primary', entry: 'outline.html' },
       { id: 'inspection', title: 'Inspection', location: 'bottom', entry: 'bottom.html' },
     ]
@@ -797,9 +799,9 @@ describe('manifest validation', () => {
     })
     expect(shared.ok).toBe(true)
     if (shared.ok) {
-      expect(shared.manifest.contentViews.map((view) => view.companionPanel)).toEqual([
-        'asset-params',
-        'asset-params',
+      expect(shared.manifest.contentViews.map((view) => view.companionPanels)).toEqual([
+        ['asset-params'],
+        ['asset-params'],
       ])
     }
 
@@ -811,7 +813,47 @@ describe('manifest validation', () => {
     })
     expect(withoutCompanion.ok).toBe(true)
     if (withoutCompanion.ok) {
-      expect(withoutCompanion.manifest.contentViews[0]?.companionPanel).toBeUndefined()
+      expect(withoutCompanion.manifest.contentViews[0]?.companionPanels).toBeUndefined()
+    }
+
+    const allLocations = validate({
+      contributes: {
+        panels,
+        contentViews: [
+          {
+            id: 'asset-preview',
+            title: 'Asset Preview',
+            entry: 'preview.html',
+            companionPanels: ['outline', 'asset-params', 'inspection'],
+          },
+        ],
+      },
+    })
+    expect(allLocations.ok).toBe(true)
+    if (allLocations.ok) {
+      expect(allLocations.manifest.contentViews[0]?.companionPanels).toEqual([
+        'outline',
+        'asset-params',
+        'inspection',
+      ])
+    }
+
+    const legacyAnyLocation = validate({
+      contributes: {
+        panels,
+        contentViews: [
+          {
+            id: 'asset-preview',
+            title: 'Asset Preview',
+            entry: 'preview.html',
+            companionPanel: 'inspection',
+          },
+        ],
+      },
+    })
+    expect(legacyAnyLocation.ok).toBe(true)
+    if (legacyAnyLocation.ok) {
+      expect(legacyAnyLocation.manifest.contentViews[0]?.companionPanels).toEqual(['inspection'])
     }
 
     const cases: Array<[Record<string, unknown>, string, string | undefined]> = [
@@ -831,19 +873,60 @@ describe('manifest validation', () => {
           title: 'Asset Preview',
           entry: 'preview.html',
           companionPanel: 'outline',
+          companionPanels: ['outline'],
         },
-        '/contributes/contentViews/0/companionPanel',
-        'A companionPanel must name a secondary panel.',
+        '/contributes/contentViews/0/companionPanels',
+        'Use either companionPanel or companionPanels, not both.',
       ],
       [
         {
           id: 'asset-preview',
           title: 'Asset Preview',
           entry: 'preview.html',
-          companionPanel: 'inspection',
+          companionPanels: [],
         },
-        '/contributes/contentViews/0/companionPanel',
-        'A companionPanel must name a secondary panel.',
+        '/contributes/contentViews/0/companionPanels',
+        undefined,
+      ],
+      [
+        {
+          id: 'asset-preview',
+          title: 'Asset Preview',
+          entry: 'preview.html',
+          companionPanels: ['asset-params', 'asset-params'],
+        },
+        '/contributes/contentViews/0/companionPanels/1',
+        'A companion panel may be listed only once.',
+      ],
+      [
+        {
+          id: 'asset-preview',
+          title: 'Asset Preview',
+          entry: 'preview.html',
+          companionPanels: ['asset-params', 'asset-extra'],
+        },
+        '/contributes/contentViews/0/companionPanels/1',
+        'A contribution may bind at most one companion panel per location.',
+      ],
+      [
+        {
+          id: 'asset-preview',
+          title: 'Asset Preview',
+          entry: 'preview.html',
+          companionPanels: ['outline', 'asset-params', 'inspection', 'missing'],
+        },
+        '/contributes/contentViews/0/companionPanels',
+        undefined,
+      ],
+      [
+        {
+          id: 'asset-preview',
+          title: 'Asset Preview',
+          entry: 'preview.html',
+          companionPanels: ['missing'],
+        },
+        '/contributes/contentViews/0/companionPanels/0',
+        'A companion panel must name a panel declared in the same manifest.',
       ],
       [
         {
@@ -873,6 +956,74 @@ describe('manifest validation', () => {
         ...(message === undefined ? {} : { message }),
       })
     }
+  })
+
+  it('validates file-editor companion panels', () => {
+    const panels = [
+      { id: 'asset-params', title: 'Parameters', location: 'secondary', entry: 'params.html' },
+      { id: 'asset-extra', title: 'Extra', location: 'secondary', entry: 'extra.html' },
+      { id: 'outline', title: 'Outline', location: 'primary', entry: 'outline.html' },
+      { id: 'inspection', title: 'Inspection', location: 'bottom', entry: 'bottom.html' },
+    ]
+    const editor = {
+      glob: '**/*.txt',
+      entry: 'editors/text.html',
+      label: 'Text',
+    }
+    const valid = validate({
+      contributes: {
+        panels,
+        fileEditors: [{ ...editor, companionPanels: ['outline', 'asset-params', 'inspection'] }],
+      },
+    })
+    expect(valid.ok).toBe(true)
+    if (valid.ok) {
+      expect(valid.manifest.fileEditors[0]?.companionPanels).toEqual([
+        'outline',
+        'asset-params',
+        'inspection',
+      ])
+    }
+
+    const cases: Array<[Record<string, unknown>, string, string | undefined]> = [
+      [
+        { ...editor, companionPanel: 'outline' },
+        '/contributes/fileEditors/0/companionPanel',
+        undefined,
+      ],
+      [{ ...editor, companionPanels: [] }, '/contributes/fileEditors/0/companionPanels', undefined],
+      [
+        { ...editor, companionPanels: ['outline', 'outline'] },
+        '/contributes/fileEditors/0/companionPanels/1',
+        'A companion panel may be listed only once.',
+      ],
+      [
+        { ...editor, companionPanels: ['asset-params', 'asset-extra'] },
+        '/contributes/fileEditors/0/companionPanels/1',
+        'A contribution may bind at most one companion panel per location.',
+      ],
+      [
+        { ...editor, companionPanels: ['missing'] },
+        '/contributes/fileEditors/0/companionPanels/0',
+        'A companion panel must name a panel declared in the same manifest.',
+      ],
+      [
+        {
+          ...editor,
+          companionPanels: ['outline', 'asset-params', 'inspection', 'missing'],
+        },
+        '/contributes/fileEditors/0/companionPanels',
+        undefined,
+      ],
+    ]
+    for (const [entry, field, message] of cases) {
+      expect(errorOf(validate({ contributes: { panels, fileEditors: [entry] } }))).toMatchObject({
+        code: 'invalid-manifest',
+        field,
+        ...(message === undefined ? {} : { message }),
+      })
+    }
+    expect(MANIFEST_MAX_COMPANIONS).toBe(3)
   })
 
   it('accepts the author-guide companion example', () => {
@@ -906,7 +1057,7 @@ describe('manifest validation', () => {
     })
     expect(result.ok).toBe(true)
     if (result.ok) {
-      expect(result.manifest.contentViews[0]?.companionPanel).toBe('asset-params')
+      expect(result.manifest.contentViews[0]?.companionPanels).toEqual(['asset-params'])
     }
   })
 
@@ -1338,7 +1489,14 @@ interface SchemaDefs {
       title: { minLength: number; maxLength: number }
       entry: { $ref: string }
       companionPanel: { $ref: string }
+      companionPanels: { $ref: string }
     }
+  }
+  companionPanels: {
+    minItems: number
+    maxItems: number
+    uniqueItems: boolean
+    items: { $ref: string }
   }
   contributionId: { minLength: number; maxLength: number; pattern: string }
   configuration: {
@@ -1374,6 +1532,7 @@ interface SchemaDefs {
       label: { maxLength: number }
       priority: { minimum: number; maximum: number; default: number }
       rendering: { enum: string[]; default: string }
+      companionPanels: { $ref: string }
     }
   }
   glob: { maxLength: number; pattern: string }
@@ -1438,6 +1597,12 @@ describe('manifest schema parity', () => {
     expect(defs.contentView.required).toEqual(['id', 'title', 'entry'])
     expect(defs.contentView.properties.id.$ref).toBe('#/$defs/contributionId')
     expect(defs.contentView.properties.companionPanel.$ref).toBe('#/$defs/contributionId')
+    expect(defs.contentView.properties.companionPanels.$ref).toBe('#/$defs/companionPanels')
+    expect(defs.fileEditor.properties.companionPanels.$ref).toBe('#/$defs/companionPanels')
+    expect(defs.companionPanels.minItems).toBe(1)
+    expect(defs.companionPanels.maxItems).toBe(MANIFEST_MAX_COMPANIONS)
+    expect(defs.companionPanels.uniqueItems).toBe(true)
+    expect(defs.companionPanels.items.$ref).toBe('#/$defs/contributionId')
     expect(defs.contributionId.pattern).toBe(MANIFEST_CONTRIBUTION_ID_PATTERN)
     expect(defs.configuration.additionalProperties).toBe(false)
     expect(defs.configuration.required).toEqual(['properties'])

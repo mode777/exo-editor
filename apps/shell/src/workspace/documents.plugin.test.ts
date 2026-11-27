@@ -149,6 +149,15 @@ describe('plugin-backed documents', () => {
     expect(document?.editor).toMatchObject({ rendering: 'frame' })
   })
 
+  it('carries companion panels from the matched contribution', async () => {
+    const { store, editors } = await setup()
+    editors.list = [candidate({ companionPanels: ['outline', 'inspection'] })]
+    const document = await store.open('/a.txt')
+    expect(document?.editor).toMatchObject({
+      companionPanels: ['outline', 'inspection'],
+    })
+  })
+
   it('starts the normal save from an active dirty plugin intent', async () => {
     const { store, editors } = await setup()
     await store.open('/a.txt')

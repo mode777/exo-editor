@@ -3,6 +3,42 @@
 All notable changes to Exo Editor are recorded here. The version axes and the
 release process are in [`docs/releases.md`](./docs/releases.md).
 
+## [0.11.0] - 2026-11-27
+
+Additive post-release update: surface companion panels.
+
+### Added
+
+- `contributes.fileEditors[].companionPanels` and
+  `contributes.contentViews[].companionPanels` accept one to three panel ids.
+  A contribution may bind at most one panel per `primary`, `secondary` and
+  `bottom` location, and a panel may be shared by several contributions.
+- The shell reveals a content view's companions when the view opens or its tab
+  is active, and a file editor's companions only after its tab is active and its
+  handler has completed the handshake. It hides each companion when the active
+  surface does not declare it, when the handler clears or the last content view
+  closes, and keeps panels shared by the old and new surface visible.
+- `companionPanel` remains a one-panel compatibility alias on content views; it
+  cannot be combined with `companionPanels`. The shell normalizes both forms.
+- The deployed fixture adds **Fixture Gallery** with companions in all three
+  regions and a `**/*.companion.txt` editor with its own three companions.
+- A manifest that uses `companionPanels` or binds a companion to a primary or
+  bottom panel must declare `engines.exo` at or above `0.11.0`.
+
+### Compatibility
+
+- Shell: `0.11.0`
+- Protocol: `1`
+- Manifest schema: `1`
+- SDK: `1.10.0`
+
+### Breaking
+
+- None for existing plugins. `companionPanel` on a secondary content-view panel
+  keeps its behavior, and older shells report `incompatible-engine` for a
+  manifest that uses the new field or location. No protocol message, shell event,
+  SDK API or consent fingerprint input changes.
+
 ## [0.10.0] - 2026-11-24
 
 Additive post-release update: editor-bound panels and a bottom panel location.

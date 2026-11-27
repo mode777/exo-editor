@@ -15,11 +15,11 @@ describe('deployed plugin fixture', () => {
     const result = validateManifest(
       JSON.parse(raw) as unknown,
       'https://mode777.github.io/exo-editor/plugin-host-fixture/exo-manifest.json',
-      '0.10.0',
+      '0.11.0',
     )
     expect(result.ok).toBe(true)
     if (!result.ok) return
-    expect(result.manifest.fileEditors).toHaveLength(10)
+    expect(result.manifest.fileEditors).toHaveLength(11)
     expect(result.manifest.configuration?.properties).toMatchObject({
       'fixture.greeting': { type: 'string', default: 'hello from fixture' },
       'fixture.repeat': { type: 'boolean', default: false },
@@ -44,9 +44,19 @@ describe('deployed plugin fixture', () => {
     expect(result.manifest.contentViews.map((view) => view.id)).toEqual([
       'fixture-tutorial',
       'fixture-generator',
+      'fixture-gallery',
     ])
-    expect(result.manifest.contentViews[0]?.companionPanel).toBe('fixture-inspector')
-    expect(result.manifest.contentViews[1]?.companionPanel).toBeUndefined()
+    expect(result.manifest.contentViews[0]?.companionPanels).toEqual(['fixture-inspector'])
+    expect(result.manifest.contentViews[1]?.companionPanels).toBeUndefined()
+    expect(result.manifest.contentViews[2]?.companionPanels).toEqual([
+      'fixture-panel',
+      'fixture-inspector',
+      'fixture-inspection',
+    ])
+    expect(
+      result.manifest.fileEditors.find((editor) => editor.glob === '**/*.companion.txt')
+        ?.companionPanels,
+    ).toEqual(['fixture-panel', 'fixture-inspector-2', 'fixture-inspection'])
     expect(result.manifest.newFiles.map((template) => template.id)).toEqual([
       'fixture.text',
       'fixture.binary',

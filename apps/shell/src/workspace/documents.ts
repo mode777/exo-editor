@@ -32,6 +32,8 @@ export interface DocumentEditor {
   entryUrl: string
   /** `frame` displays the handler in the document area; `hidden` is headless. */
   rendering: 'hidden' | 'frame'
+  /** Panels declared by the matched contribution and revealed while this editor is active. */
+  companionPanels?: string[]
   /** `workspace:write` declared and the workspace session is writable. */
   canWrite: boolean
 }
@@ -565,6 +567,9 @@ export class DocumentStore {
                 label: candidate.label,
                 entryUrl: candidate.entryUrl,
                 rendering: candidate.rendering ?? 'hidden',
+                ...(candidate.companionPanels === undefined
+                  ? {}
+                  : { companionPanels: [...candidate.companionPanels] }),
                 canWrite,
               },
               pluginPhase: 'mounting',

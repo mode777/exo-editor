@@ -4,12 +4,13 @@ import { WorkspaceRuntime } from './runtime'
 import { MemoryWorkspaceProvider } from './providers/memory'
 import { MemoryHandleStore } from './providers/folder/handle-store'
 import type { DocumentState } from './documents'
-import type { PluginHost, PluginHostRecord } from '../plugins/host'
+import type { PluginHost, PluginHostRecord, ViewLifecycle } from '../plugins/host'
 import { EventBus } from '../plugins/events'
 import { HandlerPool } from '../plugins/handlers'
 import { FakeFrameTransport } from '../plugins/frame-test-support'
 import { validateManifest } from '../plugins/manifest'
 import { clearWorkspaceTabs, configurePresetStore } from '../workbench/tabs'
+import { pluginViewId } from '../workbench/plugin-views'
 
 const ORIGIN_A = 'https://plugins.example.com'
 const ORIGIN_B = 'https://other.example.com'
@@ -52,6 +53,19 @@ function recordFor(origin: string, id: string): PluginHostRecord {
   }
 }
 
+function recordWithPanels(origin: string, id: string, panelIds: string[]): PluginHostRecord {
+  const record = recordFor(origin, id)
+  record.panels = panelIds.map((panelId, order) => ({
+    id: panelId,
+    title: panelId,
+    location: panelId === 'outline' ? 'primary' : panelId === 'inspection' ? 'bottom' : 'secondary',
+    entry: `views/${panelId}.html`,
+    entryUrl: `${origin}/${id}/views/${panelId}.html`,
+    registrationOrder: order,
+  }))
+  return record
+}
+
 function hostStub(records: PluginHostRecord[]): PluginHost {
   const value = { phase: 'ready' as const, records, consentRequest: null, log: [], revision: 1 }
   return {
@@ -91,6 +105,7 @@ function documentFor(path: string, overrides: Partial<DocumentState> = {}): Docu
       label: 'Code',
       entryUrl: `${ORIGIN_A}/viewer/editor.html`,
       rendering: 'frame',
+      companionPanels: ['outline', 'inspector', 'inspection'],
       canWrite: true,
     },
     pluginPhase: 'active',
@@ -123,8 +138,8 @@ async function createRuntime() {
     eventTarget: new EventTarget(),
     now: () => 1,
     pluginHost: hostStub([
-      recordFor(ORIGIN_A, 'com.example.viewer'),
-      recordFor(ORIGIN_B, 'com.example.other'),
+      recordWithPanels(ORIGIN_A, 'com.example.viewer', ['outline', 'inspector', 'inspection']),
+      recordWithPanels(ORIGIN_B, 'com.example.other', ['inspector']),
     ]),
     handlerPool,
     viewTransport: new FakeFrameTransport(),
@@ -340,6 +355,187 @@ describe('runtime active editor context', () => {
       payload: { pluginId: 'com.example.viewer', active: false },
       target: IDENTITY_A,
     })
+    runtime.dispose()
+  })
+
+  it('reveals editor companions in every region only after the handler is active', async () => {
+    const runtime = await createRuntime()
+    const documents = vi.spyOn(runtime.documents, 'get')
+    const handlers = vi.spyOn(runtime.handlers, 'get')
+    useWorkbenchStore.setState({
+      tabs: [fileTab('/a.txt')],
+      activeTabId: '/a.txt',
+      primarySideBarVisible: false,
+      secondarySideBarVisible: false,
+      bottomPanelVisible: false,
+    })
+
+    documents.mockReturnValue(documentFor('/a.txt', { pluginPhase: 'mounting' }))
+    handlers.mockReturnValue(handler('editor-1'))
+    runtime.setActiveTab('/a.txt')
+    expect(useWorkbenchStore.getState().primarySideBarVisible).toBe(false)
+    expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(false)
+    expect(useWorkbenchStore.getState().bottomPanelVisible).toBe(false)
+
+    documents.mockReturnValue(documentFor('/a.txt'))
+    runtime.setActiveTab('/a.txt')
+    expect(useWorkbenchStore.getState().primarySideBarVisible).toBe(true)
+    expect(useWorkbenchStore.getState().activePrimaryView).toBe(pluginViewId(IDENTITY_A, 'outline'))
+    expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(true)
+    expect(useWorkbenchStore.getState().activeSecondaryView).toBe(
+      pluginViewId(IDENTITY_A, 'inspector'),
+    )
+    expect(useWorkbenchStore.getState().bottomPanelVisible).toBe(true)
+    expect(useWorkbenchStore.getState().activePanelView).toBe(
+      pluginViewId(IDENTITY_A, 'inspection'),
+    )
+    runtime.dispose()
+  })
+
+  it('hides editor companions when the handler clears or the tab is not the editor', async () => {
+    const runtime = await createRuntime()
+    const documents = vi.spyOn(runtime.documents, 'get')
+    const handlers = vi.spyOn(runtime.handlers, 'get')
+    useWorkbenchStore.setState({
+      tabs: [fileTab('/a.txt')],
+      activeTabId: '/a.txt',
+      secondarySideBarVisible: false,
+      bottomPanelVisible: false,
+    })
+    documents.mockReturnValue(documentFor('/a.txt'))
+    handlers.mockReturnValue(handler('editor-1'))
+    runtime.setActiveTab('/a.txt')
+    expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(true)
+
+    documents.mockReturnValue(documentFor('/a.txt', { pluginPhase: 'failed' }))
+    runtime.setActiveTab('/a.txt')
+    expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(false)
+    expect(useWorkbenchStore.getState().bottomPanelVisible).toBe(false)
+
+    documents.mockReturnValue(
+      documentFor('/plain.md', { surface: 'text', editor: undefined, pluginPhase: undefined }),
+    )
+    useWorkbenchStore.setState({ tabs: [fileTab('/plain.md')], activeTabId: '/plain.md' })
+    runtime.setActiveTab('/plain.md')
+    expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(false)
+    runtime.dispose()
+  })
+
+  it('keeps shared editor companions and diffs a different contribution', async () => {
+    const runtime = await createRuntime()
+    const documents = vi.spyOn(runtime.documents, 'get')
+    const handlers = vi.spyOn(runtime.handlers, 'get')
+    useWorkbenchStore.setState({
+      tabs: [fileTab('/a.txt')],
+      activeTabId: '/a.txt',
+      primarySideBarVisible: false,
+      secondarySideBarVisible: false,
+      bottomPanelVisible: false,
+    })
+    documents.mockImplementation((path) =>
+      path === '/b.txt' ? documentFor('/b.txt') : documentFor('/a.txt'),
+    )
+    handlers.mockReturnValue(handler('editor-1'))
+    runtime.setActiveTab('/a.txt')
+    expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(true)
+    expect(useWorkbenchStore.getState().bottomPanelVisible).toBe(true)
+
+    useWorkbenchStore.setState({ tabs: [fileTab('/b.txt')], activeTabId: '/b.txt' })
+    runtime.setActiveTab('/b.txt')
+    expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(true)
+    expect(useWorkbenchStore.getState().bottomPanelVisible).toBe(true)
+
+    const editor = documentFor('/c.txt').editor
+    if (!editor) throw new Error('Editor fixture missing')
+    documents.mockReturnValue(
+      documentFor('/c.txt', {
+        editor: { ...editor, companionPanels: ['inspector'] },
+      }),
+    )
+    useWorkbenchStore.setState({ tabs: [fileTab('/c.txt')], activeTabId: '/c.txt' })
+    runtime.setActiveTab('/c.txt')
+    expect(useWorkbenchStore.getState().primarySideBarVisible).toBe(false)
+    expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(true)
+    expect(useWorkbenchStore.getState().bottomPanelVisible).toBe(false)
+    runtime.dispose()
+  })
+
+  it('keeps a manual editor companion hide until refocus', async () => {
+    const runtime = await createRuntime()
+    const documents = vi.spyOn(runtime.documents, 'get')
+    const handlers = vi.spyOn(runtime.handlers, 'get')
+    useWorkbenchStore.setState({
+      tabs: [fileTab('/a.txt')],
+      activeTabId: '/a.txt',
+      secondarySideBarVisible: false,
+    })
+    documents.mockReturnValue(documentFor('/a.txt'))
+    handlers.mockReturnValue(handler('editor-1'))
+    runtime.setActiveTab('/a.txt')
+    useWorkbenchStore.getState().toggleSecondarySideBar(pluginViewId(IDENTITY_A, 'inspector'))
+    expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(false)
+
+    runtime.setActiveTab('/a.txt')
+    expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(false)
+
+    documents.mockReturnValue(
+      documentFor('/plain.md', { surface: 'text', editor: undefined, pluginPhase: undefined }),
+    )
+    useWorkbenchStore.setState({ tabs: [fileTab('/plain.md')], activeTabId: '/plain.md' })
+    runtime.setActiveTab('/plain.md')
+    documents.mockReturnValue(documentFor('/a.txt'))
+    useWorkbenchStore.setState({ tabs: [fileTab('/a.txt')], activeTabId: '/a.txt' })
+    runtime.setActiveTab('/a.txt')
+    expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(true)
+    runtime.dispose()
+  })
+
+  it('does not move focus when an editor companion reveals', async () => {
+    const runtime = await createRuntime()
+    const documents = vi.spyOn(runtime.documents, 'get')
+    const handlers = vi.spyOn(runtime.handlers, 'get')
+    const button = document.createElement('button')
+    document.body.appendChild(button)
+    button.focus()
+    useWorkbenchStore.setState({
+      tabs: [fileTab('/a.txt')],
+      activeTabId: '/a.txt',
+      secondarySideBarVisible: false,
+    })
+    documents.mockReturnValue(documentFor('/a.txt'))
+    handlers.mockReturnValue(handler('editor-1'))
+    runtime.setActiveTab('/a.txt')
+    expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(true)
+    expect(document.activeElement).toBe(button)
+    runtime.dispose()
+  })
+
+  it('hides editor companions on plugin removal and workspace switch', async () => {
+    const runtime = await createRuntime()
+    const documents = vi.spyOn(runtime.documents, 'get')
+    const handlers = vi.spyOn(runtime.handlers, 'get')
+    useWorkbenchStore.setState({
+      tabs: [fileTab('/a.txt')],
+      activeTabId: '/a.txt',
+      secondarySideBarVisible: false,
+      bottomPanelVisible: false,
+    })
+    documents.mockReturnValue(documentFor('/a.txt'))
+    handlers.mockReturnValue(handler('editor-1'))
+    runtime.setActiveTab('/a.txt')
+    expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(true)
+
+    const lifecycle = (
+      runtime.pluginHost.setViewLifecycle as unknown as {
+        mock: { calls: Array<[ViewLifecycle]> }
+      }
+    ).mock.calls[0]?.[0]
+    lifecycle?.closeFor(IDENTITY_A, 'plugin-removed')
+    expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(false)
+    expect(useWorkbenchStore.getState().bottomPanelVisible).toBe(false)
+
+    await runtime.openFolder()
+    expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(false)
     runtime.dispose()
   })
 })

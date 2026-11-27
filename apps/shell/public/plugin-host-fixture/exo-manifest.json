@@ -2,13 +2,13 @@
   "schemaVersion": 1,
   "id": "com.example.exo.fixture",
   "name": "Exo Host Fixture",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "A stub plugin used to verify the Exo plugin host and file editors.",
   "publisher": {
     "name": "Exo"
   },
   "engines": {
-    "exo": ">=0.10.0"
+    "exo": ">=0.11.0"
   },
   "runtime": {
     "entry": "plugin.html"
@@ -56,6 +56,12 @@
         "id": "fixture-generator",
         "title": "Fixture Generator",
         "entry": "view-content.html"
+      },
+      {
+        "id": "fixture-gallery",
+        "title": "Fixture Gallery",
+        "entry": "view-content.html",
+        "companionPanels": ["fixture-panel", "fixture-inspector", "fixture-inspection"]
       }
     ],
     "newFiles": [
@@ -139,6 +145,14 @@
         "label": "Fixture Bound Editor",
         "priority": 70,
         "rendering": "frame"
+      },
+      {
+        "glob": "**/*.companion.txt",
+        "entry": "editor-bound.html",
+        "label": "Fixture Companion Editor",
+        "priority": 75,
+        "rendering": "frame",
+        "companionPanels": ["fixture-panel", "fixture-inspector-2", "fixture-inspection"]
       },
       {
         "glob": "**/*.local.txt",

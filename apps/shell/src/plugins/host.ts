@@ -157,9 +157,17 @@ function errorMessage(issue: {
 function cloneManifest(manifest: PluginManifest): PluginManifest {
   return {
     ...manifest,
-    fileEditors: manifest.fileEditors.map((editor) => ({ ...editor })),
+    fileEditors: manifest.fileEditors.map((editor) => ({
+      ...editor,
+      ...(editor.companionPanels === undefined
+        ? {}
+        : { companionPanels: [...editor.companionPanels] }),
+    })),
     panels: manifest.panels.map((panel) => ({ ...panel })),
-    contentViews: manifest.contentViews.map((view) => ({ ...view })),
+    contentViews: manifest.contentViews.map((view) => ({
+      ...view,
+      ...(view.companionPanels === undefined ? {} : { companionPanels: [...view.companionPanels] }),
+    })),
     commands: manifest.commands.map((command) => ({
       ...command,
       ...(command.target === 'activeEditor' ? {} : { target: { ...command.target } }),

@@ -62,7 +62,13 @@ active, and `0.9.0` adds the active content-view context and `view/active`
 `2026-11-24-editor-bound-panels`) adds the `bottom`
 panel location, `activeEditor`, `editor.instanceId`, the targeted `editor/active`
 topic and SDK `1.10.0`; shell `0.10.0`, protocol `1` and manifest schema `1`.
-The parallel Stratofold provider track
+The post-layer-10 change `surface-companion-panels` adds
+`contributes.fileEditors[].companionPanels` and
+`contributes.contentViews[].companionPanels`, with one panel per region and the
+legacy `companionPanel` alias normalized to the same list. The shell derives
+visibility from the active content view or active file-editor handler and sends
+no new message or event; shell `0.11.0`, protocol `1`, manifest schema `1` and
+SDK `1.10.0`. The parallel Stratofold provider track
 (P1-P3) is archived and verified; it does not gate the numbered layers. The
 contracts are ratified, and the shell app (`apps/shell`) builds, tests and
 deploys to GitHub Pages through CI. Do not scaffold code ahead of the [roadmap](./ROADMAP.md) layer

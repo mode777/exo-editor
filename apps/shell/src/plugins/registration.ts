@@ -53,6 +53,8 @@ export interface RegisteredEditor {
   priority: number
   /** From the manifest contribution; not part of `plugin/register`. */
   rendering?: ManifestFileEditor['rendering']
+  /** From the manifest contribution; not part of `plugin/register`. */
+  companionPanels?: string[]
   /** Arrival order within this plugin, starting at zero. */
   registrationOrder: number
 }
@@ -593,6 +595,9 @@ export class RegistrationSession {
       label,
       priority: declared.priority,
       rendering: declared.rendering,
+      ...(declared.companionPanels === undefined
+        ? {}
+        : { companionPanels: [...declared.companionPanels] }),
     }
   }
 

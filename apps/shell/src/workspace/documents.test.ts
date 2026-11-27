@@ -37,6 +37,7 @@ describe('document open pipeline', () => {
 
     expect(document).toMatchObject({ status: 'ready', text: content, size: content.length })
     expect(document?.dirty).toBe(false)
+    expect(document?.editor).toBeUndefined()
   })
 
   it('shows no editor for binary content', async () => {

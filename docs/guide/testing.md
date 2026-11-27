@@ -112,6 +112,10 @@ and [`docs/contracts/plugin-manifest.md`](../contracts/plugin-manifest.md).
 - [ ] The plugin does not touch storage in same-origin mode.
 - [ ] A bottom panel mounts only when its tab is active, and an editor-bound
       panel follows `editor/active` without receiving a save or write method.
+- [ ] A declared companion reveals on the active tab (after the handler is
+      active for a file editor), hides when another surface becomes active, and
+      stays hidden after a manual hide until the surface is opened or focused
+      again. Reopen the surface and confirm the same frame returns.
 - [ ] The plugin has no `postMessage`, envelope or handshake code outside the
       SDK.
 - [ ] The deployed manifest URL works from the deployed shell.

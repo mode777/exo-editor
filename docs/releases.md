@@ -10,7 +10,7 @@ replace the contracts; the normative version rules are in
 
 | Axis              | Current | Where it lives                                                         | Meaning                                                                      |
 | ----------------- | ------- | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| Shell SemVer      | `0.10.0` | `apps/shell/package.json`, `SHELL_VERSION`, advertised in `shell/init` | The deployed shell release; independent of the protocol major                |
+| Shell SemVer      | `0.11.0` | `apps/shell/package.json`, `SHELL_VERSION`, advertised in `shell/init` | The deployed shell release; independent of the protocol major                |
 | Protocol major    | `1`     | Envelope `exo: 1`, `PROTOCOL_VERSION`, handshake                       | The wire compatibility axis; the shell accepts exactly one major per release |
 | Manifest schema   | `1`     | `manifest.schemaVersion` / `exo.json` `schemaVersion`                  | The manifest shape; a new version needs a validator and a consent re-prompt  |
 | SDK SemVer        | `1.10.0` | `packages/plugin-sdk/package.json`                                     | The client package; its MAJOR equals the protocol major it speaks            |
@@ -24,8 +24,10 @@ SDK version answers "which client API is this".
 ## Current release
 
 The first public release is shell `0.1.0`, protocol `1`, manifest schema `1`,
-SDK `1.1.0`, dated 2026-11-16. The current shell is `0.10.0`, protocol `1`,
-manifest schema `1` and SDK `1.10.0`, dated 2026-11-24; `0.10.0` adds editor-bound
+SDK `1.1.0`, dated 2026-11-16. The current shell is `0.11.0`, protocol `1`,
+manifest schema `1` and SDK `1.10.0`, dated 2026-11-27; `0.11.0` adds surface
+companion panels for file editors and content views across all three regions,
+`0.10.0` adds editor-bound
 panels and the bottom panel location, `0.9.0` exposes the active content-view tab
 in `shell/init` and the targeted `view/active` topic,
 `0.8.3` makes a content-view companion follow the active tab, `0.8.2` reattaches

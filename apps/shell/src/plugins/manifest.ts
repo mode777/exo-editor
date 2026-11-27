@@ -14,6 +14,7 @@ export const MANIFEST_TIMEOUT_MS = 5000
 export const MANIFEST_MAX_EDITORS = 20
 export const MANIFEST_MAX_PANELS = 8
 export const MANIFEST_MAX_CONTENT_VIEWS = 16
+export const MANIFEST_MAX_COMPANIONS = 3
 export const MANIFEST_MAX_COMMANDS = 32
 export const MANIFEST_MAX_NEW_FILES = 20
 export const MANIFEST_MAX_NEW_FILE_BYTES = 64 * 1024
@@ -133,6 +134,8 @@ export interface ManifestFileEditor {
   priority: number
   /** Whether the handler frame is displayed in the document area. Absent = hidden. */
   rendering?: ManifestRendering
+  /** Panels revealed while this editor's tab and handler are active. */
+  companionPanels?: string[]
 }
 
 export interface ManifestPanel {
@@ -153,8 +156,8 @@ export interface ManifestContentView {
   entry: string
   /** Resolved absolute page URL. */
   entryUrl: string
-  /** Secondary panel declared in the same manifest and revealed with this view. */
-  companionPanel?: string
+  /** Panels declared in the same manifest and revealed with this view. */
+  companionPanels?: string[]
 }
 
 export interface ManifestSetting {
@@ -427,11 +430,56 @@ function parsePermissions(value: unknown): PluginPermission[] | ManifestIssue {
   return permissions
 }
 
+/**
+ * Validate a companion list against the panels declared in the same manifest.
+ * A region can show one view, so a contribution binds at most one panel there.
+ */
+function parseCompanionPanels(
+  value: unknown,
+  base: string,
+  panels: ManifestPanel[],
+): string[] | ManifestIssue {
+  if (!Array.isArray(value) || value.length < 1 || value.length > MANIFEST_MAX_COMPANIONS) {
+    return issue('invalid-manifest', { field: base })
+  }
+  const ids: string[] = []
+  const locations = new Set<ManifestPanelLocation>()
+  for (let index = 0; index < value.length; index += 1) {
+    const raw = value[index]
+    if (typeof raw !== 'string' || !CONTRIBUTION_ID.test(raw)) {
+      return issue('invalid-manifest', { field: `${base}/${index}` })
+    }
+    if (ids.includes(raw)) {
+      return issue('invalid-manifest', {
+        field: `${base}/${index}`,
+        message: 'A companion panel may be listed only once.',
+      })
+    }
+    const panel = panels.find((entry) => entry.id === raw)
+    if (!panel) {
+      return issue('invalid-manifest', {
+        field: `${base}/${index}`,
+        message: 'A companion panel must name a panel declared in the same manifest.',
+      })
+    }
+    if (locations.has(panel.location)) {
+      return issue('invalid-manifest', {
+        field: `${base}/${index}`,
+        message: 'A contribution may bind at most one companion panel per location.',
+      })
+    }
+    ids.push(raw)
+    locations.add(panel.location)
+  }
+  return ids
+}
+
 function parseFileEditors(
   value: unknown,
   manifestUrl: string,
   manifestOrigin: string,
   pluginRoot: string,
+  panels: ManifestPanel[],
 ): ManifestFileEditor[] | ManifestIssue {
   if (!Array.isArray(value) || value.length > MANIFEST_MAX_EDITORS) {
     return issue('invalid-manifest', { field: '/contributes/fileEditors' })
@@ -444,7 +492,11 @@ function parseFileEditors(
     if (!isPlainObject(raw)) {
       return issue('invalid-manifest', { field: base })
     }
-    const unknown = unknownKeys(raw, ['glob', 'entry', 'label', 'priority', 'rendering'], base)
+    const unknown = unknownKeys(
+      raw,
+      ['glob', 'entry', 'label', 'priority', 'rendering', 'companionPanels'],
+      base,
+    )
     if (unknown) return unknown
     if (!hasOwn(raw, 'glob') || typeof raw.glob !== 'string') {
       return issue('invalid-manifest', { field: `${base}/glob` })
@@ -495,6 +547,12 @@ function parseFileEditors(
       }
       rendering = raw.rendering as ManifestRendering
     }
+    let companionPanels: string[] | undefined
+    if (hasOwn(raw, 'companionPanels')) {
+      const parsed = parseCompanionPanels(raw.companionPanels, `${base}/companionPanels`, panels)
+      if (!Array.isArray(parsed)) return parsed
+      companionPanels = parsed
+    }
     editors.push({
       glob: raw.glob,
       entry: raw.entry as string,
@@ -502,6 +560,7 @@ function parseFileEditors(
       label: raw.label,
       priority,
       rendering,
+      ...(companionPanels === undefined ? {} : { companionPanels }),
     })
   }
   return editors
@@ -589,7 +648,11 @@ function parseContentViews(
     const raw = value[index]
     const base = pointer('contributes', 'contentViews', index)
     if (!isPlainObject(raw)) return issue('invalid-manifest', { field: base })
-    const unknown = unknownKeys(raw, ['id', 'title', 'entry', 'companionPanel'], base)
+    const unknown = unknownKeys(
+      raw,
+      ['id', 'title', 'entry', 'companionPanel', 'companionPanels'],
+      base,
+    )
     if (unknown) return unknown
     if (typeof raw.id !== 'string' || !CONTRIBUTION_ID.test(raw.id)) {
       return issue('invalid-manifest', { field: `${base}/id` })
@@ -604,8 +667,18 @@ function parseContentViews(
     if (!isStringInRange(raw.title, 1, MANIFEST_MAX_VIEW_TITLE)) {
       return issue('invalid-manifest', { field: `${base}/title` })
     }
-    let companionPanel: string | undefined
-    if (hasOwn(raw, 'companionPanel')) {
+    if (hasOwn(raw, 'companionPanel') && hasOwn(raw, 'companionPanels')) {
+      return issue('invalid-manifest', {
+        field: `${base}/companionPanels`,
+        message: 'Use either companionPanel or companionPanels, not both.',
+      })
+    }
+    let companionPanels: string[] | undefined
+    if (hasOwn(raw, 'companionPanels')) {
+      const parsed = parseCompanionPanels(raw.companionPanels, `${base}/companionPanels`, panels)
+      if (!Array.isArray(parsed)) return parsed
+      companionPanels = parsed
+    } else if (hasOwn(raw, 'companionPanel')) {
       if (typeof raw.companionPanel !== 'string' || !CONTRIBUTION_ID.test(raw.companionPanel)) {
         return issue('invalid-manifest', { field: `${base}/companionPanel` })
       }
@@ -616,13 +689,7 @@ function parseContentViews(
           message: 'A companionPanel must name a panel declared in the same manifest.',
         })
       }
-      if (panel.location !== 'secondary') {
-        return issue('invalid-manifest', {
-          field: `${base}/companionPanel`,
-          message: 'A companionPanel must name a secondary panel.',
-        })
-      }
-      companionPanel = panel.id
+      companionPanels = [panel.id]
     }
     if (!hasOwn(raw, 'entry')) {
       return issue('invalid-manifest', { field: `${base}/entry` })
@@ -639,7 +706,7 @@ function parseContentViews(
       title: raw.title,
       entry: raw.entry as string,
       entryUrl: entry.url,
-      ...(companionPanel === undefined ? {} : { companionPanel }),
+      ...(companionPanels === undefined ? {} : { companionPanels }),
     })
   }
   return views
@@ -1078,16 +1145,6 @@ export function validateManifest(
       '/contributes',
     )
     if (contributesUnknown) return { ok: false, error: contributesUnknown }
-    if (hasOwn(value.contributes, 'fileEditors')) {
-      const parsed = parseFileEditors(
-        value.contributes.fileEditors,
-        manifestUrl.href,
-        manifestUrl.origin,
-        controller.pluginRoot,
-      )
-      if (!Array.isArray(parsed)) return { ok: false, error: parsed }
-      fileEditors = parsed
-    }
     if (hasOwn(value.contributes, 'panels')) {
       const parsed = parsePanels(
         value.contributes.panels,
@@ -1097,6 +1154,17 @@ export function validateManifest(
       )
       if (!Array.isArray(parsed)) return { ok: false, error: parsed }
       panels = parsed
+    }
+    if (hasOwn(value.contributes, 'fileEditors')) {
+      const parsed = parseFileEditors(
+        value.contributes.fileEditors,
+        manifestUrl.href,
+        manifestUrl.origin,
+        controller.pluginRoot,
+        panels,
+      )
+      if (!Array.isArray(parsed)) return { ok: false, error: parsed }
+      fileEditors = parsed
     }
     if (hasOwn(value.contributes, 'contentViews')) {
       const parsed = parseContentViews(

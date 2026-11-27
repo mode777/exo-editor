@@ -971,6 +971,20 @@ median and 18 ms maximum against the 2,000 ms ceiling. The deployed evidence is
 recorded in the change design, and the change is archived as
 `2026-11-24-editor-bound-panels` with its deltas synced into the main specs.
 
+**Follow-up (2026-11-27):** the post-layer-10 change `surface-companion-panels`
+adds `contributes.fileEditors[].companionPanels` and
+`contributes.contentViews[].companionPanels`. A contribution may bind one to
+three panels, at most one per `primary`, `secondary` and `bottom` region, and
+the shell derives reveal/hide from the active content view or active file-editor
+handler. `companionPanel` remains a one-panel content-view alias; both forms
+normalize to one list. The shell removes the separate view-pool companion
+callback and content-surface effect, uses no new protocol message or event, and
+keeps `plugin/request-panel` unchanged. The fixture adds **Fixture Gallery** and
+a `*.companion.txt` editor with companions in all three regions; shell `0.11.0`,
+protocol `1`, manifest schema `1` and SDK `1.10.0`. Deployed verification is
+recorded in the change design; the change is archived as
+`2026-11-27-surface-companion-panels` with its deltas synced into the main specs.
+
 ---
 
 ## Deferred beyond v1
