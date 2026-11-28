@@ -1035,9 +1035,9 @@ against deployed commit `0577aeb` (asset `index-BtRN9Y2v.js`) on 2026-11-28 with
 Monaco editor took menu, palette and shortcut undo/redo, dirty followed the
 saved-text comparison, the shell textarea kept native undo, the read-only
 fixture offered no command, no console errors occurred and the bundle stayed
-within 184,665/186,000 JS and 14,456/14,600 CSS gzip bytes. The change is ready
-to archive as `2026-11-28-plugin-editor-undo-redo` with its deltas synced into
-the main specs.
+within 184,665/186,000 JS and 14,456/14,600 CSS gzip bytes. The change is
+archived as `2026-11-28-plugin-editor-undo-redo` with its deltas synced into the
+main specs.
 
 ---
 
