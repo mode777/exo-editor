@@ -519,6 +519,43 @@ export class WorkspaceRuntime {
     return this.documents.save(path)
   }
 
+  /**
+   * Whether the active document is a writable plugin editor whose handler is
+   * active. Undo, redo and their command surfaces use this one gate; it is not
+   * undo availability, which only the plugin knows.
+   */
+  canEditActivePluginDocument(): boolean {
+    if (!this.session || !this.current.writable) return false
+    const path = activeDocumentPath()
+    if (!path) return false
+    const document = this.documents.get(path)
+    return Boolean(
+      document &&
+      document.surface === 'plugin' &&
+      document.pluginPhase === 'active' &&
+      !document.readOnly &&
+      document.editor?.canWrite &&
+      this.handlers.get(path)?.active,
+    )
+  }
+
+  /** Route one id-less undo intent to the active plugin handler. */
+  undoActiveDocument(): boolean {
+    return this.sendHistoryIntent('undo')
+  }
+
+  /** Route one id-less redo intent to the active plugin handler. */
+  redoActiveDocument(): boolean {
+    return this.sendHistoryIntent('redo')
+  }
+
+  private sendHistoryIntent(action: 'undo' | 'redo'): boolean {
+    if (!this.canEditActivePluginDocument()) return false
+    const path = activeDocumentPath()
+    if (!path) return false
+    return action === 'undo' ? this.handlers.undo(path) : this.handlers.redo(path)
+  }
+
   renameOpenPath(previousPath: WorkspacePath, nextPath: WorkspacePath, stat: FileStat): void {
     this.documents.rename(previousPath, nextPath, stat)
     updateTabPath(previousPath, nextPath)

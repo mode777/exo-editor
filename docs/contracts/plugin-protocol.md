@@ -560,6 +560,32 @@ shell/save-result     { ok: true, version } | { ok: false, code, message? }
   the plugin has not reported dirty again in the meantime, and emits
   `workspace/file-changed` with kind `changed`.
 
+### 5.3.1 Undo and redo
+
+```text
+shell/undo            { }                      // id-less, no reply
+shell/redo            { }                      // id-less, no reply
+```
+
+- The shell sends `shell/undo` or `shell/redo` only to the active editor handler
+  of the active document, in the editor phase, when the workspace is writable and
+  the editor has write capability. It never sends them to a registration frame, a
+  view frame, an inactive tab, a shell text document or a read-only plugin
+  document.
+- The messages are id-less notifications. They carry no content, version or
+  reply; the shell does not queue, coalesce, retry or time them out. They are
+  sent regardless of the dirty flag because the plugin's history may move the
+  buffer away from, or back to, the saved text.
+- The plugin applies the action to its own history and reports any resulting
+  dirty change only through `plugin/dirty`. It sends no content, acknowledgement
+  or save request. An intent its history cannot apply is a silent no-op.
+- The shell keeps no undo stack, content snapshot or `canUndo`/`canRedo` state for
+  a plugin-backed document. A reopened or remounted handler starts with no
+  history, and the shell does not replay or restore previous entries.
+- A plugin that does not implement these messages ignores the unknown id-less
+  types, as with any shell message it does not know. No permission, manifest
+  field or capability bit is added.
+
 ### 5.4 External changes
 
 ```text

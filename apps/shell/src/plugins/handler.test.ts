@@ -676,6 +676,58 @@ describe('handler session', () => {
     expect(context.saveRequests).toEqual([])
   })
 
+  it('sends one id-less undo or redo intent for an active writable handler', async () => {
+    const context = await start()
+    ready(context)
+    context.frame.emit({ exo: 1, type: 'plugin/dirty', payload: { dirty: false } }, PLUGIN_ORIGIN)
+    expect(context.handler.requestUndo()).toBe(true)
+    expect(postedType(context.frame, 'shell/undo')).toEqual({ exo: 1, type: 'shell/undo' })
+    expect(context.handler.requestRedo()).toBe(true)
+    expect(postedType(context.frame, 'shell/redo')).toEqual({ exo: 1, type: 'shell/redo' })
+    expect(context.dirty).toEqual([false])
+    expect(postedType(context.frame, 'shell/request-save')).toBeUndefined()
+    expect(postedType(context.frame, 'shell/save-result')).toBeUndefined()
+    expect(postedType(context.frame, 'shell/error')).toBeUndefined()
+  })
+
+  it('does not accept a plugin-sent history message', async () => {
+    const context = await start()
+    ready(context)
+    context.frame.emit({ exo: 1, type: 'shell/undo', id: 'evil' }, PLUGIN_ORIGIN)
+    expect(postedType(context.frame, 'shell/error')).toMatchObject({
+      replyTo: 'evil',
+      payload: { code: 'unsupported-message' },
+    })
+    expect(context.dirty).toEqual([])
+    expect(postedType(context.frame, 'shell/undo')).toBeUndefined()
+    expect(postedType(context.frame, 'shell/request-save')).toBeUndefined()
+
+    context.frame.emit({ exo: 1, type: 'shell/redo' }, PLUGIN_ORIGIN)
+    expect(postedType(context.frame, 'shell/error')).toMatchObject({ replyTo: 'evil' })
+    expect(context.dirty).toEqual([])
+  })
+
+  it('does not send history intents before ready, after disposal or without write capability', async () => {
+    const early = await start()
+    expect(early.handler.requestUndo()).toBe(false)
+    expect(postedType(early.frame, 'shell/undo')).toBeUndefined()
+
+    const readOnly = await start({
+      candidate: candidate({ permissions: ['workspace:read'] }),
+    })
+    ready(readOnly)
+    expect(readOnly.handler.requestRedo()).toBe(false)
+    expect(postedType(readOnly.frame, 'shell/redo')).toBeUndefined()
+
+    const context = await start()
+    ready(context)
+    const disposing = context.handler.dispose('closed')
+    context.frame.emit({ exo: 1, type: 'plugin/dispose-ack' }, PLUGIN_ORIGIN)
+    await disposing
+    expect(context.handler.requestUndo()).toBe(false)
+    expect(postedType(context.frame, 'shell/undo')).toBeUndefined()
+  })
+
   it('round-trips a save and answers with the request id', async () => {
     const context = await start()
     ready(context)

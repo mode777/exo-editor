@@ -3,6 +3,41 @@
 All notable changes to Exo Editor are recorded here. The version axes and the
 release process are in [`docs/releases.md`](./docs/releases.md).
 
+## [0.13.0] - 2026-11-28
+
+Additive post-release update: shell Undo/Redo for plugin editors.
+
+### Added
+
+- Shell-owned **Undo** and **Redo** commands in a new Edit menu, the command
+  palette and `Ctrl/Cmd+Z`, `Ctrl/Cmd+Shift+Z` and `Ctrl/Cmd+Y` for the active
+  writable plugin-backed document.
+- Id-less `shell/undo` and `shell/redo` notifications to the active editor
+  handler. The plugin applies them to its own history and reports dirty through
+  `plugin/dirty`; the shell keeps no history, content snapshot or
+  `canUndo`/`canRedo` tab state.
+- SDK `1.11.0` `EditorClient.onUndoRequest()` and `onRedoRequest()`. The
+  reference Monaco editor routes both through Monaco's own history and reports
+  dirty from a saved-text comparison, so undoing back to the saved text clears
+  the tab. A hidden fixture handler covers the menu/shortcut path for a frame
+  that cannot receive keyboard focus.
+- The shell text surface keeps its native textarea undo; the commands are
+  no-ops outside a writable plugin document.
+
+### Compatibility
+
+- Shell: `0.13.0`
+- Protocol: `1`
+- Manifest schema: `1`
+- Marketplace feed schema: `1`
+- SDK: `1.11.0`
+
+### Breaking
+
+- None for plugin authors. No permission, consent-fingerprint input, manifest
+  field, protocol major or sandbox change. Existing plugins ignore the new
+  id-less messages and keep working.
+
 ## [0.12.0] - 2026-11-27
 
 Additive post-release update: marketplace discovery and the Extensions view.

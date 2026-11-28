@@ -28,6 +28,8 @@ export interface CommandContext {
   hasActiveDocument: boolean
   /** More than one registered editor matches the active document. */
   hasEditorChoice: boolean
+  /** The active document is a writable plugin editor with an active handler. */
+  canEditPluginDocument: boolean
   /** The active workspace is a remote connection. */
   remote: boolean
   /** Number of active secondary panels; the picker needs more than one. */
@@ -59,6 +61,8 @@ export interface ExoCommandHandlers {
   disconnect: () => void
   restoreAccess: () => void
   saveActive: () => void
+  undoActive: () => void
+  redoActive: () => void
   openWith: () => void
   newFile: () => void
   newFolder: () => void
@@ -147,6 +151,20 @@ export function createExoCommands(handlers: ExoCommandHandlers): WorkbenchComman
       run: handlers.saveActive,
     },
     {
+      id: 'exo.edit.undo',
+      title: 'Undo',
+      category: 'Edit',
+      keybinding: 'Ctrl+Z',
+      run: handlers.undoActive,
+    },
+    {
+      id: 'exo.edit.redo',
+      title: 'Redo',
+      category: 'Edit',
+      keybinding: 'Ctrl+Shift+Z',
+      run: handlers.redoActive,
+    },
+    {
       id: 'exo.file.openWith',
       title: 'Open With…',
       category: 'File',
@@ -205,6 +223,8 @@ const AVAILABILITY: Record<string, (context: CommandContext) => boolean> = {
   'exo.explorer.collapseAll': (context) => context.hasWorkspace,
   'exo.views.selectSecondary': (context) => context.secondaryViewCount > 1,
   'exo.file.save': (context) => context.hasActiveDocument,
+  'exo.edit.undo': (context) => context.canEditPluginDocument,
+  'exo.edit.redo': (context) => context.canEditPluginDocument,
   'exo.file.openWith': (context) => context.hasActiveDocument && context.hasEditorChoice,
 }
 

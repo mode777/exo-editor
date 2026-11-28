@@ -58,6 +58,7 @@ document title so a hidden frame remains inspectable in devtools.
 | `**/*.list.txt`     | `editor-list.html`         | Probes `plugin/request-list`: root, relative, large, file, missing and reserved                                                                    |
 | `**/*.picker.txt`   | `editor-picker.html`       | Visible frame with a Pick button; exercises `plugin/request-files`                                                                                 |
 | `**/*.events.txt`   | `editor-events.html`       | Subscribes to the four v1 topics and records sequences and events                                                                                  |
+| `**/*.history.txt`  | `editor-history.html`      | Hidden handler with a local edit and undo/redo stacks; records each shell intent, buffer and dirty report                                          |
 | `**/*.txt`          | `editor.html`              | Read, report dirty, save with a `[fixture save N]` marker, acknowledge dispose                                                                     |
 | `**/*.append.txt`   | `editor-append.html`       | Same, with an `[fixture append N]` marker and a second visible edit signal                                                                         |
 | `**/*.repeat.txt`   | `editor-repeat.html`       | Requests the same file twice and records both versions in `#observation`                                                                           |
@@ -118,58 +119,63 @@ carries the full new map to subscribed frames of this plugin only.
    reports `conflict` without overwriting the newer content.
 6. Close the tab or disable the plugin: the frame receives `shell/dispose` (or is
    removed after the timeout) and a clean document falls back to the text editor.
-7. A plugin with only `workspace:read` gets an editor with no Save action; a
+7. Open a `*.history.txt` file. The hidden handler applies one local edit and
+   reports dirty. With focus in the shell, use Edit > Undo or `Ctrl/Cmd+Z`; the
+   buffer returns to the saved text, `plugin/dirty` reports `false` and the tab
+   dot clears. Redo reports dirty again. The frame records each intent and
+   buffer in `#observation`; a visible frame must keep its own in-frame keys.
+8. A plugin with only `workspace:read` gets an editor with no Save action; a
    read-only workspace behaves the same.
-8. Open `events.events.txt` with the events editor. `#observation` shows
+9. Open `events.events.txt` with the events editor. `#observation` shows
    `subscriptions` with `seq: 0` for all four topics and `init.theme` matches the
    current theme. Toggling the theme appends one `theme/changed` event; a `.txt`
    opened with the default editor records none.
-9. Write the open file externally while the events editor is mounted: the frame
-   records the targeted `shell/file-changed`, re-reads the file, and appends one
-   `workspace/file-changed` with the new version. Save after that and confirm one
-   more `workspace/file-changed` after `shell/save-result`; switching away without
-   saving should not prompt.
-10. Switch or close the workspace: the events frame records `workspace/closed`
+10. Write the open file externally while the events editor is mounted: the frame
+    records the targeted `shell/file-changed`, re-reads the file, and appends one
+    `workspace/file-changed` with the new version. Save after that and confirm one
+    more `workspace/file-changed` after `shell/save-result`; switching away without
+    saving should not prompt.
+11. Switch or close the workspace: the events frame records `workspace/closed`
     with `switch` or `close` before `shell/dispose`, and `#observation` stops
     changing afterwards.
-11. Enable `readonly-manifest.json` instead: its events editor opens and every
+12. Enable `readonly-manifest.json` instead: its events editor opens and every
     subscription is answered with `permission-denied` in `errors`.
-12. Open Extensions with the deployed manifest and select the fixture in
+13. Open Extensions with the deployed manifest and select the fixture in
     Installed: its details tab shows the string, boolean and enum controls with
     the manifest defaults and descriptions.
-13. Open `events.events.txt`, change `fixture.greeting` in the fixture's
+14. Open `events.events.txt`, change `fixture.greeting` in the fixture's
     extension details, and confirm the frame records exactly one `config/changed`
     with `{ pluginId, values }` for the full map. Open a new `.txt` document and
     confirm its `shell/init.settings` already carries the new value.
-14. Reload the page with the same workspace: the extension details and
+15. Reload the page with the same workspace: the extension details and
     `shell/init` show the changed value. Switch to a second workspace: the
     defaults are shown and the first workspace's value is not delivered. Switch
     back: the value returns.
-15. Seed an invalid stored value: in DevTools > Application > IndexedDB >
+16. Seed an invalid stored value: in DevTools > Application > IndexedDB >
     `exo-plugin-settings` > `settings`, edit the record for the workspace and set
     `values[<identity>]['fixture.size'] = 9`, then reload. The extension details
     tab warns for `fixture.size`, the fixture receives the default `1`, and the
     workspace stays usable.
-16. Confirm a setting change does not modify `exo.json`, create a workspace file
+17. Confirm a setting change does not modify `exo.json`, create a workspace file
     or open a document tab.
-17. Enable `readonly-manifest.json`: the settings block still renders and stays
+18. Enable `readonly-manifest.json`: the settings block still renders and stays
     editable, and the "does not subscribe to configuration changes" hint appears
     because that manifest lacks `events:subscribe`. The events editor's
     subscriptions remain `permission-denied`.
-18. Open `picker.picker.txt`. The fixture renders a visible frame with a **Pick
+19. Open `picker.picker.txt`. The fixture renders a visible frame with a **Pick
     workspace file** button. Click it: the shell picker opens at the fixture
     file's directory, `exo.json` and `.exo` are absent, and selecting a text file
     appends `[fixture picked <path>]` to the fixture buffer in `#observation`,
     reports dirty and saves through the normal Save action.
-19. Cancel the picker: `#observation.picks` records one entry with `paths: []`,
+20. Cancel the picker: `#observation.picks` records one entry with `paths: []`,
     the tab stays clean and no read follows. Press Escape or use only the
     keyboard to select a row; focus returns to the plugin frame when the picker
     closes.
-20. Open `picker.picker.txt` with `readonly-manifest.json`: the picker still
+21. Open `picker.picker.txt` with `readonly-manifest.json`: the picker still
     returns paths and the fixture reads them, but the shell offers no Save. A
     hidden `.txt` editor has no Pick button and a picker request from it is
     denied.
-21. Open `listing/one.list.txt` with the deployed manifest. The listing fixture
+22. Open `listing/one.list.txt` with the deployed manifest. The listing fixture
     probes `plugin/request-list` in order: the workspace root (absolute), its own
     directory (relative `.`), `/listing/big`, its own file path, a missing path
     and `/exo.json`. `#observation.lists` records each page's entry count, the
@@ -179,31 +185,31 @@ carries the full new map to subscribed frames of this plugin only.
     `not-found` for the missing path and `permission-denied` for `/exo.json`.
     `#observation.listReads` proves a listed path is read through
     `plugin/request-file`.
-22. Create `listing/big/` with 1,001 files and reopen the document. The
+23. Create `listing/big/` with 1,001 files and reopen the document. The
     `list-big` page records `count: 1000` and a `nextCursor`, and the follow-up
     `list-big-2` page records the remaining entry without a cursor. A 1,001-entry
     root page also continues automatically as `list-root-2`.
-23. Enable `readonly-manifest.json` instead and open the same document. Every
+24. Enable `readonly-manifest.json` instead and open the same document. Every
     listing request is answered with `permission-denied` and no `lists` page is
     recorded, because that manifest declares only `workspace:read`.
-24. Switch to another workspace while the listing page is in flight: the old
+25. Switch to another workspace while the listing page is in flight: the old
     frame is disposed, no late `list-result` is recorded, and the new workspace
     starts with no listing state. Disabling the plugin or closing the tab has the
     same effect.
-25. Open `one.local.txt` with the deployed manifest. `observation.local`
+26. Open `one.local.txt` with the deployed manifest. `observation.local`
     records `subscription: { topic: 'local/fixture', seq: 0 }`. Press **Publish
     local event**: `published` records `{ topic: 'local/fixture', seq: 1 }` and
     `events` records one event with `from` equal to the frame's
     `exo-session`.
-26. Keep it open and open `two.local.txt`. Press Publish in the second frame:
+27. Keep it open and open `two.local.txt`. Press Publish in the second frame:
     switch back to the first and confirm it recorded the second frame's event
     with the second `from`; the second frame also records its own event. The
     sequences increase per identity and topic.
-27. Add `other-manifest.json` to `exo.json`, approve its consent and open
+28. Add `other-manifest.json` to `exo.json`, approve its consent and open
     `three.local-other.txt`. Press Publish in both plugins: neither plugin's
     `local.events` contains the other plugin's event or `from`, while each
     receives its own.
-28. Send an oversized local publish or a shell topic through DevTools and
+29. Send an oversized local publish or a shell topic through DevTools and
     confirm `errors` records `too-large` with the 1 MiB limit or
     `permission-denied` for `theme/changed`; no `published` entry is added. A
     publish from the registration frame is a protocol violation and produces no

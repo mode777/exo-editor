@@ -30,6 +30,12 @@
     activeEditor: null,
     history: [],
     panelEdits: [],
+    historySaved: '',
+    historyUndo: [],
+    historyRedo: [],
+    historyActions: [],
+    historyInitialized: false,
+    pendingSaveBuffer: null,
     dirty: false,
     disposed: 'pending',
     external: null,
@@ -42,7 +48,7 @@
   function render() {
     state.origin = location.origin
     observation.textContent = JSON.stringify(state)
-    document.title = `Exo fixture ${fixtureMode} ${state.phase} events:${state.events.length} picks:${state.picks.length} lists:${state.lists.length} local:${state.local.events.length}`
+    document.title = `Exo fixture ${fixtureMode} ${state.phase} events:${state.events.length} picks:${state.picks.length} lists:${state.lists.length} local:${state.local.events.length} history:${state.historyActions.length}`
   }
 
   function post(type, payload, replyTo, id) {
@@ -333,6 +339,16 @@
       render()
       return
     }
+    if (fixtureMode === 'history' && typeof payload.text === 'string') {
+      if (state.historyInitialized) return
+      state.historyInitialized = true
+      state.historySaved = payload.text
+      state.buffer = `${payload.text}\n[fixture history edit]`
+      state.historyUndo.push(payload.text)
+      state.historyActions.push({ action: 'edit', buffer: state.buffer })
+      setDirty(true)
+      return
+    }
     if (typeof payload.text === 'string' && !state.dirty) {
       state.buffer = payload.text
     }
@@ -361,11 +377,31 @@
   }
 
   function markDirty() {
-    if (state.dirty) return
-    state.dirty = true
+    setDirty(true)
+  }
+
+  function setDirty(value) {
+    if (state.dirty === value) return
+    state.dirty = value
     render()
-    console.log('EXO_EDITOR dirty')
-    post('plugin/dirty', { dirty: true })
+    console.log('EXO_EDITOR dirty', value)
+    post('plugin/dirty', { dirty: value })
+  }
+
+  function onHistory(action) {
+    if (fixtureMode !== 'history') return
+    const from = action === 'undo' ? state.historyUndo : state.historyRedo
+    const to = action === 'undo' ? state.historyRedo : state.historyUndo
+    const record = { action, buffer: state.buffer, applied: false }
+    if (from.length > 0) {
+      const next = from.pop()
+      to.push(state.buffer)
+      state.buffer = next
+      record.applied = true
+    }
+    state.historyActions.push(record)
+    setDirty(state.buffer !== state.historySaved)
+    render()
   }
 
   function onSave(requestId) {
@@ -379,6 +415,7 @@
         ? `\n[fixture append ${state.saveCount}]`
         : `\n[fixture save ${state.saveCount}]`
     state.buffer += marker
+    state.pendingSaveBuffer = state.buffer
     post('plugin/save-content', { text: state.buffer }, requestId)
     render()
   }
@@ -404,8 +441,14 @@
   function onSaveResult(payload) {
     state.saveResult = payload
     if (payload && payload.ok) {
-      state.dirty = false
-      post('plugin/dirty', { dirty: false })
+      if (fixtureMode === 'history') {
+        state.historySaved = state.pendingSaveBuffer ?? state.buffer
+        state.pendingSaveBuffer = null
+        setDirty(state.buffer !== state.historySaved)
+      } else {
+        state.dirty = false
+        post('plugin/dirty', { dirty: false })
+      }
     }
     render()
   }
@@ -449,6 +492,12 @@
         break
       case 'shell/save-result':
         onSaveResult(data.payload)
+        break
+      case 'shell/undo':
+        onHistory('undo')
+        break
+      case 'shell/redo':
+        onHistory('redo')
         break
       case 'shell/file-changed':
         state.external = data.payload

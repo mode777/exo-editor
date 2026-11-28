@@ -368,6 +368,30 @@ describe('handler pool', () => {
     ).toBe(false)
   })
 
+  it('routes undo and redo to the owning document path', async () => {
+    const context = await harness({ '/src/a.ts': 'a', '/src/b.ts': 'b' })
+    await open(context, '/src/a.ts')
+    await open(context, '/src/b.ts')
+    const first = context.transport.frames[0]
+    const second = context.transport.frames[1]
+    readyFrame(first, PLUGIN_ORIGIN)
+    readyFrame(second, PLUGIN_ORIGIN)
+    const count = (frame: typeof first, type: string) =>
+      frame.posted.filter((posted) => (posted.message as { type?: string }).type === type).length
+
+    expect(context.pool.undo('/src/a.ts')).toBe(true)
+    expect(count(first, 'shell/undo')).toBe(1)
+    expect(count(second, 'shell/undo')).toBe(0)
+    expect(context.pool.redo('/src/b.ts')).toBe(true)
+    expect(count(second, 'shell/redo')).toBe(1)
+    expect(count(first, 'shell/redo')).toBe(0)
+    expect(context.pool.undo('/src/missing.ts')).toBe(false)
+
+    context.pool.close('/src/a.ts')
+    expect(context.pool.undo('/src/a.ts')).toBe(false)
+    expect(count(first, 'shell/undo')).toBe(1)
+  })
+
   it('delivers config changes only to the target plugin frame', async () => {
     const context = await harness({ '/src/a.ts': 'a', '/src/b.ts': 'b' })
     const first = candidate('https://a.example.com::com.example.a', {

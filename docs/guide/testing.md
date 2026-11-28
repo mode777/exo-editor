@@ -51,6 +51,11 @@ plus the shell text surface. The recorded acceptance path is
   and version but no automatic tab.
 - Dirty state reaches the tab, Save writes exact text or bytes, a conflict
   leaves the buffer and disk intact.
+- Undo and redo reach the active writable plugin handler from the Edit menu, the
+  palette and `Ctrl/Cmd+Z` / `Ctrl/Cmd+Shift+Z` / `Ctrl/Cmd+Y` while the shell
+  owns focus. A hidden handler works, the buffer changes, and dirty follows the
+  saved-text comparison. The shell textarea keeps native undo, and a visible
+  frame keeps its own in-frame keys without a second undo.
 - An external change is visible and does not silently replace a dirty buffer.
 - The visible plugin page follows the shell theme: toggling dark/light updates
   the background, text, inputs, focus ring, selection and scrollbars without

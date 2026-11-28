@@ -55,6 +55,18 @@ const EMPTY_SESSION: InitialWorkbenchSession = {
 
 const FILE_ICONS: FileIconResolver = { icon: () => 'file' }
 
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false
+  return (
+    target.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"]') !==
+    null
+  )
+}
+
+function hasOpenModal(): boolean {
+  return document.querySelector('[role="dialog"][aria-modal="true"]') !== null
+}
+
 interface PendingClose {
   paths: WorkspacePath[]
   proceed: () => void
@@ -160,12 +172,26 @@ function Shell({ runtime }: { runtime: WorkspaceRuntime }) {
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
-      if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 's') {
+      if (!(event.ctrlKey || event.metaKey)) return
+      const key = event.key.toLowerCase()
+      if (key === 's') {
+        if (!activeDocumentPath()) return
+        event.preventDefault()
+        void runtime.saveActiveDocument()
         return
       }
-      if (!activeDocumentPath()) return
-      event.preventDefault()
-      void runtime.saveActiveDocument()
+      if (key !== 'z' && key !== 'y') return
+      if (
+        event.altKey ||
+        event.defaultPrevented ||
+        isEditableTarget(event.target) ||
+        hasOpenModal()
+      ) {
+        return
+      }
+      const handled =
+        key === 'y' || event.shiftKey ? runtime.redoActiveDocument() : runtime.undoActiveDocument()
+      if (handled) event.preventDefault()
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
@@ -258,6 +284,8 @@ function Shell({ runtime }: { runtime: WorkspaceRuntime }) {
       disconnect: disconnectWorkspace,
       restoreAccess: () => void runtime.requestPermission(),
       saveActive: () => void runtime.saveActiveDocument(),
+      undoActive: () => void runtime.undoActiveDocument(),
+      redoActive: () => void runtime.redoActiveDocument(),
       openWith: requestOpenWith,
       newFile: () => requestExplorerCommand('new-file'),
       newFolder: () => requestExplorerCommand('new-folder'),
@@ -297,6 +325,7 @@ function Shell({ runtime }: { runtime: WorkspaceRuntime }) {
       hasSelection: Boolean(current.selection),
       hasActiveDocument: Boolean(activePath),
       hasEditorChoice: activePath ? runtime.documents.candidatesFor(activePath).length > 1 : false,
+      canEditPluginDocument: runtime.canEditActivePluginDocument(),
       remote: Boolean(current.remote),
       secondaryViewCount,
     }

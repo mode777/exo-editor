@@ -272,6 +272,25 @@ export class HandlerSession extends FrameSession {
     })
   }
 
+  /** An id-less undo intent for this handler's document. */
+  requestUndo(): boolean {
+    return this.sendHistoryIntent('shell/undo')
+  }
+
+  /** An id-less redo intent for this handler's document. */
+  requestRedo(): boolean {
+    return this.sendHistoryIntent('shell/redo')
+  }
+
+  private sendHistoryIntent(type: 'shell/undo' | 'shell/redo'): boolean {
+    if (!this.active || !this.frame) return false
+    if (!this.handlerOptions.canWrite || !this.candidate.permissions.includes('workspace:write')) {
+      return false
+    }
+    this.post(type)
+    return true
+  }
+
   completeSave(result: HandlerSaveCompletion): void {
     const save = this.liveSave
     if (!save || save.stage !== 'write') return

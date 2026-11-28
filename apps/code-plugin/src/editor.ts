@@ -7,7 +7,7 @@ import EditorWorker from 'monaco-editor/editor/editor.worker.js?worker&inline'
 import JsonWorker from 'monaco-editor/language/json/json.worker.js?worker&inline'
 import TsWorker from 'monaco-editor/language/typescript/ts.worker.js?worker&inline'
 import './editor.css'
-import { shouldClearDirty } from './dirty'
+import { isDirty } from './dirty'
 import {
   canOpenInMonaco,
   formatBytes,
@@ -49,8 +49,8 @@ async function main(): Promise<void> {
   let currentPath = client.file.path
   let dirty = false
   let applying = true
-  let changeGeneration = 0
-  let pendingSaveGeneration: number | null = null
+  let savedText = ''
+  let pendingSaveText: string | null = null
   let language = languageForPath(currentPath)
 
   pathLabel.textContent = currentPath
@@ -66,6 +66,7 @@ async function main(): Promise<void> {
 
   const content = await client.readFile(currentPath, 'utf8')
   currentPath = content.path
+  savedText = content.text
   pathLabel.textContent = currentPath
 
   const model = monaco.editor.createModel(content.text, language, monaco.Uri.file(currentPath))
@@ -107,14 +108,29 @@ async function main(): Promise<void> {
     renderStatus(currentPath, language, dirty, formatBytes(client.file.size))
   }
 
+  const syncDirty = (): void => {
+    markDirty(isDirty(savedText, model.getValue()))
+  }
+
   editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
     if (!dirty || !client.capabilities.write) return
     client.requestSave()
   })
 
+  client.onUndoRequest(() => {
+    if (!client.capabilities.write) return
+    editor.trigger('exo', 'undo', null)
+  })
+
+  client.onRedoRequest(() => {
+    if (!client.capabilities.write) return
+    editor.trigger('exo', 'redo', null)
+  })
+
   const applyContent = (text: string, nextPath: string): void => {
     applying = true
     model.setValue(text)
+    savedText = text
     currentPath = nextPath
     language = languageForPath(currentPath)
     monaco.editor.setModelLanguage(model, language)
@@ -127,25 +143,26 @@ async function main(): Promise<void> {
 
   model.onDidChangeContent(() => {
     if (applying) return
-    changeGeneration += 1
-    markDirty(true)
+    syncDirty()
     setNotice(null)
   })
 
   client.onSaveRequest(() => {
-    pendingSaveGeneration = changeGeneration
-    return { text: model.getValue() }
+    pendingSaveText = model.getValue()
+    return { text: pendingSaveText }
   })
 
   client.onSaveResult((result: SaveResult) => {
-    const savedGeneration = pendingSaveGeneration
-    pendingSaveGeneration = null
+    const saved = pendingSaveText
+    pendingSaveText = null
     if (!result.ok) {
+      syncDirty()
       setNotice(`Save failed: ${result.code}. Your edits are still here.`)
       renderStatus(currentPath, language, dirty, formatBytes(client.file.size))
       return
     }
-    if (shouldClearDirty(savedGeneration, changeGeneration)) markDirty(false)
+    if (saved !== null) savedText = saved
+    syncDirty()
     setNotice(null)
     renderStatus(currentPath, language, dirty, formatBytes(client.file.size))
   })

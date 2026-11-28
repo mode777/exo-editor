@@ -50,6 +50,12 @@ function markDirty(value: boolean) {
 }
 
 editor.onSaveRequest(() => ({ text: buffer }))
+editor.onUndoRequest(() => {
+  // Apply undo through your own history, then report the resulting dirty state.
+})
+editor.onRedoRequest(() => {
+  // Apply redo through your own history, then report the resulting dirty state.
+})
 editor.onFileChanged((change) => {
   if (change.kind === 'changed' && !dirty) void reload()
 })
@@ -65,6 +71,13 @@ async function reload() {
 
 await reload()
 ```
+
+`onUndoRequest` and `onRedoRequest` receive the shell's id-less Undo/Redo
+intent. The shell does not keep your history: apply the action to your own stack
+and report the resulting dirty state with `setDirty`. A visible editor should
+also bind the same keys inside its own frame, because keyboard events there do
+not reach the shell; the shell intent covers the menu, palette and hidden
+handlers.
 
 To let the user pick a workspace file instead of typing a path:
 

@@ -18,7 +18,7 @@ enough to ship a plugin.
 
 | Artifact                                            | Version | Packaging                                        |
 | --------------------------------------------------- | ------- | ------------------------------------------------ |
-| `packages/plugin-sdk` (`@exo/plugin-sdk`)           | `1.10.0` | Private workspace package; no runtime dependency |
+| `packages/plugin-sdk` (`@exo/plugin-sdk`)           | `1.11.0` | Private workspace package; no runtime dependency |
 | `packages/plugin-template` (`@exo/plugin-template`) | `0.1.0` | Private workspace package; built static assets   |
 
 - The SDK MAJOR equals the protocol major it speaks. `PROTOCOL_VERSION` and
@@ -34,8 +34,9 @@ enough to ship a plugin.
   stylesheet, `1.9.0` exposes the active content view from `shell/init` and
   the `view/active` event topic, and `1.10.0` exposes the editor instance id,
   the active-editor context and `editor/active`, accepts the `bottom` view
-  location and adds the registration `bottomPanel` bit, all without changing the
-  protocol major.
+  location and adds the registration `bottomPanel` bit, and `1.11.0` adds
+  `onUndoRequest()` and `onRedoRequest()` for the shell's id-less undo and redo
+  intents, all without changing the protocol major.
 - The packages are not published in v1 (D12). Consumers in this repository use
   the workspace copy. A future publication adds a built `dist` and does not
   change the message protocol.
@@ -157,6 +158,8 @@ editor.setDirty(dirty)
 editor.requestSave()
 editor.onSaveRequest(handler)
 editor.onSaveResult(listener)
+editor.onUndoRequest(listener)
+editor.onRedoRequest(listener)
 editor.onFileChanged(listener)
 editor.onCommand(handler)
 editor.onDispose(listener)
@@ -215,6 +218,12 @@ editor.onLocalEvent(topic, listener)
 - A missing save handler, a throwing handler or a rejected handler sends
   nothing. The protocol defines no save-cancel message, so the shell's
   five-second timeout is the outcome and the document stays dirty.
+- `shell/undo` and `shell/redo` are delivered to `onUndoRequest` and
+  `onRedoRequest`. The listeners receive no payload and the SDK sends no reply,
+  content or save request. The plugin applies the action to its own history and
+  reports any resulting dirty change through `setDirty`. An older shell never
+  sends the messages, so the listeners simply stay idle; no capability check is
+  needed.
 - `shell/file-changed` is delivered to `onFileChanged` without changing dirty
   state. The plugin decides whether to reload.
 - `shell/dispose` rejects every pending request, sends `plugin/dispose-ack` once,

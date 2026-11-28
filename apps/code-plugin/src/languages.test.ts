@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { shouldClearDirty } from './dirty'
+import { isDirty } from './dirty'
 import {
   MAX_MONACO_BYTES,
   canOpenInMonaco,
@@ -57,10 +57,10 @@ describe('large-file guard', () => {
   })
 })
 
-describe('dirty generation', () => {
-  it('clears only when no later change occurred', () => {
-    expect(shouldClearDirty(3, 3)).toBe(true)
-    expect(shouldClearDirty(3, 4)).toBe(false)
-    expect(shouldClearDirty(null, 4)).toBe(false)
+describe('dirty text comparison', () => {
+  it('is clean only while the model equals the saved text', () => {
+    expect(isDirty('saved', 'saved')).toBe(false)
+    expect(isDirty('saved', 'edited')).toBe(true)
+    expect(isDirty('saved', '')).toBe(true)
   })
 })

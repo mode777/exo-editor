@@ -19,7 +19,7 @@ describe('deployed plugin fixture', () => {
     )
     expect(result.ok).toBe(true)
     if (!result.ok) return
-    expect(result.manifest.fileEditors).toHaveLength(11)
+    expect(result.manifest.fileEditors).toHaveLength(12)
     expect(result.manifest.configuration?.properties).toMatchObject({
       'fixture.greeting': { type: 'string', default: 'hello from fixture' },
       'fixture.repeat': { type: 'boolean', default: false },
@@ -131,6 +131,8 @@ describe('deployed plugin fixture', () => {
     expect(byGlob.get('**/*.picker.txt')?.priority).toBeGreaterThan(30)
     expect(byGlob.get('**/*.events.txt')?.entry).toBe('editor-events.html')
     expect(byGlob.get('**/*.events.txt')?.priority).toBe(30)
+    expect(byGlob.get('**/*.history.txt')?.entry).toBe('editor-history.html')
+    expect(byGlob.get('**/*.history.txt')?.priority).toBeGreaterThan(0)
     expect(byGlob.get('**/*.repeat.txt')?.priority).toBeGreaterThan(0)
     expect(byGlob.get('**/*.append.txt')?.priority).toBeGreaterThan(0)
     expect(byGlob.get('**/*.neverack.txt')?.priority).toBeGreaterThan(0)

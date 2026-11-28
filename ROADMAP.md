@@ -1022,6 +1022,16 @@ bytes. The deployed evidence is recorded in the change design; the change is
 archived as `2026-11-27-plugin-marketplace` with its deltas synced into the main
 specs.
 
+**Follow-up (2026-11-28):** the post-layer-10 change `plugin-editor-undo-redo`
+adds shell-owned Undo/Redo menu entries, palette commands and shortcuts for
+active writable plugin editors. The shell sends id-less `shell/undo` and
+`shell/redo` intents; the plugin applies them to its own history and reports
+dirty through `plugin/dirty`, while the shell keeps no history, content snapshot
+or `canUndo`/`canRedo` tab state. The reference Monaco plugin and a hidden
+fixture handler cover visible and hidden editors. Shell `0.13.0`, SDK `1.11.0`,
+protocol `1` and manifest schema `1`; no permission or consent change. Deployed
+verification pending.
+
 ---
 
 ## Deferred beyond v1

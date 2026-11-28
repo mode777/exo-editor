@@ -181,6 +181,12 @@
         "priority": 30
       },
       {
+        "glob": "**/*.history.txt",
+        "entry": "editor-history.html",
+        "label": "Fixture History",
+        "priority": 15
+      },
+      {
         "glob": "**/*.repeat.txt",
         "entry": "editor-repeat.html",
         "label": "Fixture Repeat",

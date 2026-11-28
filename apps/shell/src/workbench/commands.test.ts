@@ -8,6 +8,7 @@ const NO_WORKSPACE: CommandContext = {
   hasSelection: false,
   hasActiveDocument: false,
   hasEditorChoice: false,
+  canEditPluginDocument: false,
   remote: false,
   secondaryViewCount: 0,
 }
@@ -24,6 +25,8 @@ function setup(context: CommandContext = NO_WORKSPACE) {
     disconnect: vi.fn(),
     restoreAccess: vi.fn(),
     saveActive: vi.fn(),
+    undoActive: vi.fn(),
+    redoActive: vi.fn(),
     openWith: vi.fn(),
     newFile: vi.fn(),
     newFolder: vi.fn(),
@@ -211,6 +214,7 @@ describe('exo command registry', () => {
       hasSelection: false,
       hasActiveDocument: false,
       hasEditorChoice: false,
+      canEditPluginDocument: false,
       remote: false,
       secondaryViewCount: 0,
     })
@@ -232,6 +236,7 @@ describe('exo command registry', () => {
       hasSelection: true,
       hasActiveDocument: true,
       hasEditorChoice: false,
+      canEditPluginDocument: false,
       remote: false,
       secondaryViewCount: 0,
     })
@@ -239,6 +244,39 @@ describe('exo command registry', () => {
     expect(selectedIds).toEqual(
       expect.arrayContaining(['exo.explorer.rename', 'exo.explorer.delete', 'exo.file.save']),
     )
+  })
+
+  it('offers undo and redo only for an editable plugin document', () => {
+    const editable = setup({
+      hasWorkspace: true,
+      writable: true,
+      hasSelection: false,
+      hasActiveDocument: true,
+      hasEditorChoice: false,
+      canEditPluginDocument: true,
+      remote: false,
+      secondaryViewCount: 0,
+    })
+    const ids = editable.registry.list().map((command) => command.id)
+    expect(ids).toEqual(expect.arrayContaining(['exo.edit.undo', 'exo.edit.redo']))
+    expect(editable.registry.run('exo.edit.undo')).toBe(true)
+    expect(editable.handlers.undoActive).toHaveBeenCalledOnce()
+    expect(editable.registry.run('exo.edit.redo')).toBe(true)
+    expect(editable.handlers.redoActive).toHaveBeenCalledOnce()
+
+    const text = setup({
+      hasWorkspace: true,
+      writable: true,
+      hasSelection: false,
+      hasActiveDocument: true,
+      hasEditorChoice: false,
+      canEditPluginDocument: false,
+      remote: false,
+      secondaryViewCount: 0,
+    })
+    expect(text.registry.list().map((command) => command.id)).not.toContain('exo.edit.undo')
+    expect(text.registry.run('exo.edit.undo')).toBe(false)
+    expect(text.handlers.undoActive).not.toHaveBeenCalled()
   })
 
   it('runs collapse folders only with a workspace', () => {
@@ -252,6 +290,7 @@ describe('exo command registry', () => {
       hasSelection: false,
       hasActiveDocument: false,
       hasEditorChoice: false,
+      canEditPluginDocument: false,
       remote: false,
       secondaryViewCount: 0,
     })
@@ -266,6 +305,7 @@ describe('exo command registry', () => {
       hasSelection: false,
       hasActiveDocument: false,
       hasEditorChoice: false,
+      canEditPluginDocument: false,
       remote: false,
       secondaryViewCount: 0,
     })
@@ -279,6 +319,7 @@ describe('exo command registry', () => {
       hasSelection: false,
       hasActiveDocument: false,
       hasEditorChoice: false,
+      canEditPluginDocument: false,
       remote: false,
       secondaryViewCount: 0,
     })

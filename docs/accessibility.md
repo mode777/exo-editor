@@ -153,6 +153,13 @@ Run against the deployed URL with the demo workspace from
     clipped. With a feed error, confirm the error is announced and the Retry
     button is reachable while installed rows still work. With no workspace, the
     install actions are disabled and the explanation is announced.
+13. With a plugin-backed document active, open the Edit menu with the keyboard.
+    Undo and Redo are announced with their shortcut labels and Escape closes the
+    menu without invoking them. Invoke Undo and Redo and confirm focus stays in
+    the shell and the tab dirty state follows the plugin's report. Repeat with
+    `Ctrl/Cmd+Z`, `Ctrl/Cmd+Shift+Z` and `Ctrl/Cmd+Y`; confirm the shell text
+    editor still uses its native undo and the palette lists Undo and Redo only
+    for a writable plugin document.
 
 ## Known limitations
 

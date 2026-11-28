@@ -88,6 +88,15 @@ describe('code plugin protocol code', () => {
     expect(source).toContain('!dirty || !client.capabilities.write')
   })
 
+  it('routes shell undo and redo through Monaco history', () => {
+    const source = read('src/editor.ts')
+    expect(source).toContain('client.onUndoRequest')
+    expect(source).toContain("editor.trigger('exo', 'undo', null)")
+    expect(source).toContain('client.onRedoRequest')
+    expect(source).toContain("editor.trigger('exo', 'redo', null)")
+    expect(source).toContain('isDirty(savedText, model.getValue())')
+  })
+
   it('never constructs save content outside the shell request', () => {
     const source = read('src/editor.ts')
     expect(source).not.toContain('plugin/save-content')

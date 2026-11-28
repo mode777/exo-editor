@@ -73,6 +73,11 @@ instance plus the session echo, not the origin string.
 - Save intent: `plugin/request-save` is an id-less notification that the user
   wants to save. It carries no content and no version; the normal shell-initiated
   round trip still does the write.
+- Undo/redo: `shell/undo` and `shell/redo` are id-less shell notifications.
+  Apply each to your own history and report the resulting dirty state. They carry
+  no content and expect no reply; the shell keeps no history or availability
+  state. A visible editor must also bind the keys inside its own frame, because
+  keyboard events there do not reach the shell.
 - External change: `shell/file-changed` tells the handler that the file changed,
   was deleted or was renamed. Do not silently replace a dirty buffer; the shell
   also owns its own notice.

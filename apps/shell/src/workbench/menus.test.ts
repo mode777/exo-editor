@@ -14,6 +14,8 @@ function createHandlers(): ExoCommandHandlers {
     disconnect: vi.fn(),
     restoreAccess: vi.fn(),
     saveActive: vi.fn(),
+    undoActive: vi.fn(),
+    redoActive: vi.fn(),
     openWith: vi.fn(),
     newFile: vi.fn(),
     newFolder: vi.fn(),
@@ -41,6 +43,15 @@ describe('workbench menus', () => {
       label: 'Connect Remote Workspace…',
       commandId: 'exo.workspace.connectRemote',
     })
+  })
+
+  it('offers Undo and Redo in the Edit menu', () => {
+    const edit = workbenchMenus.find((entry) => entry.id === 'edit')
+    expect(edit?.label).toBe('Edit')
+    expect(edit?.entries).toEqual([
+      { label: 'Undo', commandId: 'exo.edit.undo', keybinding: 'Ctrl+Z' },
+      { label: 'Redo', commandId: 'exo.edit.redo', keybinding: 'Ctrl+Shift+Z' },
+    ])
   })
 
   it('offers Extensions and plugin debugging', () => {

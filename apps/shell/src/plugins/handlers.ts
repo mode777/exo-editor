@@ -461,6 +461,16 @@ export class HandlerPool {
     return record.session.requestSave()
   }
 
+  /** Send the id-less undo intent to the handler for one document path. */
+  undo(path: WorkspacePath): boolean {
+    return this.records.get(path)?.session.requestUndo() ?? false
+  }
+
+  /** Send the id-less redo intent to the handler for one document path. */
+  redo(path: WorkspacePath): boolean {
+    return this.records.get(path)?.session.requestRedo() ?? false
+  }
+
   completeSave(path: WorkspacePath, result: HandlerSaveCompletion): void {
     const record = this.records.get(path)
     if (!record) return

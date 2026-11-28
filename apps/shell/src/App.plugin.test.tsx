@@ -1,7 +1,7 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { useWorkbenchStore } from 'vscode-workbench'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from './App'
 import { WorkspaceRuntime } from './workspace/runtime'
 import { MemoryWorkspaceProvider } from './workspace/providers/memory'
@@ -39,6 +39,9 @@ class FakePool implements DocumentEditorHost {
   saveContent = 'edited'
   baseVersion = ''
   seq = 0
+  handler: { active: boolean; instanceId: string } | undefined
+  undo = vi.fn(() => true)
+  redo = vi.fn(() => true)
   surfaces = new Map<WorkspacePath, HTMLElement | null>()
 
   candidates(): EditorCandidate[] {
@@ -71,8 +74,8 @@ class FakePool implements DocumentEditorHost {
   dirtySequence(): number {
     return this.seq
   }
-  get(): undefined {
-    return undefined
+  get() {
+    return this.handler as never
   }
   attach(): void {}
   async detach(): Promise<void> {}
@@ -141,6 +144,46 @@ describe('plugin document surface', () => {
     expect(workspace.container.querySelector('.exo-document-editor')).toBeNull()
     expect(workspace.container.querySelector('.exo-plugin-surface')).toBeNull()
     expect(workspace.container.textContent).toContain('Opened with Code')
+  })
+
+  it('routes undo and redo keyboard gestures through the active plugin handler', async () => {
+    workspace.editors.handler = { active: true, instanceId: 'editor-1' }
+    await act(async () => workspace.runtime.openDocument('/a.txt'))
+    await activate(workspace)
+    const press = (key: string, options: KeyboardEventInit = {}) =>
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key,
+          ctrlKey: true,
+          bubbles: true,
+          cancelable: true,
+          ...options,
+        }),
+      )
+
+    press('z')
+    expect(workspace.editors.undo).toHaveBeenCalledOnce()
+    press('Z', { shiftKey: true })
+    expect(workspace.editors.redo).toHaveBeenCalledOnce()
+    press('y')
+    expect(workspace.editors.redo).toHaveBeenCalledTimes(2)
+
+    const input = document.createElement('input')
+    document.body.appendChild(input)
+    input.focus()
+    input.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true }),
+    )
+    expect(workspace.editors.undo).toHaveBeenCalledOnce()
+    input.remove()
+
+    const modal = document.createElement('div')
+    modal.setAttribute('role', 'dialog')
+    modal.setAttribute('aria-modal', 'true')
+    document.body.appendChild(modal)
+    press('z')
+    expect(workspace.editors.undo).toHaveBeenCalledOnce()
+    modal.remove()
   })
 
   it('reserves a document-area slot for a frame contribution', async () => {

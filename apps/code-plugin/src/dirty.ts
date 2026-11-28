@@ -1,7 +1,4 @@
-/** A save clears dirty only when no model change happened after the request. */
-export function shouldClearDirty(
-  savedGeneration: number | null,
-  currentGeneration: number,
-): boolean {
-  return savedGeneration !== null && savedGeneration === currentGeneration
+/** The model is dirty only while its text differs from the last saved text. */
+export function isDirty(savedText: string, currentText: string): boolean {
+  return currentText !== savedText
 }

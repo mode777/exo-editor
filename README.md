@@ -45,7 +45,9 @@ the bottom panel location and the targeted `editor/active` event (SDK `1.10.0`);
 primary, secondary and bottom regions (SDK unchanged); `0.12.0` adds
 deployment-scoped marketplace discovery, the Extensions activity-bar view,
 install-by-URL and a shell-owned extension details tab, with plugin management
-moved out of Settings (SDK unchanged).
+moved out of Settings (SDK unchanged); `0.13.0` adds shell-owned Undo/Redo menu,
+palette and shortcut commands for active writable plugin editors, using id-less
+`shell/undo`/`shell/redo` intents (SDK `1.11.0`).
 Panels mount lazily and content views open as read-only tabs; both are
 user-invoked and excluded from the consent fingerprint.
 

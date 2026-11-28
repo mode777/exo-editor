@@ -122,7 +122,7 @@ function handler(instanceId: string) {
   return { active: true, instanceId } as never
 }
 
-async function createRuntime() {
+async function createRuntime(options: { writable?: boolean } = {}) {
   const events = new EventBus()
   const handlerPool = new HandlerPool({
     transport: new FakeFrameTransport(),
@@ -132,7 +132,12 @@ async function createRuntime() {
     createSessionId: () => 'handler-1',
   })
   const runtime = new WorkspaceRuntime({
-    providerFactory: () => new MemoryWorkspaceProvider({ now: () => 1, initialFiles: {} }),
+    providerFactory: () =>
+      new MemoryWorkspaceProvider({
+        now: () => 1,
+        initialFiles: {},
+        writable: options.writable ?? true,
+      }),
     supportsFolder: () => true,
     handleStore: new MemoryHandleStore(),
     eventTarget: new EventTarget(),
@@ -537,5 +542,80 @@ describe('runtime active editor context', () => {
     await runtime.openFolder()
     expect(useWorkbenchStore.getState().secondarySideBarVisible).toBe(false)
     runtime.dispose()
+  })
+
+  it('routes undo and redo only for an active writable plugin document', async () => {
+    const runtime = await createRuntime()
+    const documents = vi.spyOn(runtime.documents, 'get')
+    const handlers = vi.spyOn(runtime.handlers, 'get')
+    const undo = vi.spyOn(runtime.handlers, 'undo').mockReturnValue(true)
+    const redo = vi.spyOn(runtime.handlers, 'redo').mockReturnValue(true)
+
+    useWorkbenchStore.setState({ tabs: [fileTab('/a.txt')], activeTabId: '/a.txt' })
+    documents.mockReturnValue(documentFor('/a.txt'))
+    handlers.mockReturnValue(handler('editor-1'))
+    runtime.setActiveTab('/a.txt')
+
+    expect(runtime.canEditActivePluginDocument()).toBe(true)
+    expect(runtime.undoActiveDocument()).toBe(true)
+    expect(undo).toHaveBeenCalledWith('/a.txt')
+    expect(runtime.redoActiveDocument()).toBe(true)
+    expect(redo).toHaveBeenCalledWith('/a.txt')
+
+    undo.mockClear()
+    documents.mockReturnValue(documentFor('/a.txt', { readOnly: true }))
+    expect(runtime.undoActiveDocument()).toBe(false)
+    expect(undo).not.toHaveBeenCalled()
+
+    const document = documentFor('/a.txt')
+    documents.mockReturnValue({
+      ...document,
+      editor: document.editor ? { ...document.editor, canWrite: false } : undefined,
+    })
+    expect(runtime.undoActiveDocument()).toBe(false)
+
+    documents.mockReturnValue(documentFor('/a.txt', { pluginPhase: 'mounting' }))
+    expect(runtime.undoActiveDocument()).toBe(false)
+
+    documents.mockReturnValue(
+      documentFor('/plain.md', { surface: 'text', editor: undefined, pluginPhase: undefined }),
+    )
+    useWorkbenchStore.setState({ tabs: [fileTab('/plain.md')], activeTabId: '/plain.md' })
+    expect(runtime.undoActiveDocument()).toBe(false)
+
+    useWorkbenchStore.setState({ tabs: [], activeTabId: null })
+    expect(runtime.undoActiveDocument()).toBe(false)
+
+    handlers.mockReturnValue({ active: false, instanceId: 'editor-1' } as never)
+    documents.mockReturnValue(documentFor('/a.txt'))
+    useWorkbenchStore.setState({ tabs: [fileTab('/a.txt')], activeTabId: '/a.txt' })
+    expect(runtime.undoActiveDocument()).toBe(false)
+
+    handlers.mockReturnValue(handler('editor-2'))
+    documents.mockImplementation((path) => documentFor(path))
+    useWorkbenchStore.setState({
+      tabs: [fileTab('/a.txt'), fileTab('/b.txt')],
+      activeTabId: '/b.txt',
+    })
+    undo.mockClear()
+    expect(runtime.undoActiveDocument()).toBe(true)
+    expect(undo).toHaveBeenCalledWith('/b.txt')
+
+    await runtime.disconnect()
+    expect(runtime.undoActiveDocument()).toBe(false)
+
+    const readOnlyRuntime = await createRuntime({ writable: false })
+    const readOnlyDocuments = vi.spyOn(readOnlyRuntime.documents, 'get')
+    const readOnlyHandlers = vi.spyOn(readOnlyRuntime.handlers, 'get')
+    const readOnlyUndo = vi.spyOn(readOnlyRuntime.handlers, 'undo').mockReturnValue(true)
+    useWorkbenchStore.setState({ tabs: [fileTab('/a.txt')], activeTabId: '/a.txt' })
+    readOnlyDocuments.mockReturnValue(documentFor('/a.txt'))
+    readOnlyHandlers.mockReturnValue(handler('editor-1'))
+    expect(readOnlyRuntime.canEditActivePluginDocument()).toBe(false)
+    expect(readOnlyRuntime.undoActiveDocument()).toBe(false)
+    expect(readOnlyUndo).not.toHaveBeenCalled()
+    await readOnlyRuntime.dispose()
+
+    await runtime.dispose()
   })
 })

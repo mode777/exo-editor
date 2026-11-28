@@ -22,6 +22,14 @@ export const workbenchMenus: MenuDefinition[] = [
     ],
   },
   {
+    id: 'edit',
+    label: 'Edit',
+    entries: [
+      { label: 'Undo', commandId: 'exo.edit.undo', keybinding: 'Ctrl+Z' },
+      { label: 'Redo', commandId: 'exo.edit.redo', keybinding: 'Ctrl+Shift+Z' },
+    ],
+  },
+  {
     id: 'view',
     label: 'View',
     entries: [

@@ -74,7 +74,13 @@ the **Extensions** activity-bar view, install by URL, a shell-owned details tab
 and the move of plugin management out of Settings into a **Plugin debugging**
 section. Install writes one manifest URL to `exo.json` and still follows the
 normal validation and consent path; shell `0.12.0`, marketplace feed schema `1`,
-protocol `1`, manifest schema `1` and SDK `1.10.0`. The authoritative feed is
+protocol `1`, manifest schema `1` and SDK `1.10.0`. The post-layer-10 change
+`plugin-editor-undo-redo` adds shell-owned Undo/Redo menu entries, palette
+commands and shortcuts for active writable plugin editors. The shell sends
+id-less `shell/undo`/`shell/redo` intents, the plugin applies them to its own
+history and reports dirty, and the shell keeps no history or `canUndo` tab
+state; shell `0.13.0`, protocol `1`, manifest schema `1` and SDK `1.11.0`. The
+authoritative feed is
 `https://mode777.github.io/exo-editor/marketplace.json`. The parallel Stratofold provider track
 (P1-P3) is archived and verified; it does not gate the numbered layers. The
 contracts are ratified, and the shell app (`apps/shell`) builds, tests and

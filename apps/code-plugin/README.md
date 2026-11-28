@@ -48,6 +48,10 @@ storage and its workers are bundled inline, so the surface still works.
 - Reports dirty state, answers the shell's save request with the current model
   text, keeps failed saves dirty and follows external changes without silently
   replacing a dirty buffer.
+- Applies the shell's id-less `shell/undo` and `shell/redo` intents through
+  Monaco's own history. Dirty is the model's saved-text comparison, so undoing
+  back to the saved text clears the tab. Monaco keeps its native in-frame
+  shortcuts; the shell menu and palette cover the focused-shell case.
 - Applies the initial shell theme and follows `theme/changed` through the SDK
   `followTheme` helper; the surrounding page uses the SDK `--exo-*` tokens.
 - Refuses files above 5 MiB (or a lower shell limit) without reading them.
@@ -72,20 +76,24 @@ model after keyboard and save checks.
 3. Edit and save each file with Ctrl/Cmd+S and with File > Save;
    reload and confirm the text survives. The tab's dirty dot clears on a
    successful save and stays set after a conflict.
-4. Change the shell theme and confirm Monaco follows without reopening the file.
-5. Switch tabs and return. The editor keeps its session and content; it is not
+4. Edit the file, then use Edit > Undo, the palette and `Ctrl/Cmd+Z`. The model
+   reverts, the tab dot follows the saved-text comparison, and Redo reapplies
+   the edit. The same shortcuts inside Monaco keep working without a second
+   undo.
+5. Change the shell theme and confirm Monaco follows without reopening the file.
+6. Switch tabs and return. The editor keeps its session and content; it is not
    remounted by the tab switch.
-6. Disable the plugin in settings. Matching files fall back to the shell text
+7. Disable the plugin in settings. Matching files fall back to the shell text
    renderer and no plugin frame remains.
 
 ## Files
 
-| Path                       | Purpose                                                              |
-| -------------------------- | -------------------------------------------------------------------- |
-| `plugin.html`              | Registration controller                                              |
-| `editor.html`              | Visible Monaco handler page                                          |
-| `src/controller.ts`        | SDK-only registration of the four globs                              |
-| `src/editor.ts`            | Monaco setup, workers, dirty/save/external-change and theme handling |
-| `src/editor.css`           | Page chrome using the SDK `--exo-*` theme tokens                     |
-| `src/languages.ts`         | Extension, theme and large-file helpers                              |
-| `public/exo-manifest.json` | Plugin manifest; pages resolve inside the deployed child path        |
+| Path                       | Purpose                                                                         |
+| -------------------------- | ------------------------------------------------------------------------------- |
+| `plugin.html`              | Registration controller                                                         |
+| `editor.html`              | Visible Monaco handler page                                                     |
+| `src/controller.ts`        | SDK-only registration of the four globs                                         |
+| `src/editor.ts`            | Monaco setup, workers, undo/redo, dirty/save/external-change and theme handling |
+| `src/editor.css`           | Page chrome using the SDK `--exo-*` theme tokens                                |
+| `src/languages.ts`         | Extension, theme and large-file helpers                                         |
+| `public/exo-manifest.json` | Plugin manifest; pages resolve inside the deployed child path                   |
