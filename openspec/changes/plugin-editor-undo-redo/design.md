@@ -221,6 +221,23 @@ record or manifest changes with this feature.
 
 ## Deployed Verification
 
-Pending. Record the deployed commit, date, fixture URLs and observations
-(menu, palette, shortcuts, hidden handler, text surface and dirty transition)
-during apply.
+Verified on 2026-11-28 against deployed commit `0577aeb` at
+`https://mode777.github.io/exo-editor/` (asset `index-BtRN9Y2v.js`) with
+`chrome-headless-shell` 131.0.6778.264 at 1440x900 on the reference verification
+server. The workspace was an OPFS directory exposed through the
+`showDirectoryPicker` stub, containing `notes.history.txt`, `hello.ts` and
+`plain.log`, with the deployed fixture and code-plugin manifests in `exo.json`.
+The shell and plugin assets were cache-busted to the deployed commit.
+
+| Check | Observation |
+| --- | --- |
+| Hidden fixture history | `notes.history.txt` applied one local edit and reported dirty. Ctrl/Cmd+Z while the shell owned focus restored the saved text, reported `dirty: false` and cleared the tab dot. Ctrl+Shift+Z and Ctrl+Y re-dirtied it. The frame's `#observation` recorded each intent and buffer. |
+| Edit menu | The new Edit menu listed **Undo** (`Ctrl+Z`) and **Redo** (`Ctrl+Shift+Z`). Choosing Undo through the menu item restored the saved text and cleared dirty. |
+| Palette | The palette listed Redo for the hidden handler and invoking it re-dirtied the buffer. It listed no Undo or Redo for the shell text surface or the read-only fixture. |
+| Code plugin | Typing dirtied the Monaco model. In-frame Ctrl/Cmd+Z (Monaco focus) reverted the edit and cleared dirty. A second edit undone with the shell shortcut while the File menu button owned focus reverted the model through `shell/undo`; Ctrl+Y applied `shell/redo` and re-dirtied it. |
+| Shell text surface | Ctrl/Cmd+Z in `plain.log` used the textarea's native undo and restored the text. The palette listed no shell Undo or Redo command. |
+| Read-only fixture | With `readonly-manifest.json`, the palette listed no Undo, and the shortcut left the tab's dirty state unchanged. |
+| Errors and budget | No page or console errors. The deployed build used the CI budget result of 184,665/186,000 JS and 14,456/14,600 CSS gzip bytes. |
+
+The verification script is at `/home/devuser/exo-verify/verify-undo-redo.cjs` on
+the reference verification server and was run with `EXO_COMMIT=0577aeb`.

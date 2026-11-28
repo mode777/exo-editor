@@ -41,8 +41,8 @@
 ## 7. Integration and deployment
 
 - [x] 7.1 Run the full CI gate locally as a development aid: `npm ci`, `npm run lint`, `npm run format:check`, `npm run typecheck`, `npm test`, `npm run build`, the bundle budget, CSP/elements/no-sdk/no-monaco checks, template/code builds and copies, marketplace checks and the secrets check; resolve every failure before pushing.
-- [ ] 7.2 Push `main`, wait for the CI `verify` job and Pages deploy, then verify on `https://mode777.github.io/exo-editor/`: the code plugin's menu, palette and shortcut undo/redo with the saved-text dirty transition; the hidden fixture `.history.txt` handler with the same surfaces; the text surface's native undo and hidden palette entries; the read-only fixture's no-op; no console errors and the bundle budget.
-- [ ] 7.3 Record the deployed commit, date, fixture URL and observations in the design's Deployed Verification section; verify `openspec validate --all` passes.
+- [x] 7.2 Push `main`, wait for the CI `verify` job and Pages deploy, then verify on `https://mode777.github.io/exo-editor/`: the code plugin's menu, palette and shortcut undo/redo with the saved-text dirty transition; the hidden fixture `.history.txt` handler with the same surfaces; the text surface's native undo and hidden palette entries; the read-only fixture's no-op; no console errors and the bundle budget.
+- [x] 7.3 Record the deployed commit, date, fixture URL and observations in the design's Deployed Verification section; verify `openspec validate --all` passes.
 
 ## Workflow follow-up
 

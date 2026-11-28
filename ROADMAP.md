@@ -1029,8 +1029,15 @@ active writable plugin editors. The shell sends id-less `shell/undo` and
 dirty through `plugin/dirty`, while the shell keeps no history, content snapshot
 or `canUndo`/`canRedo` tab state. The reference Monaco plugin and a hidden
 fixture handler cover visible and hidden editors. Shell `0.13.0`, SDK `1.11.0`,
-protocol `1` and manifest schema `1`; no permission or consent change. Deployed
-verification pending.
+protocol `1` and manifest schema `1`; no permission or consent change. Verified
+against deployed commit `0577aeb` (asset `index-BtRN9Y2v.js`) on 2026-11-28 with
+`chrome-headless-shell` 131: the hidden `notes.history.txt` handler and the
+Monaco editor took menu, palette and shortcut undo/redo, dirty followed the
+saved-text comparison, the shell textarea kept native undo, the read-only
+fixture offered no command, no console errors occurred and the bundle stayed
+within 184,665/186,000 JS and 14,456/14,600 CSS gzip bytes. The change is ready
+to archive as `2026-11-28-plugin-editor-undo-redo` with its deltas synced into
+the main specs.
 
 ---
 
